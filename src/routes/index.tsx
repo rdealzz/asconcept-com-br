@@ -3,6 +3,8 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Search, User as UserIcon, ShoppingBag, X, Plus, Minus, LogOut } from "lucide-react";
 import { CartProvider, useCart, formatBRL, type Product } from "@/lib/cart-context";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
+import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 
 import hero from "@/assets/hero.jpg";
 import editorial from "@/assets/editorial.jpg";
@@ -21,6 +23,9 @@ export const Route = createFileRoute("/")({
 
 const SIZES = ["P", "M", "G", "GG"] as const;
 
+// A galeria de cada produto contém APENAS imagens da mesma peça
+// (a foto principal por enquanto — variações de ângulo/detalhe podem ser
+// adicionadas depois sem misturar produtos diferentes).
 const PRODUCTS: Product[] = [
   {
     id: "1",
@@ -30,7 +35,7 @@ const PRODUCTS: Product[] = [
       "Confeccionada em linho italiano de fio longo, a camisa Cornwall combina caimento fluido com detalhes artesanais. Botões de madrepérola natural, pespontos internos e barra levemente arredondada. Ideal para as manhãs de sol e noites à beira-mar.",
     price: 1590,
     image: p1,
-    gallery: [p1, p2, p7],
+    gallery: [p1],
   },
   {
     id: "2",
@@ -40,7 +45,7 @@ const PRODUCTS: Product[] = [
       "Tricô fino em cashmere mongol grade A, com toque sedoso e caimento estruturado. Gola careca ribana, punhos e barra em canelado clássico. Uma peça atemporal para o guarda-roupa perene.",
     price: 3290,
     image: p2,
-    gallery: [p2, p3, p4],
+    gallery: [p2],
   },
   {
     id: "3",
@@ -50,7 +55,7 @@ const PRODUCTS: Product[] = [
       "Alfaiataria napolitana em lã super 120, com lapela pico, ombro natural e forro em cupro. Bolsos flap com lenço interno, três botões forrados. Uma releitura contemporânea do blazer clássico.",
     price: 7890,
     image: p3,
-    gallery: [p3, p1, p6],
+    gallery: [p3],
   },
   {
     id: "4",
@@ -60,7 +65,7 @@ const PRODUCTS: Product[] = [
       "Cintura alta com pregas duplas, corte reto e caimento fluido. Confeccionada em crepe de lã fresca, com bolsos italianos e fivela lateral discreta.",
     price: 2590,
     image: p4,
-    gallery: [p4, p1, p7],
+    gallery: [p4],
   },
   {
     id: "5",
@@ -70,7 +75,7 @@ const PRODUCTS: Product[] = [
       "Sarja de seda 100% italiana, estampada digitalmente em Como e finalizada com bainha rolada à mão. Um acessório versátil para elevar qualquer conjunto.",
     price: 1850,
     image: p5,
-    gallery: [p5, p2, p8],
+    gallery: [p5],
   },
   {
     id: "6",
@@ -80,7 +85,7 @@ const PRODUCTS: Product[] = [
       "Mocassim penny loafer em couro de bezerro full-grain, montagem Blake e solado em couro. Forro interno em pelica e detalhe metálico discreto. Costura à mão por artesãos italianos.",
     price: 4290,
     image: p6,
-    gallery: [p6, p3, p4],
+    gallery: [p6],
   },
   {
     id: "7",
@@ -90,7 +95,7 @@ const PRODUCTS: Product[] = [
       "Malha piquê em algodão egípcio de fibra longa, com padronagem trançada exclusiva. Gola e punhos em canelado, botões de madrepérola.",
     price: 2190,
     image: p7,
-    gallery: [p7, p1, p2],
+    gallery: [p7],
   },
   {
     id: "8",
@@ -100,7 +105,7 @@ const PRODUCTS: Product[] = [
       "Lenço de bolso em seda dobrada doze vezes à mão, com bainha em contraste marfim. O toque final de sofisticação para o blazer.",
     price: 790,
     image: p8,
-    gallery: [p8, p3, p5],
+    gallery: [p8],
   },
 ];
 
@@ -414,8 +419,12 @@ function ProductModal() {
                 Adicionar à Sacola
               </button>
 
+              <div className="mt-8">
+                <ShippingCalculator subtotal={active.price} />
+              </div>
+
               <div className="mt-8 space-y-2 border-t border-border pt-6 text-xs font-light text-muted-foreground">
-                <p>Entrega expressa gratuita para pedidos acima de R$ 2.000.</p>
+                <p>Frete grátis em pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}.</p>
                 <p>Trocas e ajustes cortesia em até 30 dias.</p>
               </div>
             </div>
@@ -633,49 +642,57 @@ function CartDrawer() {
               </button>
             </div>
           ) : (
-            <ul className="space-y-6">
-              {items.map((i) => (
-                <li
-                  key={`${i.id}-${i.size}`}
-                  className="flex gap-4 border-b border-border pb-6 last:border-0"
-                >
-                  <img src={i.image} alt={i.name} className="h-28 w-20 object-cover" />
-                  <div className="flex flex-1 flex-col">
-                    <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-serif text-base leading-tight">{i.name}</h4>
-                      <button
-                        onClick={() => remove(i.id, i.size)}
-                        aria-label="Remover"
-                        className="text-muted-foreground hover:text-accent"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    <p className="mt-1 text-[11px] text-muted-foreground">Tamanho {i.size}</p>
-                    <div className="mt-auto flex items-center justify-between">
-                      <div className="flex items-center border border-border">
+            <>
+              <div className="mb-6 rounded-sm border border-border/60 bg-secondary/40 p-4">
+                <FreeShippingHint subtotal={subtotal} />
+              </div>
+              <ul className="space-y-6">
+                {items.map((i) => (
+                  <li
+                    key={`${i.id}-${i.size}`}
+                    className="flex gap-4 border-b border-border pb-6 last:border-0"
+                  >
+                    <img src={i.image} alt={i.name} className="h-28 w-20 object-cover" />
+                    <div className="flex flex-1 flex-col">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-serif text-base leading-tight">{i.name}</h4>
                         <button
-                          onClick={() => updateQty(i.id, i.size, -1)}
-                          aria-label="Diminuir"
-                          className="flex h-8 w-8 items-center justify-center hover:bg-secondary transition-colors"
+                          onClick={() => remove(i.id, i.size)}
+                          aria-label="Remover"
+                          className="text-muted-foreground hover:text-accent"
                         >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                        <span className="w-8 text-center text-sm tabular-nums">{i.qty}</span>
-                        <button
-                          onClick={() => updateQty(i.id, i.size, 1)}
-                          aria-label="Aumentar"
-                          className="flex h-8 w-8 items-center justify-center hover:bg-secondary transition-colors"
-                        >
-                          <Plus className="h-3 w-3" />
+                          <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                      <span className="text-sm tabular-nums">{formatBRL(i.price * i.qty)}</span>
+                      <p className="mt-1 text-[11px] text-muted-foreground">Tamanho {i.size}</p>
+                      <div className="mt-auto flex items-center justify-between">
+                        <div className="flex items-center border border-border">
+                          <button
+                            onClick={() => updateQty(i.id, i.size, -1)}
+                            aria-label="Diminuir"
+                            className="flex h-8 w-8 items-center justify-center hover:bg-secondary transition-colors"
+                          >
+                            <Minus className="h-3 w-3" />
+                          </button>
+                          <span className="w-8 text-center text-sm tabular-nums">{i.qty}</span>
+                          <button
+                            onClick={() => updateQty(i.id, i.size, 1)}
+                            aria-label="Aumentar"
+                            className="flex h-8 w-8 items-center justify-center hover:bg-secondary transition-colors"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        </div>
+                        <span className="text-sm tabular-nums">{formatBRL(i.price * i.qty)}</span>
+                      </div>
                     </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8">
+                <ShippingCalculator subtotal={subtotal} />
+              </div>
+            </>
           )}
         </div>
 
@@ -688,8 +705,8 @@ function CartDrawer() {
               <span className="font-serif text-xl tabular-nums">{formatBRL(subtotal)}</span>
             </div>
             <p className="text-[11px] font-light text-muted-foreground">
-              Frete e impostos calculados no checkout. Entrega expressa cortesia em pedidos acima de
-              R$ 2.000.
+              Frete grátis para pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}. Impostos
+              calculados no checkout.
             </p>
             {checkoutMsg && (
               <p className="text-[11px] text-accent">{checkoutMsg}</p>
