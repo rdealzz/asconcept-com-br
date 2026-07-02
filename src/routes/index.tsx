@@ -21,6 +21,9 @@ export const Route = createFileRoute("/")({
 
 const SIZES = ["P", "M", "G", "GG"] as const;
 
+// A galeria de cada produto contém APENAS imagens da mesma peça
+// (a foto principal por enquanto — variações de ângulo/detalhe podem ser
+// adicionadas depois sem misturar produtos diferentes).
 const PRODUCTS: Product[] = [
   {
     id: "1",
@@ -30,7 +33,7 @@ const PRODUCTS: Product[] = [
       "Confeccionada em linho italiano de fio longo, a camisa Cornwall combina caimento fluido com detalhes artesanais. Botões de madrepérola natural, pespontos internos e barra levemente arredondada. Ideal para as manhãs de sol e noites à beira-mar.",
     price: 1590,
     image: p1,
-    gallery: [p1, p2, p7],
+    gallery: [p1],
   },
   {
     id: "2",
@@ -40,7 +43,7 @@ const PRODUCTS: Product[] = [
       "Tricô fino em cashmere mongol grade A, com toque sedoso e caimento estruturado. Gola careca ribana, punhos e barra em canelado clássico. Uma peça atemporal para o guarda-roupa perene.",
     price: 3290,
     image: p2,
-    gallery: [p2, p3, p4],
+    gallery: [p2],
   },
   {
     id: "3",
@@ -50,7 +53,7 @@ const PRODUCTS: Product[] = [
       "Alfaiataria napolitana em lã super 120, com lapela pico, ombro natural e forro em cupro. Bolsos flap com lenço interno, três botões forrados. Uma releitura contemporânea do blazer clássico.",
     price: 7890,
     image: p3,
-    gallery: [p3, p1, p6],
+    gallery: [p3],
   },
   {
     id: "4",
@@ -60,7 +63,7 @@ const PRODUCTS: Product[] = [
       "Cintura alta com pregas duplas, corte reto e caimento fluido. Confeccionada em crepe de lã fresca, com bolsos italianos e fivela lateral discreta.",
     price: 2590,
     image: p4,
-    gallery: [p4, p1, p7],
+    gallery: [p4],
   },
   {
     id: "5",
@@ -70,7 +73,7 @@ const PRODUCTS: Product[] = [
       "Sarja de seda 100% italiana, estampada digitalmente em Como e finalizada com bainha rolada à mão. Um acessório versátil para elevar qualquer conjunto.",
     price: 1850,
     image: p5,
-    gallery: [p5, p2, p8],
+    gallery: [p5],
   },
   {
     id: "6",
@@ -80,7 +83,7 @@ const PRODUCTS: Product[] = [
       "Mocassim penny loafer em couro de bezerro full-grain, montagem Blake e solado em couro. Forro interno em pelica e detalhe metálico discreto. Costura à mão por artesãos italianos.",
     price: 4290,
     image: p6,
-    gallery: [p6, p3, p4],
+    gallery: [p6],
   },
   {
     id: "7",
@@ -90,7 +93,7 @@ const PRODUCTS: Product[] = [
       "Malha piquê em algodão egípcio de fibra longa, com padronagem trançada exclusiva. Gola e punhos em canelado, botões de madrepérola.",
     price: 2190,
     image: p7,
-    gallery: [p7, p1, p2],
+    gallery: [p7],
   },
   {
     id: "8",
@@ -100,7 +103,7 @@ const PRODUCTS: Product[] = [
       "Lenço de bolso em seda dobrada doze vezes à mão, com bainha em contraste marfim. O toque final de sofisticação para o blazer.",
     price: 790,
     image: p8,
-    gallery: [p8, p3, p5],
+    gallery: [p8],
   },
 ];
 
