@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Search, User as UserIcon, ShoppingBag, X, Plus, Minus, LogOut } from "lucide-react";
 import { CartProvider, useCart, formatBRL, type Product } from "@/lib/cart-context";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
