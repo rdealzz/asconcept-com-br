@@ -127,7 +127,6 @@ function Index() {
 }
 
 /* ---------- Product Modal Context ---------- */
-import { createContext, useContext } from "react";
 const ProductCtx = createContext<{
   active: Product | null;
   open: (p: Product) => void;
