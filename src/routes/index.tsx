@@ -647,54 +647,52 @@ function CartDrawer() {
                 <FreeShippingHint subtotal={subtotal} />
               </div>
               <ul className="space-y-6">
-                {/* items list rendered below */}
-              </ul>
-            </>
-          )}
-          {items.length > 0 && (
-            <ul className="space-y-6">
-              {items.map((i) => (
-                <li
-                  key={`${i.id}-${i.size}`}
-                  className="flex gap-4 border-b border-border pb-6 last:border-0"
-                >
-                  <img src={i.image} alt={i.name} className="h-28 w-20 object-cover" />
-                  <div className="flex flex-1 flex-col">
-                    <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-serif text-base leading-tight">{i.name}</h4>
-                      <button
-                        onClick={() => remove(i.id, i.size)}
-                        aria-label="Remover"
-                        className="text-muted-foreground hover:text-accent"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    <p className="mt-1 text-[11px] text-muted-foreground">Tamanho {i.size}</p>
-                    <div className="mt-auto flex items-center justify-between">
-                      <div className="flex items-center border border-border">
+                {items.map((i) => (
+                  <li
+                    key={`${i.id}-${i.size}`}
+                    className="flex gap-4 border-b border-border pb-6 last:border-0"
+                  >
+                    <img src={i.image} alt={i.name} className="h-28 w-20 object-cover" />
+                    <div className="flex flex-1 flex-col">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-serif text-base leading-tight">{i.name}</h4>
                         <button
-                          onClick={() => updateQty(i.id, i.size, -1)}
-                          aria-label="Diminuir"
-                          className="flex h-8 w-8 items-center justify-center hover:bg-secondary transition-colors"
+                          onClick={() => remove(i.id, i.size)}
+                          aria-label="Remover"
+                          className="text-muted-foreground hover:text-accent"
                         >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                        <span className="w-8 text-center text-sm tabular-nums">{i.qty}</span>
-                        <button
-                          onClick={() => updateQty(i.id, i.size, 1)}
-                          aria-label="Aumentar"
-                          className="flex h-8 w-8 items-center justify-center hover:bg-secondary transition-colors"
-                        >
-                          <Plus className="h-3 w-3" />
+                          <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                      <span className="text-sm tabular-nums">{formatBRL(i.price * i.qty)}</span>
+                      <p className="mt-1 text-[11px] text-muted-foreground">Tamanho {i.size}</p>
+                      <div className="mt-auto flex items-center justify-between">
+                        <div className="flex items-center border border-border">
+                          <button
+                            onClick={() => updateQty(i.id, i.size, -1)}
+                            aria-label="Diminuir"
+                            className="flex h-8 w-8 items-center justify-center hover:bg-secondary transition-colors"
+                          >
+                            <Minus className="h-3 w-3" />
+                          </button>
+                          <span className="w-8 text-center text-sm tabular-nums">{i.qty}</span>
+                          <button
+                            onClick={() => updateQty(i.id, i.size, 1)}
+                            aria-label="Aumentar"
+                            className="flex h-8 w-8 items-center justify-center hover:bg-secondary transition-colors"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        </div>
+                        <span className="text-sm tabular-nums">{formatBRL(i.price * i.qty)}</span>
+                      </div>
                     </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8">
+                <ShippingCalculator subtotal={subtotal} />
+              </div>
+            </>
           )}
         </div>
 
