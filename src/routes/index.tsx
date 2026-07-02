@@ -1,6 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { Search, User as UserIcon, ShoppingBag, X, Plus, Minus, LogOut } from "lucide-react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Search,
+  User as UserIcon,
+  ShoppingBag,
+  X,
+  Plus,
+  Minus,
+  LogOut,
+  Shield,
+  Package,
+} from "lucide-react";
 import { CartProvider, useCart, formatBRL, type Product } from "@/lib/cart-context";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
@@ -23,109 +33,101 @@ export const Route = createFileRoute("/")({
 
 const SIZES = ["P", "M", "G", "GG"] as const;
 
-// A galeria de cada produto contém APENAS imagens da mesma peça
-// (a foto principal por enquanto — variações de ângulo/detalhe podem ser
-// adicionadas depois sem misturar produtos diferentes).
 const PRODUCTS: Product[] = [
-  {
-    id: "1",
-    name: "Camisa de Linho Cornwall",
-    description: "Linho italiano acabado à mão. Modelagem relaxada.",
-    longDescription:
-      "Confeccionada em linho italiano de fio longo, a camisa Cornwall combina caimento fluido com detalhes artesanais. Botões de madrepérola natural, pespontos internos e barra levemente arredondada. Ideal para as manhãs de sol e noites à beira-mar.",
-    price: 1590,
-    image: p1,
-    gallery: [p1],
-  },
-  {
-    id: "2",
-    name: "Suéter de Cashmere Kensington",
-    description: "Cashmere puro da Mongólia em azul meia-noite.",
-    longDescription:
-      "Tricô fino em cashmere mongol grade A, com toque sedoso e caimento estruturado. Gola careca ribana, punhos e barra em canelado clássico. Uma peça atemporal para o guarda-roupa perene.",
-    price: 3290,
-    image: p2,
-    gallery: [p2],
-  },
-  {
-    id: "3",
-    name: "Blazer Trespassado Mayfair",
-    description: "Lã com lapela pico, alfaiataria napolitana.",
-    longDescription:
-      "Alfaiataria napolitana em lã super 120, com lapela pico, ombro natural e forro em cupro. Bolsos flap com lenço interno, três botões forrados. Uma releitura contemporânea do blazer clássico.",
-    price: 7890,
-    image: p3,
-    gallery: [p3],
-  },
-  {
-    id: "4",
-    name: "Calça de Prega Windsor",
-    description: "Cintura alta em crepe de lã marfim.",
-    longDescription:
-      "Cintura alta com pregas duplas, corte reto e caimento fluido. Confeccionada em crepe de lã fresca, com bolsos italianos e fivela lateral discreta.",
-    price: 2590,
-    image: p4,
-    gallery: [p4],
-  },
-  {
-    id: "5",
-    name: "Lenço de Seda Saint-Tropez",
-    description: "Twill de seda com bainha rolada à mão, estampado em Como.",
-    longDescription:
-      "Sarja de seda 100% italiana, estampada digitalmente em Como e finalizada com bainha rolada à mão. Um acessório versátil para elevar qualquer conjunto.",
-    price: 1850,
-    image: p5,
-    gallery: [p5],
-  },
-  {
-    id: "6",
-    name: "Mocassim Belgrave",
-    description: "Couro de bezerro costurado Blake, conhaque.",
-    longDescription:
-      "Mocassim penny loafer em couro de bezerro full-grain, montagem Blake e solado em couro. Forro interno em pelica e detalhe metálico discreto. Costura à mão por artesãos italianos.",
-    price: 4290,
-    image: p6,
-    gallery: [p6],
-  },
-  {
-    id: "7",
-    name: "Polo Trançado Hampton",
-    description: "Algodão egípcio com costuras finalizadas à mão.",
-    longDescription:
-      "Malha piquê em algodão egípcio de fibra longa, com padronagem trançada exclusiva. Gola e punhos em canelado, botões de madrepérola.",
-    price: 2190,
-    image: p7,
-    gallery: [p7],
-  },
-  {
-    id: "8",
-    name: "Lenço de Bolso Belgravia",
-    description: "Seda doze dobras, ourela marfim.",
-    longDescription:
-      "Lenço de bolso em seda dobrada doze vezes à mão, com bainha em contraste marfim. O toque final de sofisticação para o blazer.",
-    price: 790,
-    image: p8,
-    gallery: [p8],
-  },
+  { id: "1", name: "Camisa de Linho Cornwall", description: "Linho italiano acabado à mão. Modelagem relaxada.", longDescription: "Confeccionada em linho italiano de fio longo, a camisa Cornwall combina caimento fluido com detalhes artesanais. Botões de madrepérola natural, pespontos internos e barra levemente arredondada.", price: 1590, image: p1, gallery: [p1] },
+  { id: "2", name: "Suéter de Cashmere Kensington", description: "Cashmere puro da Mongólia em azul meia-noite.", longDescription: "Tricô fino em cashmere mongol grade A, com toque sedoso e caimento estruturado. Gola careca ribana, punhos e barra em canelado clássico.", price: 3290, image: p2, gallery: [p2] },
+  { id: "3", name: "Blazer Trespassado Mayfair", description: "Lã com lapela pico, alfaiataria napolitana.", longDescription: "Alfaiataria napolitana em lã super 120, com lapela pico, ombro natural e forro em cupro. Bolsos flap com lenço interno, três botões forrados.", price: 7890, image: p3, gallery: [p3] },
+  { id: "4", name: "Calça de Prega Windsor", description: "Cintura alta em crepe de lã marfim.", longDescription: "Cintura alta com pregas duplas, corte reto e caimento fluido. Confeccionada em crepe de lã fresca, com bolsos italianos e fivela lateral discreta.", price: 2590, image: p4, gallery: [p4] },
+  { id: "5", name: "Lenço de Seda Saint-Tropez", description: "Twill de seda com bainha rolada à mão, estampado em Como.", longDescription: "Sarja de seda 100% italiana, estampada digitalmente em Como e finalizada com bainha rolada à mão.", price: 1850, image: p5, gallery: [p5] },
+  { id: "6", name: "Mocassim Belgrave", description: "Couro de bezerro costurado Blake, conhaque.", longDescription: "Mocassim penny loafer em couro de bezerro full-grain, montagem Blake e solado em couro. Forro interno em pelica.", price: 4290, image: p6, gallery: [p6] },
+  { id: "7", name: "Polo Trançado Hampton", description: "Algodão egípcio com costuras finalizadas à mão.", longDescription: "Malha piquê em algodão egípcio de fibra longa, com padronagem trançada exclusiva.", price: 2190, image: p7, gallery: [p7] },
+  { id: "8", name: "Lenço de Bolso Belgravia", description: "Seda doze dobras, ourela marfim.", longDescription: "Lenço de bolso em seda dobrada doze vezes à mão, com bainha em contraste marfim.", price: 790, image: p8, gallery: [p8] },
 ];
+
+// Simulação de admin: qualquer e-mail que contenha "admin" é tratado como Administrador.
+function useIsAdmin() {
+  const { user } = useAuth();
+  return !!user?.email && /admin/i.test(user.email);
+}
+
+/* ---------- Stock Context ---------- */
+type StockCtx = {
+  stock: Record<string, number>;
+  setStock: (id: string, qty: number) => void;
+  decrement: (id: string, by?: number) => void;
+};
+const StockContext = createContext<StockCtx | null>(null);
+function StockProvider({ children }: { children: React.ReactNode }) {
+  const [stock, setStockMap] = useState<Record<string, number>>(() => {
+    const initial: Record<string, number> = {};
+    PRODUCTS.forEach((p, i) => {
+      // valores variados para demonstrar os badges
+      initial[p.id] = [5, 3, 1, 0, 8, 2, 1, 4][i] ?? 5;
+    });
+    return initial;
+  });
+  const setStock = (id: string, qty: number) =>
+    setStockMap((prev) => ({ ...prev, [id]: Math.max(0, Math.floor(qty)) }));
+  const decrement = (id: string, by = 1) =>
+    setStockMap((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) - by) }));
+  return (
+    <StockContext.Provider value={{ stock, setStock, decrement }}>{children}</StockContext.Provider>
+  );
+}
+function useStock() {
+  const c = useContext(StockContext);
+  if (!c) throw new Error("StockProvider missing");
+  return c;
+}
+
+/* ---------- Search Context ---------- */
+type SearchCtx = {
+  query: string;
+  setQuery: (q: string) => void;
+  isOpen: boolean;
+  open: () => void;
+  close: () => void;
+};
+const SearchContext = createContext<SearchCtx | null>(null);
+function SearchProvider({ children }: { children: React.ReactNode }) {
+  const [query, setQuery] = useState("");
+  const [isOpen, setOpen] = useState(false);
+  return (
+    <SearchContext.Provider
+      value={{ query, setQuery, isOpen, open: () => setOpen(true), close: () => setOpen(false) }}
+    >
+      {children}
+    </SearchContext.Provider>
+  );
+}
+function useSearch() {
+  const c = useContext(SearchContext);
+  if (!c) throw new Error("SearchProvider missing");
+  return c;
+}
 
 function Index() {
   return (
     <AuthProvider>
       <CartProvider>
-        <ProductProvider>
-          <div className="min-h-screen bg-background text-foreground">
-            <Nav />
-            <Hero />
-            <Products />
-            <Concept />
-            <Newsletter />
-            <Footer />
-            <CartDrawer />
-            <ProductModal />
-            <AuthModal />
-          </div>
-        </ProductProvider>
+        <StockProvider>
+          <SearchProvider>
+            <ProductProvider>
+              <div className="min-h-screen bg-background text-foreground">
+                <Nav />
+                <Hero />
+                <Products />
+                <Concept />
+                <Newsletter />
+                <Footer />
+                <CartDrawer />
+                <ProductModal />
+                <AuthModal />
+                <SearchOverlay />
+              </div>
+            </ProductProvider>
+          </SearchProvider>
+        </StockProvider>
       </CartProvider>
     </AuthProvider>
   );
@@ -158,6 +160,8 @@ function useProduct() {
 function Nav() {
   const { open, count } = useCart();
   const { user, openAuth, signOut } = useAuth();
+  const { open: openSearch } = useSearch();
+  const isAdmin = useIsAdmin();
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -181,6 +185,11 @@ function Nav() {
           <a href="#collections" className="hover:text-accent transition-colors">Coleção</a>
           <a href="#edit" className="hover:text-accent transition-colors">O Editorial</a>
           <a href="#about" className="hover:text-accent transition-colors">Sobre</a>
+          {isAdmin && (
+            <span className="inline-flex items-center gap-1.5 border border-accent/60 px-2 py-1 text-accent">
+              <Shield className="h-3 w-3" strokeWidth={1.5} /> Admin
+            </span>
+          )}
         </nav>
         <a
           href="#"
@@ -195,7 +204,11 @@ function Nav() {
             scrolled ? "text-foreground" : "text-ivory"
           }`}
         >
-          <button aria-label="Buscar" className="hover:text-accent transition-colors">
+          <button
+            aria-label="Buscar"
+            onClick={openSearch}
+            className="hover:text-accent transition-colors"
+          >
             <Search className="h-4 w-4" strokeWidth={1.5} />
           </button>
           {user ? (
@@ -274,6 +287,18 @@ function Hero() {
 
 /* ---------- Products ---------- */
 function Products() {
+  const { query, setQuery } = useSearch();
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return PRODUCTS;
+    return PRODUCTS.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q) ||
+        (p.longDescription ?? "").toLowerCase().includes(q),
+    );
+  }, [query]);
+
   return (
     <section id="collections" className="py-28 md:py-40">
       <div className="mx-auto max-w-[1600px] px-6 md:px-12">
@@ -283,33 +308,125 @@ function Products() {
           <p className="mt-6 max-w-xl text-sm md:text-base text-muted-foreground font-light">
             Peças atemporais, produzidas em pequenas séries por ateliês tradicionais europeus.
           </p>
+          {query && (
+            <div className="mt-8 flex items-center gap-3 border border-border px-4 py-2 text-xs">
+              <span className="text-muted-foreground">Buscando por</span>
+              <span className="font-serif italic">“{query}”</span>
+              <button
+                onClick={() => setQuery("")}
+                className="ml-2 text-muted-foreground hover:text-accent"
+                aria-label="Limpar busca"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
         </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-16 md:grid-cols-3 md:gap-x-8 lg:grid-cols-4">
-          {PRODUCTS.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
+
+        {filtered.length === 0 ? (
+          <div className="mx-auto max-w-lg py-16 text-center">
+            <p className="font-serif text-2xl">Nenhum produto encontrado para “{query}”.</p>
+            <p className="mt-4 text-sm text-muted-foreground font-light">
+              Tente outra palavra-chave ou explore a coleção completa.
+            </p>
+            <button
+              onClick={() => setQuery("")}
+              className="mt-8 border border-foreground px-8 py-3 text-[11px] tracking-luxe uppercase transition-colors hover:bg-foreground hover:text-ivory"
+            >
+              Ver toda a coleção
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-16 md:grid-cols-3 md:gap-x-8 lg:grid-cols-4">
+            {filtered.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
 }
 
+function StockBadge({ qty }: { qty: number }) {
+  if (qty === 0)
+    return (
+      <span className="inline-flex items-center border border-destructive/60 bg-destructive/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-destructive">
+        Esgotado
+      </span>
+    );
+  if (qty === 1)
+    return (
+      <span className="inline-flex items-center gap-1 border border-accent/70 bg-accent/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-accent">
+        ⚠️ Última unidade
+      </span>
+    );
+  return null;
+}
+
+function AdminStockEditor({ id }: { id: string }) {
+  const { stock, setStock } = useStock();
+  const [val, setVal] = useState(String(stock[id] ?? 0));
+  useEffect(() => setVal(String(stock[id] ?? 0)), [stock, id]);
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="mt-3 flex items-center gap-2 border border-accent/40 bg-accent/5 px-2 py-1.5"
+    >
+      <Shield className="h-3 w-3 text-accent" strokeWidth={1.5} />
+      <span className="text-[10px] tracking-luxe uppercase text-accent">Estoque</span>
+      <input
+        type="number"
+        min={0}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={() => setStock(id, Number(val) || 0)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        className="ml-auto w-16 border border-border bg-background px-2 py-1 text-right text-xs tabular-nums outline-none focus:border-accent"
+      />
+    </div>
+  );
+}
+
 function ProductCard({ product }: { product: Product }) {
   const { open } = useProduct();
+  const { stock } = useStock();
+  const isAdmin = useIsAdmin();
+  const qty = stock[product.id] ?? 0;
+  const soldOut = qty === 0;
+
   return (
-    <article className="group flex flex-col cursor-pointer" onClick={() => open(product)}>
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-secondary">
+    <article className="group flex flex-col">
+      <div
+        className={`relative aspect-[3/4] w-full overflow-hidden bg-secondary ${
+          soldOut ? "" : "cursor-pointer"
+        }`}
+        onClick={() => !soldOut && open(product)}
+      >
         <img
           src={product.image}
           alt={product.name}
           loading="lazy"
           width={900}
           height={1200}
-          className="h-full w-full object-cover transition-transform duration-[1400ms] ease-out group-hover:scale-[1.06]"
+          className={`h-full w-full object-cover transition-transform duration-[1400ms] ease-out group-hover:scale-[1.06] ${
+            soldOut ? "opacity-60 grayscale" : ""
+          }`}
         />
-        <div className="absolute inset-x-4 bottom-4 translate-y-6 border border-ivory/80 bg-charcoal/70 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory opacity-0 backdrop-blur-sm transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">
-          Ver Produto
+        <div className="absolute left-3 top-3 flex flex-col gap-1.5">
+          <StockBadge qty={qty} />
         </div>
+        {soldOut ? (
+          <div className="absolute inset-x-4 bottom-4 border border-ivory/40 bg-charcoal/80 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory/80 backdrop-blur-sm">
+            Produto Esgotado
+          </div>
+        ) : (
+          <div className="absolute inset-x-4 bottom-4 translate-y-6 border border-ivory/80 bg-charcoal/70 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory opacity-0 backdrop-blur-sm transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">
+            Ver Produto
+          </div>
+        )}
       </div>
       <div className="mt-5 flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -320,6 +437,7 @@ function ProductCard({ product }: { product: Product }) {
         </div>
         <span className="shrink-0 text-xs md:text-sm tabular-nums">{formatBRL(product.price)}</span>
       </div>
+      {isAdmin && <AdminStockEditor id={product.id} />}
     </article>
   );
 }
@@ -328,6 +446,7 @@ function ProductCard({ product }: { product: Product }) {
 function ProductModal() {
   const { active, close } = useProduct();
   const { add } = useCart();
+  const { stock, decrement } = useStock();
   const [size, setSize] = useState<string>("M");
   const [activeImg, setActiveImg] = useState(0);
 
@@ -338,6 +457,8 @@ function ProductModal() {
 
   if (!active) return null;
   const gallery = active.gallery ?? [active.image];
+  const qty = stock[active.id] ?? 0;
+  const soldOut = qty === 0;
 
   return (
     <>
@@ -384,6 +505,7 @@ function ProductModal() {
               <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Concept</p>
               <h2 className="mt-3 font-serif text-3xl md:text-4xl leading-tight">{active.name}</h2>
               <p className="mt-3 text-lg tabular-nums">{formatBRL(active.price)}</p>
+              <div className="mt-3"><StockBadge qty={qty} /></div>
               <p className="mt-6 text-sm leading-relaxed text-muted-foreground font-light">
                 {active.longDescription ?? active.description}
               </p>
@@ -411,12 +533,15 @@ function ProductModal() {
 
               <button
                 onClick={() => {
+                  if (soldOut) return;
                   add(active, size);
+                  decrement(active.id, 1);
                   close();
                 }}
-                className="mt-10 bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
+                disabled={soldOut}
+                className="mt-10 bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
               >
-                Adicionar à Sacola
+                {soldOut ? "Produto Esgotado" : "Adicionar à Sacola"}
               </button>
 
               <div className="mt-8">
@@ -478,8 +603,7 @@ function Concept() {
             <p className="mt-8 text-sm md:text-base leading-relaxed text-ivory/75 font-light">
               A&amp;S Concept é um estudo de contenção — um guarda-roupa moderno traçado a partir
               dos códigos do old money, feito para uma geração que valoriza a discrição acima da
-              ostentação. Cada peça é criada em parceria com ateliês familiares na Itália, Escócia
-              e no sul da França, com tecidos pensados para durar gerações.
+              ostentação.
             </p>
             <p className="mt-6 text-sm md:text-base leading-relaxed text-ivory/75 font-light">
               Não perseguimos estações. Construímos uma biblioteca.
@@ -512,7 +636,6 @@ function Newsletter() {
         </h2>
         <p className="mx-auto mt-8 max-w-md text-sm md:text-base text-muted-foreground font-light">
           Prévias privadas, histórias dos ateliês e acesso antecipado às edições limitadas.
-          Enviadas com intenção.
         </p>
         <form
           onSubmit={(e) => {
@@ -629,16 +752,18 @@ function CartDrawer() {
         <div className="flex-1 overflow-y-auto px-6 py-6">
           {items.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <ShoppingBag className="h-8 w-8 text-muted-foreground" strokeWidth={1} />
-              <p className="mt-6 font-serif text-xl">Sua sacola está vazia.</p>
-              <p className="mt-2 text-xs font-light text-muted-foreground">
-                Uma seleção curada aguarda por você.
+              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-border">
+                <ShoppingBag className="h-8 w-8 text-muted-foreground" strokeWidth={1} />
+              </div>
+              <p className="mt-6 font-serif text-xl">Seu carrinho está vazio.</p>
+              <p className="mt-3 max-w-[260px] text-sm font-light text-muted-foreground">
+                Que tal adicionar alguns produtos? Uma seleção curada aguarda por você.
               </p>
               <button
                 onClick={close}
-                className="mt-8 border border-foreground px-8 py-3 text-[11px] tracking-luxe uppercase transition-colors hover:bg-foreground hover:text-ivory"
+                className="mt-8 bg-charcoal px-8 py-3 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
               >
-                Continuar Navegando
+                Continuar Comprando
               </button>
             </div>
           ) : (
@@ -708,9 +833,7 @@ function CartDrawer() {
               Frete grátis para pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}. Impostos
               calculados no checkout.
             </p>
-            {checkoutMsg && (
-              <p className="text-[11px] text-accent">{checkoutMsg}</p>
-            )}
+            {checkoutMsg && <p className="text-[11px] text-accent">{checkoutMsg}</p>}
             <button
               onClick={onCheckout}
               className="w-full bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
@@ -725,6 +848,69 @@ function CartDrawer() {
           </div>
         )}
       </aside>
+    </>
+  );
+}
+
+/* ---------- Search Overlay ---------- */
+function SearchOverlay() {
+  const { isOpen, close, query, setQuery } = useSearch();
+  const [term, setTerm] = useState(query);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTerm(query);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [isOpen, query]);
+
+  if (!isOpen) return null;
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setQuery(term.trim());
+    close();
+    document.getElementById("collections")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  return (
+    <>
+      <div
+        onClick={close}
+        className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
+      />
+      <div className="fixed inset-x-0 top-0 z-[90] animate-in slide-in-from-top duration-500">
+        <div className="bg-background shadow-2xl">
+          <div className="mx-auto max-w-3xl px-6 py-10 md:py-14">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] tracking-luxe uppercase text-accent">Buscar</p>
+              <button onClick={close} aria-label="Fechar" className="hover:text-accent">
+                <X className="h-4 w-4" strokeWidth={1.5} />
+              </button>
+            </div>
+            <form onSubmit={submit} className="mt-6 flex items-center gap-4 border-b border-foreground/40 pb-3 focus-within:border-accent transition-colors">
+              <Search className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+              <input
+                ref={inputRef}
+                value={term}
+                onChange={(e) => setTerm(e.target.value)}
+                placeholder="Ex: cashmere, blazer, mocassim..."
+                className="flex-1 bg-transparent py-2 font-serif text-2xl md:text-3xl outline-none placeholder:text-muted-foreground/50"
+              />
+              <button
+                type="submit"
+                className="text-[11px] tracking-luxe uppercase hover:text-accent transition-colors"
+              >
+                Buscar
+              </button>
+            </form>
+            <p className="mt-4 text-[11px] text-muted-foreground">
+              Pressione Enter para pesquisar na coleção.
+            </p>
+          </div>
+        </div>
+      </div>
     </>
   );
 }
@@ -757,6 +943,16 @@ function AuthModal() {
     else if (mode === "signup") setInfo("Conta criada! Verifique seu e-mail para confirmar.");
   };
 
+  const fillDemo = (kind: "cliente" | "admin") => {
+    if (kind === "admin") {
+      setEmail("admin@asconcept.com");
+      setPassword("admin123");
+    } else {
+      setEmail("cliente@asconcept.com");
+      setPassword("cliente123");
+    }
+  };
+
   return (
     <>
       <div
@@ -784,7 +980,28 @@ function AuthModal() {
               : "Registre-se para prosseguir com o pagamento e envio."}
           </p>
 
-          <form onSubmit={onSubmit} className="mt-8 space-y-4">
+          <div className="mt-6 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => fillDemo("cliente")}
+              className="flex items-center justify-center gap-2 border border-border py-2.5 text-[10px] tracking-luxe uppercase hover:border-foreground transition-colors"
+            >
+              <UserIcon className="h-3.5 w-3.5" strokeWidth={1.5} /> Cliente
+            </button>
+            <button
+              type="button"
+              onClick={() => fillDemo("admin")}
+              className="flex items-center justify-center gap-2 border border-accent/60 bg-accent/5 py-2.5 text-[10px] tracking-luxe uppercase text-accent hover:bg-accent/10 transition-colors"
+            >
+              <Shield className="h-3.5 w-3.5" strokeWidth={1.5} /> Admin
+            </button>
+          </div>
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            Contas de demonstração — clique para preencher. Contas com “admin” no e-mail liberam o
+            gerenciamento de estoque <Package className="inline h-3 w-3" strokeWidth={1.5} />.
+          </p>
+
+          <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <div>
               <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
                 E-mail
