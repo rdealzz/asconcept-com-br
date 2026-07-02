@@ -642,6 +642,16 @@ function CartDrawer() {
               </button>
             </div>
           ) : (
+            <>
+              <div className="mb-6 rounded-sm border border-border/60 bg-secondary/40 p-4">
+                <FreeShippingHint subtotal={subtotal} />
+              </div>
+              <ul className="space-y-6">
+                {/* items list rendered below */}
+              </ul>
+            </>
+          )}
+          {items.length > 0 && (
             <ul className="space-y-6">
               {items.map((i) => (
                 <li
