@@ -705,8 +705,8 @@ function CartDrawer() {
               <span className="font-serif text-xl tabular-nums">{formatBRL(subtotal)}</span>
             </div>
             <p className="text-[11px] font-light text-muted-foreground">
-              Frete e impostos calculados no checkout. Entrega expressa cortesia em pedidos acima de
-              R$ 2.000.
+              Frete grátis para pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}. Impostos
+              calculados no checkout.
             </p>
             {checkoutMsg && (
               <p className="text-[11px] text-accent">{checkoutMsg}</p>
