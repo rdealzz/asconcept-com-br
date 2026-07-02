@@ -3,6 +3,8 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Search, User as UserIcon, ShoppingBag, X, Plus, Minus, LogOut } from "lucide-react";
 import { CartProvider, useCart, formatBRL, type Product } from "@/lib/cart-context";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
+import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 
 import hero from "@/assets/hero.jpg";
 import editorial from "@/assets/editorial.jpg";
