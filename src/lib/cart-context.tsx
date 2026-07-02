@@ -4,17 +4,20 @@ export type Product = {
   id: string;
   name: string;
   description: string;
+  longDescription?: string;
   price: number;
   image: string;
+  gallery?: string[];
 };
 
-export type CartItem = Product & { qty: number };
+export type CartItem = Product & { qty: number; size: string };
 
 type CartCtx = {
   items: CartItem[];
   isOpen: boolean;
-  add: (p: Product) => void;
-  remove: (id: string) => void;
+  add: (p: Product, size?: string) => void;
+  remove: (id: string, size: string) => void;
+  updateQty: (id: string, size: string, delta: number) => void;
   open: () => void;
   close: () => void;
   toggle: () => void;
@@ -28,15 +31,31 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setOpen] = useState(false);
 
-  const add = (p: Product) => {
+  const add = (p: Product, size: string = "M") => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.id === p.id);
-      if (existing) return prev.map((i) => (i.id === p.id ? { ...i, qty: i.qty + 1 } : i));
-      return [...prev, { ...p, qty: 1 }];
+      const existing = prev.find((i) => i.id === p.id && i.size === size);
+      if (existing)
+        return prev.map((i) =>
+          i.id === p.id && i.size === size ? { ...i, qty: i.qty + 1 } : i,
+        );
+      return [...prev, { ...p, qty: 1, size }];
     });
     setOpen(true);
   };
-  const remove = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id));
+
+  const remove = (id: string, size: string) =>
+    setItems((prev) => prev.filter((i) => !(i.id === id && i.size === size)));
+
+  const updateQty = (id: string, size: string, delta: number) => {
+    setItems((prev) =>
+      prev
+        .map((i) =>
+          i.id === id && i.size === size ? { ...i, qty: i.qty + delta } : i,
+        )
+        .filter((i) => i.qty > 0),
+    );
+  };
+
   const count = items.reduce((s, i) => s + i.qty, 0);
   const subtotal = items.reduce((s, i) => s + i.qty * i.price, 0);
 
@@ -47,6 +66,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         isOpen,
         add,
         remove,
+        updateQty,
         count,
         subtotal,
         open: () => setOpen(true),
@@ -65,5 +85,5 @@ export function useCart() {
   return c;
 }
 
-export const formatUSD = (n: number) =>
-  `$${n.toLocaleString("en-US")} USD`;
+export const formatBRL = (n: number) =>
+  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
