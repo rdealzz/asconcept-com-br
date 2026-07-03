@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Search,
@@ -17,13 +17,12 @@ import {
   Sparkles,
 } from "lucide-react";
 import {
-  CartProvider,
   useCart,
   formatBRL,
   type Product,
   type ProductCategory,
 } from "@/lib/cart-context";
-import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { useAuth } from "@/lib/auth-context";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 
@@ -185,30 +184,26 @@ function useSearch() {
 
 function Index() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <CatalogProvider>
-          <SearchProvider>
-            <ProductProvider>
-              <div className="min-h-screen bg-background text-foreground">
-                <Nav />
-                <Hero />
-                <CategoryTabs />
-                <Products />
-                <Concept />
-                <Newsletter />
-                <Footer />
-                <CartDrawer />
-                <ProductModal />
-                <AuthModal />
-                <SearchOverlay />
-                <AdminEditModal />
-              </div>
-            </ProductProvider>
-          </SearchProvider>
-        </CatalogProvider>
-      </CartProvider>
-    </AuthProvider>
+    <CatalogProvider>
+      <SearchProvider>
+        <ProductProvider>
+          <div className="min-h-screen bg-background text-foreground">
+            <Nav />
+            <Hero />
+            <CategoryTabs />
+            <Products />
+            <Concept />
+            <Newsletter />
+            <Footer />
+            <CartDrawer />
+            <ProductModal />
+            <AuthModal />
+            <SearchOverlay />
+            <AdminEditModal />
+          </div>
+        </ProductProvider>
+      </SearchProvider>
+    </CatalogProvider>
   );
 }
 
@@ -1248,6 +1243,7 @@ function CartDrawer() {
   const { isOpen, close, items, remove, updateQty, subtotal, count } = useCart();
   const { setTab } = useSearch();
   const { user, openAuth } = useAuth();
+  const navigate = useNavigate();
   const [checkoutMsg, setCheckoutMsg] = useState<string | null>(null);
 
   const onCheckout = () => {
@@ -1257,7 +1253,8 @@ function CartDrawer() {
       openAuth();
       return;
     }
-    setCheckoutMsg("Redirecionando para o pagamento...");
+    close();
+    navigate({ to: "/checkout" });
   };
 
   return (
