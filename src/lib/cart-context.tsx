@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 export type Product = {
   id: string;
@@ -10,7 +10,14 @@ export type Product = {
   gallery?: string[];
 };
 
-export type CartItem = Product & { qty: number; size: string };
+export type CartItem = {
+  id: string;
+  name: string;
+  price: number;
+  image: string;
+  size: string;
+  qty: number;
+};
 
 type CartCtx = {
   items: CartItem[];
@@ -26,10 +33,28 @@ type CartCtx = {
 };
 
 const Ctx = createContext<CartCtx | null>(null);
+const CART_KEY = "as_cart";
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setOpen] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(CART_KEY);
+      if (raw) setItems(JSON.parse(raw));
+    } catch {}
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined") return;
+    try {
+      localStorage.setItem(CART_KEY, JSON.stringify(items));
+    } catch {}
+  }, [items, hydrated]);
 
   const add = (p: Product, size: string = "M") => {
     setItems((prev) => {
@@ -38,7 +63,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return prev.map((i) =>
           i.id === p.id && i.size === size ? { ...i, qty: i.qty + 1 } : i,
         );
-      return [...prev, { ...p, qty: 1, size }];
+      return [
+        ...prev,
+        { id: p.id, name: p.name, price: p.price, image: p.image, size, qty: 1 },
+      ];
     });
     setOpen(true);
   };
@@ -49,9 +77,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const updateQty = (id: string, size: string, delta: number) => {
     setItems((prev) =>
       prev
-        .map((i) =>
-          i.id === id && i.size === size ? { ...i, qty: i.qty + delta } : i,
-        )
+        .map((i) => (i.id === id && i.size === size ? { ...i, qty: i.qty + delta } : i))
         .filter((i) => i.qty > 0),
     );
   };
