@@ -18,11 +18,18 @@ export interface OrderItem {
 }
 
 export type PaymentMethod = "credit_card" | "pix" | "boleto";
-export type OrderStatus = "Pendente" | "Aprovado" | "Enviado" | "Entregue";
+
+export type OrderStatus =
+  | "Pendente"
+  | "Aprovado"
+  | "Preparando pedido"
+  | "Em trânsito"
+  | "Entregue";
 
 export interface Order {
   id: string;
   customerEmail: string;
+  customerName?: string;
   items: OrderItem[];
   address: CheckoutAddress;
   shippingCost: number;
@@ -30,5 +37,6 @@ export interface Order {
   total: number;
   paymentMethod: PaymentMethod;
   status: OrderStatus;
+  trackingCode?: string;
   createdAt: string;
 }
