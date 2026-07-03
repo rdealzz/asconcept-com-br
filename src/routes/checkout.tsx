@@ -79,8 +79,7 @@ function CheckoutForm({
   count: number;
   navigate: ReturnType<typeof useNavigate>;
 }) {
-  const { items, clear } = useCart() as ReturnType<typeof useCart> & { clear?: () => void };
-  const cart = useCart();
+  const { items, clear } = useCart();
   const { createOrder } = useOrders();
 
   const [address, setAddress] = useState<CheckoutAddress>({
