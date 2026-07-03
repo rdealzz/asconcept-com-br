@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { triggerWelcomeMail } from "./mail";
 
 export type AppUser = {
   email: string;
