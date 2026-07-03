@@ -97,6 +97,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         add,
         remove,
         updateQty,
+        clear: () => setItems([]),
         count,
         subtotal,
         open: () => setOpen(true),
