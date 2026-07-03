@@ -17,13 +17,12 @@ import {
   Sparkles,
 } from "lucide-react";
 import {
-  CartProvider,
   useCart,
   formatBRL,
   type Product,
   type ProductCategory,
 } from "@/lib/cart-context";
-import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { useAuth } from "@/lib/auth-context";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 
