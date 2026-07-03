@@ -185,30 +185,26 @@ function useSearch() {
 
 function Index() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <CatalogProvider>
-          <SearchProvider>
-            <ProductProvider>
-              <div className="min-h-screen bg-background text-foreground">
-                <Nav />
-                <Hero />
-                <CategoryTabs />
-                <Products />
-                <Concept />
-                <Newsletter />
-                <Footer />
-                <CartDrawer />
-                <ProductModal />
-                <AuthModal />
-                <SearchOverlay />
-                <AdminEditModal />
-              </div>
-            </ProductProvider>
-          </SearchProvider>
-        </CatalogProvider>
-      </CartProvider>
-    </AuthProvider>
+    <CatalogProvider>
+      <SearchProvider>
+        <ProductProvider>
+          <div className="min-h-screen bg-background text-foreground">
+            <Nav />
+            <Hero />
+            <CategoryTabs />
+            <Products />
+            <Concept />
+            <Newsletter />
+            <Footer />
+            <CartDrawer />
+            <ProductModal />
+            <AuthModal />
+            <SearchOverlay />
+            <AdminEditModal />
+          </div>
+        </ProductProvider>
+      </SearchProvider>
+    </CatalogProvider>
   );
 }
 
