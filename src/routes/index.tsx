@@ -80,55 +80,89 @@ type CatalogCtx = {
 };
 const CatalogContext = createContext<CatalogCtx | null>(null);
 
+function loadProductsInitial(): Product[] {
+  if (typeof window === "undefined") return DEFAULT_PRODUCTS;
+  try {
+    const raw = localStorage.getItem(PRODUCTS_KEY);
+    if (raw) return JSON.parse(raw) as Product[];
+  } catch {}
+  // Primeiro acesso — grava o padrão de fábrica imediatamente para blindar contra F5.
+  try {
+    localStorage.setItem(PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
+  } catch {}
+  return DEFAULT_PRODUCTS;
+}
+
+function loadStockInitial(): Record<string, number> {
+  if (typeof window === "undefined") return DEFAULT_STOCK;
+  try {
+    const raw = localStorage.getItem(STOCK_KEY);
+    if (raw) return JSON.parse(raw) as Record<string, number>;
+  } catch {}
+  try {
+    localStorage.setItem(STOCK_KEY, JSON.stringify(DEFAULT_STOCK));
+  } catch {}
+  return DEFAULT_STOCK;
+}
+
+function persistProducts(next: Product[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(PRODUCTS_KEY, JSON.stringify(next));
+  } catch {}
+}
+
+function persistStock(next: Record<string, number>) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STOCK_KEY, JSON.stringify(next));
+  } catch {}
+}
+
 function CatalogProvider({ children }: { children: React.ReactNode }) {
-  const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCTS);
-  const [stock, setStockMap] = useState<Record<string, number>>(DEFAULT_STOCK);
-  const [hydrated, setHydrated] = useState(false);
+  // Lazy init — carrega diretamente do localStorage evitando qualquer reset em F5.
+  const [products, setProducts] = useState<Product[]>(loadProductsInitial);
+  const [stock, setStockMap] = useState<Record<string, number>>(loadStockInitial);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const rawP = localStorage.getItem(PRODUCTS_KEY);
-      if (rawP) setProducts(JSON.parse(rawP));
-      const rawS = localStorage.getItem(STOCK_KEY);
-      if (rawS) setStockMap(JSON.parse(rawS));
-    } catch {}
-    setHydrated(true);
-  }, []);
+  const commitProducts = (updater: (prev: Product[]) => Product[]) =>
+    setProducts((prev) => {
+      const next = updater(prev);
+      persistProducts(next);
+      return next;
+    });
 
-  useEffect(() => {
-    if (!hydrated || typeof window === "undefined") return;
-    try {
-      localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
-      localStorage.setItem(STOCK_KEY, JSON.stringify(stock));
-    } catch {}
-  }, [products, stock, hydrated]);
+  const commitStock = (updater: (prev: Record<string, number>) => Record<string, number>) =>
+    setStockMap((prev) => {
+      const next = updater(prev);
+      persistStock(next);
+      return next;
+    });
 
   const updateProduct = (id: string, patch: Partial<Product>) =>
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+    commitProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
 
   const addProduct = (p: Product, qty: number) => {
-    setProducts((prev) => [...prev, p]);
-    setStockMap((prev) => ({ ...prev, [p.id]: Math.max(0, Math.floor(qty)) }));
+    commitProducts((prev) => [...prev, p]);
+    commitStock((prev) => ({ ...prev, [p.id]: Math.max(0, Math.floor(qty)) }));
   };
 
   const deleteProduct = (id: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    setStockMap((prev) => {
+    commitProducts((prev) => prev.filter((p) => p.id !== id));
+    commitStock((prev) => {
       const { [id]: _, ...rest } = prev;
       return rest;
     });
   };
 
   const setStock = (id: string, qty: number) =>
-    setStockMap((prev) => ({ ...prev, [id]: Math.max(0, Math.floor(qty)) }));
+    commitStock((prev) => ({ ...prev, [id]: Math.max(0, Math.floor(qty)) }));
 
   const decrementStock = (id: string, by = 1) =>
-    setStockMap((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) - by) }));
+    commitStock((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) - by) }));
 
   const resetCatalog = () => {
-    setProducts(DEFAULT_PRODUCTS);
-    setStockMap(DEFAULT_STOCK);
+    commitProducts(() => DEFAULT_PRODUCTS);
+    commitStock(() => DEFAULT_STOCK);
   };
 
   return (
