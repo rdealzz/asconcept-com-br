@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Search,
@@ -1244,6 +1244,7 @@ function CartDrawer() {
   const { isOpen, close, items, remove, updateQty, subtotal, count } = useCart();
   const { setTab } = useSearch();
   const { user, openAuth } = useAuth();
+  const navigate = useNavigate();
   const [checkoutMsg, setCheckoutMsg] = useState<string | null>(null);
 
   const onCheckout = () => {
@@ -1253,7 +1254,8 @@ function CartDrawer() {
       openAuth();
       return;
     }
-    setCheckoutMsg("Redirecionando para o pagamento...");
+    close();
+    navigate({ to: "/checkout" });
   };
 
   return (
