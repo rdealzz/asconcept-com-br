@@ -12,8 +12,17 @@ import {
   Pencil,
   Save,
   RotateCcw,
+  Trash2,
+  Upload,
+  Sparkles,
 } from "lucide-react";
-import { CartProvider, useCart, formatBRL, type Product } from "@/lib/cart-context";
+import {
+  CartProvider,
+  useCart,
+  formatBRL,
+  type Product,
+  type ProductCategory,
+} from "@/lib/cart-context";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
@@ -36,33 +45,36 @@ export const Route = createFileRoute("/")({
 const SIZES = ["P", "M", "G", "GG"] as const;
 
 const DEFAULT_PRODUCTS: Product[] = [
-  { id: "1", name: "Camisa de Linho Cornwall", description: "Linho italiano acabado à mão. Modelagem relaxada.", longDescription: "Confeccionada em linho italiano de fio longo, a camisa Cornwall combina caimento fluido com detalhes artesanais. Botões de madrepérola natural, pespontos internos e barra levemente arredondada.", price: 1590, image: p1, gallery: [p1] },
-  { id: "2", name: "Suéter de Cashmere Kensington", description: "Cashmere puro da Mongólia em azul meia-noite.", longDescription: "Tricô fino em cashmere mongol grade A, com toque sedoso e caimento estruturado. Gola careca ribana, punhos e barra em canelado clássico.", price: 3290, image: p2, gallery: [p2] },
-  { id: "3", name: "Blazer Trespassado Mayfair", description: "Lã com lapela pico, alfaiataria napolitana.", longDescription: "Alfaiataria napolitana em lã super 120, com lapela pico, ombro natural e forro em cupro. Bolsos flap com lenço interno, três botões forrados.", price: 7890, image: p3, gallery: [p3] },
-  { id: "4", name: "Calça de Prega Windsor", description: "Cintura alta em crepe de lã marfim.", longDescription: "Cintura alta com pregas duplas, corte reto e caimento fluido. Confeccionada em crepe de lã fresca, com bolsos italianos e fivela lateral discreta.", price: 2590, image: p4, gallery: [p4] },
-  { id: "5", name: "Lenço de Seda Saint-Tropez", description: "Twill de seda com bainha rolada à mão, estampado em Como.", longDescription: "Sarja de seda 100% italiana, estampada digitalmente em Como e finalizada com bainha rolada à mão.", price: 1850, image: p5, gallery: [p5] },
-  { id: "6", name: "Mocassim Belgrave", description: "Couro de bezerro costurado Blake, conhaque.", longDescription: "Mocassim penny loafer em couro de bezerro full-grain, montagem Blake e solado em couro. Forro interno em pelica.", price: 4290, image: p6, gallery: [p6] },
-  { id: "7", name: "Polo Trançado Hampton", description: "Algodão egípcio com costuras finalizadas à mão.", longDescription: "Malha piquê em algodão egípcio de fibra longa, com padronagem trançada exclusiva.", price: 2190, image: p7, gallery: [p7] },
-  { id: "8", name: "Lenço de Bolso Belgravia", description: "Seda doze dobras, ourela marfim.", longDescription: "Lenço de bolso em seda dobrada doze vezes à mão, com bainha em contraste marfim.", price: 790, image: p8, gallery: [p8] },
+  { id: "1", category: "clothes", name: "Camisa de Linho Cornwall", description: "Linho italiano acabado à mão. Modelagem relaxada.", longDescription: "Confeccionada em linho italiano de fio longo, com botões de madrepérola natural e pespontos internos.", price: 1590, image: p1, gallery: [p1] },
+  { id: "2", category: "clothes", name: "Suéter de Cashmere Kensington", description: "Cashmere puro da Mongólia em azul meia-noite.", longDescription: "Tricô fino em cashmere mongol grade A, com gola careca ribana e punhos em canelado.", price: 3290, image: p2, gallery: [p2] },
+  { id: "3", category: "clothes", name: "Blazer Trespassado Mayfair", description: "Lã com lapela pico, alfaiataria napolitana.", longDescription: "Alfaiataria napolitana em lã super 120, com lapela pico, ombro natural e forro em cupro.", price: 7890, image: p3, gallery: [p3] },
+  { id: "4", category: "clothes", name: "Calça de Prega Windsor", description: "Cintura alta em crepe de lã marfim.", longDescription: "Cintura alta com pregas duplas, corte reto e caimento fluido em crepe de lã fresca.", price: 2590, image: p4, gallery: [p4] },
+  { id: "5", category: "clothes", name: "Lenço de Seda Saint-Tropez", description: "Twill de seda com bainha rolada à mão, estampado em Como.", longDescription: "Sarja de seda 100% italiana, estampada digitalmente em Como e finalizada com bainha rolada à mão.", price: 1850, image: p5, gallery: [p5] },
+  { id: "6", category: "clothes", name: "Mocassim Belgrave", description: "Couro de bezerro costurado Blake, conhaque.", longDescription: "Mocassim penny loafer em couro de bezerro full-grain, com forro interno em pelica.", price: 4290, image: p6, gallery: [p6] },
+  { id: "7", category: "clothes", name: "Polo Trançado Hampton", description: "Algodão egípcio com costuras finalizadas à mão.", longDescription: "Malha piquê em algodão egípcio de fibra longa, com padronagem trançada exclusiva.", price: 2190, image: p7, gallery: [p7] },
+  { id: "8", category: "clothes", name: "Lenço de Bolso Belgravia", description: "Seda doze dobras, ourela marfim.", longDescription: "Lenço de bolso em seda dobrada doze vezes à mão, com bainha em contraste marfim.", price: 790, image: p8, gallery: [p8] },
 ];
 
 const DEFAULT_STOCK: Record<string, number> = {
   "1": 5, "2": 3, "3": 1, "4": 0, "5": 8, "6": 2, "7": 1, "8": 4,
 };
 
-const PRODUCTS_KEY = "as_products";
-const STOCK_KEY = "as_stock";
+const PRODUCTS_KEY = "as_products_v2";
+const STOCK_KEY = "as_stock_v2";
+const SNEAKERS_LAUNCH = new Date("2026-09-01T00:00:00-03:00").getTime();
 
 function useIsAdmin() {
   const { user } = useAuth();
   return !!user?.isAdmin;
 }
 
-/* ---------- Catalog Context (products + stock, persisted) ---------- */
+/* ---------- Catalog Context ---------- */
 type CatalogCtx = {
   products: Product[];
   stock: Record<string, number>;
   updateProduct: (id: string, patch: Partial<Product>) => void;
+  addProduct: (p: Product, qty: number) => void;
+  deleteProduct: (id: string) => void;
   setStock: (id: string, qty: number) => void;
   decrementStock: (id: string, by?: number) => void;
   resetCatalog: () => void;
@@ -78,15 +90,9 @@ function CatalogProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return;
     try {
       const rawP = localStorage.getItem(PRODUCTS_KEY);
-      if (rawP) {
-        const stored: Product[] = JSON.parse(rawP);
-        // merge with defaults so new default products still appear
-        const map = new Map(DEFAULT_PRODUCTS.map((p) => [p.id, p]));
-        stored.forEach((p) => map.set(p.id, { ...map.get(p.id), ...p } as Product));
-        setProducts(Array.from(map.values()));
-      }
+      if (rawP) setProducts(JSON.parse(rawP));
       const rawS = localStorage.getItem(STOCK_KEY);
-      if (rawS) setStockMap({ ...DEFAULT_STOCK, ...JSON.parse(rawS) });
+      if (rawS) setStockMap(JSON.parse(rawS));
     } catch {}
     setHydrated(true);
   }, []);
@@ -102,6 +108,19 @@ function CatalogProvider({ children }: { children: React.ReactNode }) {
   const updateProduct = (id: string, patch: Partial<Product>) =>
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
 
+  const addProduct = (p: Product, qty: number) => {
+    setProducts((prev) => [...prev, p]);
+    setStockMap((prev) => ({ ...prev, [p.id]: Math.max(0, Math.floor(qty)) }));
+  };
+
+  const deleteProduct = (id: string) => {
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+    setStockMap((prev) => {
+      const { [id]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
   const setStock = (id: string, qty: number) =>
     setStockMap((prev) => ({ ...prev, [id]: Math.max(0, Math.floor(qty)) }));
 
@@ -115,7 +134,7 @@ function CatalogProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <CatalogContext.Provider
-      value={{ products, stock, updateProduct, setStock, decrementStock, resetCatalog }}
+      value={{ products, stock, updateProduct, addProduct, deleteProduct, setStock, decrementStock, resetCatalog }}
     >
       {children}
     </CatalogContext.Provider>
@@ -127,21 +146,32 @@ function useCatalog() {
   return c;
 }
 
-/* ---------- Search Context ---------- */
+/* ---------- Search + Tabs Context ---------- */
 type SearchCtx = {
   query: string;
   setQuery: (q: string) => void;
   isOpen: boolean;
   open: () => void;
   close: () => void;
+  tab: ProductCategory;
+  setTab: (t: ProductCategory) => void;
 };
 const SearchContext = createContext<SearchCtx | null>(null);
 function SearchProvider({ children }: { children: React.ReactNode }) {
   const [query, setQuery] = useState("");
   const [isOpen, setOpen] = useState(false);
+  const [tab, setTab] = useState<ProductCategory>("clothes");
   return (
     <SearchContext.Provider
-      value={{ query, setQuery, isOpen, open: () => setOpen(true), close: () => setOpen(false) }}
+      value={{
+        query,
+        setQuery,
+        isOpen,
+        open: () => setOpen(true),
+        close: () => setOpen(false),
+        tab,
+        setTab,
+      }}
     >
       {children}
     </SearchContext.Provider>
@@ -163,6 +193,7 @@ function Index() {
               <div className="min-h-screen bg-background text-foreground">
                 <Nav />
                 <Hero />
+                <CategoryTabs />
                 <Products />
                 <Concept />
                 <Newsletter />
@@ -189,11 +220,14 @@ const ProductCtx = createContext<{
   editingId: string | null;
   openEdit: (id: string) => void;
   closeEdit: () => void;
+  creatingCategory: ProductCategory | null;
+  openCreate: (c: ProductCategory) => void;
 } | null>(null);
 
 function ProductProvider({ children }: { children: React.ReactNode }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [creatingCategory, setCreating] = useState<ProductCategory | null>(null);
   return (
     <ProductCtx.Provider
       value={{
@@ -201,8 +235,19 @@ function ProductProvider({ children }: { children: React.ReactNode }) {
         open: (id) => setActiveId(id),
         close: () => setActiveId(null),
         editingId,
-        openEdit: (id) => setEditingId(id),
-        closeEdit: () => setEditingId(null),
+        openEdit: (id) => {
+          setEditingId(id);
+          setCreating(null);
+        },
+        closeEdit: () => {
+          setEditingId(null);
+          setCreating(null);
+        },
+        creatingCategory,
+        openCreate: (c) => {
+          setCreating(c);
+          setEditingId("__new__");
+        },
       }}
     >
       {children}
@@ -252,6 +297,11 @@ function Nav() {
           }`}
         >
           A<span className="text-accent">&amp;</span>S Concept
+          {isAdmin && (
+            <span className="ml-2 hidden align-middle text-[9px] tracking-luxe uppercase text-accent md:inline">
+              · Dev
+            </span>
+          )}
         </a>
         <div
           className={`flex items-center justify-end gap-5 ${
@@ -339,35 +389,72 @@ function Hero() {
   );
 }
 
+/* ---------- Category Tabs ---------- */
+function CategoryTabs() {
+  const { tab, setTab } = useSearch();
+  return (
+    <div id="collections" className="sticky top-[68px] z-40 border-y border-border bg-background/95 backdrop-blur">
+      <div className="mx-auto flex max-w-[1600px] items-center justify-center gap-2 px-6 py-4 md:gap-8 md:px-12">
+        {(["clothes", "sneakers"] as ProductCategory[]).map((c) => (
+          <button
+            key={c}
+            onClick={() => setTab(c)}
+            className={`relative px-4 py-2 text-[11px] tracking-luxe uppercase transition-colors ${
+              tab === c ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {c === "clothes" ? "Roupas" : "Sneakers"}
+            {tab === c && (
+              <span className="absolute inset-x-2 -bottom-[1px] h-[2px] bg-accent" />
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Products ---------- */
 function Products() {
-  const { query, setQuery } = useSearch();
+  const { query, setQuery, tab } = useSearch();
   const { products, resetCatalog } = useCatalog();
+  const { openCreate } = useProduct();
   const isAdmin = useIsAdmin();
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter(
+    const inTab = products.filter((p) => (p.category ?? "clothes") === tab);
+    if (!q) return inTab;
+    return inTab.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
         p.description.toLowerCase().includes(q) ||
         (p.longDescription ?? "").toLowerCase().includes(q),
     );
-  }, [query, products]);
+  }, [query, products, tab]);
+
+  const showSneakersComingSoon = tab === "sneakers" && !isAdmin && filtered.length === 0;
 
   return (
-    <section id="collections" className="py-28 md:py-40">
+    <section className="py-20 md:py-28">
       <div className="mx-auto max-w-[1600px] px-6 md:px-12">
-        <div className="mb-16 flex flex-col items-center text-center md:mb-24">
-          <p className="mb-4 text-[11px] tracking-luxe uppercase text-accent">A Coleção</p>
-          <h2 className="font-serif text-4xl md:text-6xl">Essenciais com Propósito</h2>
-          <p className="mt-6 max-w-xl text-sm md:text-base text-muted-foreground font-light">
-            Peças atemporais, produzidas em pequenas séries por ateliês tradicionais europeus.
+        <div className="mb-12 flex flex-col items-center text-center md:mb-20">
+          <p className="mb-4 text-[11px] tracking-luxe uppercase text-accent">
+            {tab === "clothes" ? "A Coleção" : "Sneakers"}
           </p>
+          <h2 className="font-serif text-4xl md:text-6xl">
+            {tab === "clothes" ? "Essenciais com Propósito" : "A Nova Cadência"}
+          </h2>
+          <p className="mt-6 max-w-xl text-sm md:text-base text-muted-foreground font-light">
+            {tab === "clothes"
+              ? "Peças atemporais, produzidas em pequenas séries por ateliês tradicionais europeus."
+              : "Silhuetas contemporâneas, montadas artesanalmente em couros nobres."}
+          </p>
+
           {query && (
             <div className="mt-8 flex items-center gap-3 border border-border px-4 py-2 text-xs">
               <span className="text-muted-foreground">Buscando por</span>
-              <span className="font-serif italic">“{query}”</span>
+              <span className="font-serif italic">"{query}"</span>
               <button
                 onClick={() => setQuery("")}
                 className="ml-2 text-muted-foreground hover:text-accent"
@@ -377,31 +464,52 @@ function Products() {
               </button>
             </div>
           )}
+
           {isAdmin && (
-            <button
-              onClick={() => {
-                if (confirm("Restaurar catálogo original? Todas as edições serão perdidas."))
-                  resetCatalog();
-              }}
-              className="mt-6 inline-flex items-center gap-2 border border-accent/50 px-3 py-1.5 text-[10px] tracking-luxe uppercase text-accent hover:bg-accent/10 transition-colors"
-            >
-              <RotateCcw className="h-3 w-3" strokeWidth={1.5} /> Restaurar catálogo
-            </button>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={() => openCreate(tab)}
+                className="inline-flex items-center gap-2 bg-accent px-4 py-2 text-[10px] tracking-luxe uppercase text-charcoal transition-colors hover:bg-accent/90"
+              >
+                <Plus className="h-3.5 w-3.5" strokeWidth={2} /> Adicionar Novo Produto
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm("Restaurar catálogo original? Todas as edições serão perdidas."))
+                    resetCatalog();
+                }}
+                className="inline-flex items-center gap-2 border border-accent/50 px-3 py-2 text-[10px] tracking-luxe uppercase text-accent hover:bg-accent/10 transition-colors"
+              >
+                <RotateCcw className="h-3 w-3" strokeWidth={1.5} /> Restaurar catálogo
+              </button>
+            </div>
           )}
         </div>
 
-        {filtered.length === 0 ? (
+        {showSneakersComingSoon ? (
+          <SneakersComingSoon />
+        ) : filtered.length === 0 ? (
           <div className="mx-auto max-w-lg py-16 text-center">
-            <p className="font-serif text-2xl">Nenhum produto encontrado para “{query}”.</p>
-            <p className="mt-4 text-sm text-muted-foreground font-light">
-              Tente outra palavra-chave ou explore a coleção completa.
+            <p className="font-serif text-2xl">
+              {query
+                ? `Nenhum produto encontrado para "${query}".`
+                : "Nada por aqui ainda."}
             </p>
-            <button
-              onClick={() => setQuery("")}
-              className="mt-8 border border-foreground px-8 py-3 text-[11px] tracking-luxe uppercase transition-colors hover:bg-foreground hover:text-ivory"
-            >
-              Ver toda a coleção
-            </button>
+            <p className="mt-4 text-sm text-muted-foreground font-light">
+              {query
+                ? "Tente outra palavra-chave ou explore a coleção completa."
+                : isAdmin
+                  ? "Adicione o primeiro produto desta seção."
+                  : "Volte em breve."}
+            </p>
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="mt-8 border border-foreground px-8 py-3 text-[11px] tracking-luxe uppercase transition-colors hover:bg-foreground hover:text-ivory"
+              >
+                Ver toda a coleção
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-x-4 gap-y-16 md:grid-cols-3 md:gap-x-8 lg:grid-cols-4">
@@ -415,25 +523,95 @@ function Products() {
   );
 }
 
+/* ---------- Sneakers Coming Soon ---------- */
+function useCountdown(target: number) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const diff = Math.max(0, target - now);
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff / 3600000) % 24);
+  const minutes = Math.floor((diff / 60000) % 60);
+  const seconds = Math.floor((diff / 1000) % 60);
+  return { days, hours, minutes, seconds };
+}
+
+function SneakersComingSoon() {
+  const { days, hours, minutes, seconds } = useCountdown(SNEAKERS_LAUNCH);
+  const units = [
+    { label: "Dias", value: days },
+    { label: "Horas", value: hours },
+    { label: "Min", value: minutes },
+    { label: "Seg", value: seconds },
+  ];
+  return (
+    <div className="relative mx-auto max-w-4xl overflow-hidden border border-accent/30 bg-gradient-to-br from-navy via-charcoal to-navy p-10 text-center text-ivory shadow-2xl md:p-16">
+      <div className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full bg-accent/20 blur-3xl" />
+      <div className="pointer-events-none absolute -right-24 -bottom-24 h-64 w-64 rounded-full bg-accent/10 blur-3xl" />
+      <div className="relative">
+        <div className="inline-flex items-center gap-2 border border-accent/60 px-4 py-1.5 text-[10px] tracking-luxe uppercase text-accent">
+          <Sparkles className="h-3 w-3 animate-pulse" /> Em breve
+        </div>
+        <h3 className="mt-8 font-serif text-5xl leading-[1.05] md:text-7xl">
+          Sneakers<br />
+          <em className="text-accent">Coming Soon.</em>
+        </h3>
+        <p className="mx-auto mt-6 max-w-md text-sm text-ivory/70 font-light">
+          Uma nova cadência está sendo montada. Assine o Clube para acesso antecipado.
+        </p>
+        <div className="mt-10 grid grid-cols-4 gap-2 md:gap-4">
+          {units.map((u) => (
+            <div
+              key={u.label}
+              className="border border-ivory/15 bg-charcoal/40 py-4 backdrop-blur"
+            >
+              <div className="font-serif text-3xl tabular-nums text-accent md:text-5xl">
+                {String(u.value).padStart(2, "0")}
+              </div>
+              <div className="mt-1 text-[9px] tracking-luxe uppercase text-ivory/60">
+                {u.label}
+              </div>
+            </div>
+          ))}
+        </div>
+        <a
+          href="#about"
+          className="mt-12 inline-flex items-center gap-3 border border-accent px-8 py-3 text-[11px] tracking-luxe uppercase text-accent transition-all hover:bg-accent hover:text-charcoal"
+        >
+          Ser Avisado no Lançamento
+        </a>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Stock Badge ---------- */
 function StockBadge({ qty }: { qty: number }) {
   if (qty === 0)
     return (
       <span className="inline-flex items-center border border-destructive/60 bg-destructive/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-destructive">
-        Esgotado
+        Sold Out
       </span>
     );
   if (qty === 1)
     return (
-      <span className="inline-flex items-center gap-1 border border-accent/70 bg-accent/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-accent">
+      <span className="inline-flex animate-pulse items-center gap-1 border border-accent bg-accent/20 px-2 py-1 text-[10px] font-semibold tracking-luxe uppercase text-accent shadow-[0_0_12px_rgba(0,0,0,0.15)]">
         ⚠️ Última unidade
       </span>
     );
-  return null;
+  return (
+    <span className="inline-flex items-center gap-1 border border-emerald-600/40 bg-emerald-600/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-emerald-700">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" /> Disponível
+    </span>
+  );
 }
 
+/* ---------- Product Card ---------- */
 function ProductCard({ product }: { product: Product }) {
   const { open, openEdit } = useProduct();
-  const { stock } = useCatalog();
+  const { stock, deleteProduct } = useCatalog();
   const isAdmin = useIsAdmin();
   const qty = stock[product.id] ?? 0;
   const soldOut = qty === 0;
@@ -441,7 +619,7 @@ function ProductCard({ product }: { product: Product }) {
   return (
     <article className="group flex flex-col">
       <div
-        className={`relative aspect-[3/4] w-full overflow-hidden bg-secondary ${
+        className={`relative aspect-[3/4] w-full overflow-hidden bg-secondary transition-transform duration-500 hover:-translate-y-1 hover:shadow-xl ${
           soldOut ? "" : "cursor-pointer"
         }`}
         onClick={() => !soldOut && open(product.id)}
@@ -450,31 +628,48 @@ function ProductCard({ product }: { product: Product }) {
           src={product.image}
           alt={product.name}
           loading="lazy"
-          width={900}
-          height={1200}
-          className={`h-full w-full object-cover transition-transform duration-[1400ms] ease-out group-hover:scale-[1.06] ${
-            soldOut ? "opacity-60 grayscale" : ""
+          className={`h-full w-full object-cover transition-transform duration-[1400ms] ease-out group-hover:scale-[1.08] ${
+            soldOut ? "opacity-50 grayscale" : ""
           }`}
         />
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
           <StockBadge qty={qty} />
         </div>
         {isAdmin && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              openEdit(product.id);
-            }}
-            aria-label="Editar produto"
-            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center border border-accent/70 bg-background/90 text-accent shadow-sm backdrop-blur transition-colors hover:bg-accent hover:text-ivory"
-          >
-            <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
-          </button>
+          <div className="absolute right-3 top-3 flex flex-col gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openEdit(product.id);
+              }}
+              aria-label="Editar produto"
+              className="flex h-8 w-8 items-center justify-center border border-accent/70 bg-background/90 text-accent shadow-sm backdrop-blur transition-colors hover:bg-accent hover:text-ivory"
+            >
+              <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm(`Excluir "${product.name}"?`)) deleteProduct(product.id);
+              }}
+              aria-label="Excluir produto"
+              className="flex h-8 w-8 items-center justify-center border border-destructive/60 bg-background/90 text-destructive shadow-sm backdrop-blur transition-colors hover:bg-destructive hover:text-ivory"
+            >
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+            </button>
+          </div>
         )}
         {soldOut ? (
-          <div className="absolute inset-x-4 bottom-4 border border-ivory/40 bg-charcoal/80 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory/80 backdrop-blur-sm">
-            Produto Esgotado
-          </div>
+          <>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="rotate-[-8deg] border-2 border-destructive/80 bg-charcoal/40 px-6 py-2 font-serif text-2xl tracking-widest text-destructive backdrop-blur">
+                SOLD OUT
+              </span>
+            </div>
+            <div className="absolute inset-x-4 bottom-4 border border-ivory/40 bg-charcoal/80 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory/80 backdrop-blur-sm">
+              Produto Esgotado
+            </div>
+          </>
         ) : (
           <div className="absolute inset-x-4 bottom-4 translate-y-6 border border-ivory/80 bg-charcoal/70 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory opacity-0 backdrop-blur-sm transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">
             Ver Produto
@@ -490,6 +685,11 @@ function ProductCard({ product }: { product: Product }) {
         </div>
         <span className="shrink-0 text-xs md:text-sm tabular-nums">{formatBRL(product.price)}</span>
       </div>
+      {qty === 1 && (
+        <p className="mt-2 text-[10px] font-semibold uppercase tracking-luxe text-accent">
+          Garanta o seu antes que acabe!
+        </p>
+      )}
       {isAdmin && (
         <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
           Estoque: <span className="text-accent">{qty}</span>
@@ -539,7 +739,7 @@ function ProductModal() {
                 <img
                   src={gallery[activeImg]}
                   alt={active.name}
-                  className="h-full w-full object-cover transition-opacity duration-500"
+                  className="h-full w-full object-cover transition-transform duration-700 hover:scale-105"
                 />
               </div>
               {gallery.length > 1 && (
@@ -618,12 +818,24 @@ function ProductModal() {
   );
 }
 
-/* ---------- Admin Edit Modal ---------- */
+/* ---------- Admin Edit / Create Modal ---------- */
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
+
 function AdminEditModal() {
-  const { editingId, closeEdit } = useProduct();
-  const { products, updateProduct, stock, setStock } = useCatalog();
+  const { editingId, closeEdit, creatingCategory } = useProduct();
+  const { products, updateProduct, addProduct, stock, setStock, deleteProduct } = useCatalog();
+  const { tab } = useSearch();
   const isAdmin = useIsAdmin();
-  const product = editingId ? products.find((p) => p.id === editingId) ?? null : null;
+  const isCreate = editingId === "__new__";
+  const product = !isCreate && editingId ? products.find((p) => p.id === editingId) ?? null : null;
+  const open = isAdmin && (isCreate || !!product);
 
   const [form, setForm] = useState({
     name: "",
@@ -631,39 +843,91 @@ function AdminEditModal() {
     longDescription: "",
     price: 0,
     image: "",
-    gallery: "",
     stock: 0,
+    category: (creatingCategory ?? tab) as ProductCategory,
   });
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!product) return;
-    setForm({
-      name: product.name,
-      description: product.description,
-      longDescription: product.longDescription ?? "",
-      price: product.price,
-      image: product.image,
-      gallery: (product.gallery ?? [product.image]).join("\n"),
-      stock: stock[product.id] ?? 0,
-    });
-  }, [product, stock]);
+    setUploadError(null);
+    if (isCreate) {
+      setForm({
+        name: "",
+        description: "",
+        longDescription: "",
+        price: 0,
+        image: "",
+        stock: 1,
+        category: creatingCategory ?? tab,
+      });
+    } else if (product) {
+      setForm({
+        name: product.name,
+        description: product.description,
+        longDescription: product.longDescription ?? "",
+        price: product.price,
+        image: product.image,
+        stock: stock[product.id] ?? 0,
+        category: (product.category ?? "clothes") as ProductCategory,
+      });
+    }
+  }, [editingId, product, stock, isCreate, creatingCategory, tab]);
 
-  if (!isAdmin || !product) return null;
+  if (!open) return null;
+
+  const onPickFile = async (file: File | undefined) => {
+    setUploadError(null);
+    if (!file) return;
+    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) {
+      setUploadError("Envie uma imagem JPG, PNG ou WEBP.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError("Imagem muito grande. Use um arquivo de até 2 MB.");
+      return;
+    }
+    try {
+      const b64 = await fileToBase64(file);
+      setForm((f) => ({ ...f, image: b64 }));
+    } catch {
+      setUploadError("Falha ao ler a imagem.");
+    }
+  };
 
   const onSave = () => {
-    const gallery = form.gallery
-      .split("\n")
-      .map((g) => g.trim())
-      .filter(Boolean);
-    updateProduct(product.id, {
-      name: form.name.trim() || product.name,
-      description: form.description.trim(),
-      longDescription: form.longDescription.trim() || undefined,
-      price: Math.max(0, Number(form.price) || 0),
-      image: form.image.trim() || product.image,
-      gallery: gallery.length ? gallery : [form.image.trim() || product.image],
-    });
-    setStock(product.id, Math.max(0, Math.floor(Number(form.stock) || 0)));
+    const name = form.name.trim();
+    if (!name) return alert("Informe o nome do produto.");
+    if (!form.image) return alert("Envie uma foto do produto.");
+    const price = Math.max(0, Number(form.price) || 0);
+    const qty = Math.max(0, Math.floor(Number(form.stock) || 0));
+
+    if (isCreate) {
+      const id = `p_${Date.now()}`;
+      addProduct(
+        {
+          id,
+          name,
+          description: form.description.trim() || name,
+          longDescription: form.longDescription.trim() || undefined,
+          price,
+          image: form.image,
+          gallery: [form.image],
+          category: form.category,
+        },
+        qty,
+      );
+    } else if (product) {
+      updateProduct(product.id, {
+        name,
+        description: form.description.trim(),
+        longDescription: form.longDescription.trim() || undefined,
+        price,
+        image: form.image,
+        gallery: [form.image],
+        category: form.category,
+      });
+      setStock(product.id, qty);
+    }
     closeEdit();
   };
 
@@ -678,24 +942,63 @@ function AdminEditModal() {
           <div className="flex items-center justify-between border-b border-border px-6 py-4">
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-accent" strokeWidth={1.5} />
-              <p className="text-[11px] tracking-luxe uppercase text-accent">Editor · Admin</p>
+              <p className="text-[11px] tracking-luxe uppercase text-accent">
+                {isCreate ? "Novo Produto · Admin" : "Editor · Admin"}
+              </p>
             </div>
             <button onClick={closeEdit} aria-label="Fechar" className="hover:text-accent">
               <X className="h-4 w-4" strokeWidth={1.5} />
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-[160px_1fr]">
+          <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-[180px_1fr]">
             <div>
               <div className="aspect-[3/4] w-full overflow-hidden border border-border bg-secondary">
-                <img src={form.image || product.image} alt="" className="h-full w-full object-cover" />
+                {form.image ? (
+                  <img src={form.image} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-[10px] uppercase tracking-luxe text-muted-foreground">
+                    Sem foto
+                  </div>
+                )}
               </div>
-              <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
-                Prévia
+              <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 border border-accent/50 bg-accent/5 px-3 py-2 text-[10px] tracking-luxe uppercase text-accent transition-colors hover:bg-accent hover:text-charcoal">
+                <Upload className="h-3.5 w-3.5" strokeWidth={1.5} />
+                Enviar Foto (JPG)
+                <input
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  onChange={(e) => onPickFile(e.target.files?.[0])}
+                  className="hidden"
+                />
+              </label>
+              {uploadError && (
+                <p className="mt-2 text-[10px] text-destructive">{uploadError}</p>
+              )}
+              <p className="mt-2 text-[9px] tracking-luxe uppercase text-muted-foreground">
+                Até 2 MB · Salvo no dispositivo
               </p>
             </div>
 
             <div className="space-y-4">
+              <Field label="Categoria">
+                <div className="flex gap-2">
+                  {(["clothes", "sneakers"] as ProductCategory[]).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setForm({ ...form, category: c })}
+                      className={`border px-3 py-1.5 text-[10px] tracking-luxe uppercase transition-colors ${
+                        form.category === c
+                          ? "border-foreground bg-foreground text-ivory"
+                          : "border-border hover:border-foreground"
+                      }`}
+                    >
+                      {c === "clothes" ? "Roupas" : "Sneakers"}
+                    </button>
+                  ))}
+                </div>
+              </Field>
               <Field label="Nome do produto">
                 <input
                   value={form.name}
@@ -740,38 +1043,40 @@ function AdminEditModal() {
                   />
                 </Field>
               </div>
-              <Field label="Foto principal (URL)">
-                <input
-                  value={form.image}
-                  onChange={(e) => setForm({ ...form, image: e.target.value })}
-                  placeholder="https://..."
-                  className="w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent"
-                />
-              </Field>
-              <Field label="Galeria (uma URL por linha)">
-                <textarea
-                  value={form.gallery}
-                  onChange={(e) => setForm({ ...form, gallery: e.target.value })}
-                  rows={3}
-                  className="w-full border border-border bg-transparent p-2 text-xs font-mono outline-none focus:border-accent"
-                />
-              </Field>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
-            <button
-              onClick={closeEdit}
-              className="border border-border px-6 py-2.5 text-[11px] tracking-luxe uppercase hover:bg-secondary transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={onSave}
-              className="inline-flex items-center gap-2 bg-accent px-6 py-2.5 text-[11px] tracking-luxe uppercase text-charcoal transition-colors hover:bg-accent/90"
-            >
-              <Save className="h-3.5 w-3.5" strokeWidth={1.5} /> Salvar Alterações
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4">
+            {!isCreate && product ? (
+              <button
+                onClick={() => {
+                  if (confirm(`Excluir "${product.name}"?`)) {
+                    deleteProduct(product.id);
+                    closeEdit();
+                  }
+                }}
+                className="inline-flex items-center gap-2 border border-destructive/60 px-4 py-2 text-[11px] tracking-luxe uppercase text-destructive transition-colors hover:bg-destructive hover:text-ivory"
+              >
+                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} /> Excluir
+              </button>
+            ) : (
+              <span />
+            )}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={closeEdit}
+                className="border border-border px-6 py-2.5 text-[11px] tracking-luxe uppercase hover:bg-secondary transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={onSave}
+                className="inline-flex items-center gap-2 bg-accent px-6 py-2.5 text-[11px] tracking-luxe uppercase text-charcoal transition-colors hover:bg-accent/90"
+              >
+                <Save className="h-3.5 w-3.5" strokeWidth={1.5} />
+                {isCreate ? "Criar Produto" : "Salvar Alterações"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -941,6 +1246,7 @@ function Footer() {
 /* ---------- Cart Drawer ---------- */
 function CartDrawer() {
   const { isOpen, close, items, remove, updateQty, subtotal, count } = useCart();
+  const { setTab } = useSearch();
   const { user, openAuth } = useAuth();
   const [checkoutMsg, setCheckoutMsg] = useState<string | null>(null);
 
@@ -982,18 +1288,31 @@ function CartDrawer() {
         <div className="flex-1 overflow-y-auto px-6 py-6">
           {items.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-border">
-                <ShoppingBag className="h-8 w-8 text-muted-foreground" strokeWidth={1} />
+              <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-accent/40 bg-accent/5">
+                <ShoppingBag className="h-9 w-9 text-accent" strokeWidth={1} />
+                <span className="absolute -right-1 -top-1 flex h-3 w-3">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent/60" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-accent" />
+                </span>
               </div>
-              <p className="mt-6 font-serif text-xl">Seu carrinho está vazio.</p>
-              <p className="mt-3 max-w-[260px] text-sm font-light text-muted-foreground">
-                Que tal adicionar alguns produtos? Uma seleção curada aguarda por você.
+              <p className="mt-8 font-serif text-2xl leading-tight">
+                Seu carrinho<br />está vazio...
+              </p>
+              <p className="mt-4 max-w-[280px] text-sm font-light text-muted-foreground">
+                Não deixe seus produtos favoritos esgotarem — as edições são limitadas.
               </p>
               <button
-                onClick={close}
+                onClick={() => {
+                  setTab("clothes");
+                  close();
+                  setTimeout(
+                    () => document.getElementById("collections")?.scrollIntoView({ behavior: "smooth" }),
+                    150,
+                  );
+                }}
                 className="mt-8 bg-charcoal px-8 py-3 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
               >
-                Continuar Comprando
+                Ver Novidades
               </button>
             </div>
           ) : (
@@ -1136,7 +1455,7 @@ function SearchOverlay() {
               </button>
             </form>
             <p className="mt-4 text-[11px] text-muted-foreground">
-              Pressione Enter para pesquisar na coleção.
+              Pressione Enter para pesquisar em Roupas e Sneakers.
             </p>
           </div>
         </div>
