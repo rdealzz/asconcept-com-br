@@ -9,7 +9,9 @@ import {
   Minus,
   LogOut,
   Shield,
-  Package,
+  Pencil,
+  Save,
+  RotateCcw,
 } from "lucide-react";
 import { CartProvider, useCart, formatBRL, type Product } from "@/lib/cart-context";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
@@ -33,7 +35,7 @@ export const Route = createFileRoute("/")({
 
 const SIZES = ["P", "M", "G", "GG"] as const;
 
-const PRODUCTS: Product[] = [
+const DEFAULT_PRODUCTS: Product[] = [
   { id: "1", name: "Camisa de Linho Cornwall", description: "Linho italiano acabado à mão. Modelagem relaxada.", longDescription: "Confeccionada em linho italiano de fio longo, a camisa Cornwall combina caimento fluido com detalhes artesanais. Botões de madrepérola natural, pespontos internos e barra levemente arredondada.", price: 1590, image: p1, gallery: [p1] },
   { id: "2", name: "Suéter de Cashmere Kensington", description: "Cashmere puro da Mongólia em azul meia-noite.", longDescription: "Tricô fino em cashmere mongol grade A, com toque sedoso e caimento estruturado. Gola careca ribana, punhos e barra em canelado clássico.", price: 3290, image: p2, gallery: [p2] },
   { id: "3", name: "Blazer Trespassado Mayfair", description: "Lã com lapela pico, alfaiataria napolitana.", longDescription: "Alfaiataria napolitana em lã super 120, com lapela pico, ombro natural e forro em cupro. Bolsos flap com lenço interno, três botões forrados.", price: 7890, image: p3, gallery: [p3] },
@@ -44,39 +46,84 @@ const PRODUCTS: Product[] = [
   { id: "8", name: "Lenço de Bolso Belgravia", description: "Seda doze dobras, ourela marfim.", longDescription: "Lenço de bolso em seda dobrada doze vezes à mão, com bainha em contraste marfim.", price: 790, image: p8, gallery: [p8] },
 ];
 
-// Simulação de admin: qualquer e-mail que contenha "admin" é tratado como Administrador.
+const DEFAULT_STOCK: Record<string, number> = {
+  "1": 5, "2": 3, "3": 1, "4": 0, "5": 8, "6": 2, "7": 1, "8": 4,
+};
+
+const PRODUCTS_KEY = "as_products";
+const STOCK_KEY = "as_stock";
+
 function useIsAdmin() {
   const { user } = useAuth();
-  return !!user?.email && /admin/i.test(user.email);
+  return !!user?.isAdmin;
 }
 
-/* ---------- Stock Context ---------- */
-type StockCtx = {
+/* ---------- Catalog Context (products + stock, persisted) ---------- */
+type CatalogCtx = {
+  products: Product[];
   stock: Record<string, number>;
+  updateProduct: (id: string, patch: Partial<Product>) => void;
   setStock: (id: string, qty: number) => void;
-  decrement: (id: string, by?: number) => void;
+  decrementStock: (id: string, by?: number) => void;
+  resetCatalog: () => void;
 };
-const StockContext = createContext<StockCtx | null>(null);
-function StockProvider({ children }: { children: React.ReactNode }) {
-  const [stock, setStockMap] = useState<Record<string, number>>(() => {
-    const initial: Record<string, number> = {};
-    PRODUCTS.forEach((p, i) => {
-      // valores variados para demonstrar os badges
-      initial[p.id] = [5, 3, 1, 0, 8, 2, 1, 4][i] ?? 5;
-    });
-    return initial;
-  });
+const CatalogContext = createContext<CatalogCtx | null>(null);
+
+function CatalogProvider({ children }: { children: React.ReactNode }) {
+  const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCTS);
+  const [stock, setStockMap] = useState<Record<string, number>>(DEFAULT_STOCK);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const rawP = localStorage.getItem(PRODUCTS_KEY);
+      if (rawP) {
+        const stored: Product[] = JSON.parse(rawP);
+        // merge with defaults so new default products still appear
+        const map = new Map(DEFAULT_PRODUCTS.map((p) => [p.id, p]));
+        stored.forEach((p) => map.set(p.id, { ...map.get(p.id), ...p } as Product));
+        setProducts(Array.from(map.values()));
+      }
+      const rawS = localStorage.getItem(STOCK_KEY);
+      if (rawS) setStockMap({ ...DEFAULT_STOCK, ...JSON.parse(rawS) });
+    } catch {}
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined") return;
+    try {
+      localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
+      localStorage.setItem(STOCK_KEY, JSON.stringify(stock));
+    } catch {}
+  }, [products, stock, hydrated]);
+
+  const updateProduct = (id: string, patch: Partial<Product>) =>
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+
   const setStock = (id: string, qty: number) =>
     setStockMap((prev) => ({ ...prev, [id]: Math.max(0, Math.floor(qty)) }));
-  const decrement = (id: string, by = 1) =>
+
+  const decrementStock = (id: string, by = 1) =>
     setStockMap((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) - by) }));
+
+  const resetCatalog = () => {
+    setProducts(DEFAULT_PRODUCTS);
+    setStockMap(DEFAULT_STOCK);
+  };
+
   return (
-    <StockContext.Provider value={{ stock, setStock, decrement }}>{children}</StockContext.Provider>
+    <CatalogContext.Provider
+      value={{ products, stock, updateProduct, setStock, decrementStock, resetCatalog }}
+    >
+      {children}
+    </CatalogContext.Provider>
   );
 }
-function useStock() {
-  const c = useContext(StockContext);
-  if (!c) throw new Error("StockProvider missing");
+function useCatalog() {
+  const c = useContext(CatalogContext);
+  if (!c) throw new Error("CatalogProvider missing");
   return c;
 }
 
@@ -110,7 +157,7 @@ function Index() {
   return (
     <AuthProvider>
       <CartProvider>
-        <StockProvider>
+        <CatalogProvider>
           <SearchProvider>
             <ProductProvider>
               <div className="min-h-screen bg-background text-foreground">
@@ -124,10 +171,11 @@ function Index() {
                 <ProductModal />
                 <AuthModal />
                 <SearchOverlay />
+                <AdminEditModal />
               </div>
             </ProductProvider>
           </SearchProvider>
-        </StockProvider>
+        </CatalogProvider>
       </CartProvider>
     </AuthProvider>
   );
@@ -135,16 +183,27 @@ function Index() {
 
 /* ---------- Product Modal Context ---------- */
 const ProductCtx = createContext<{
-  active: Product | null;
-  open: (p: Product) => void;
+  activeId: string | null;
+  open: (id: string) => void;
   close: () => void;
+  editingId: string | null;
+  openEdit: (id: string) => void;
+  closeEdit: () => void;
 } | null>(null);
 
 function ProductProvider({ children }: { children: React.ReactNode }) {
-  const [active, setActive] = useState<Product | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   return (
     <ProductCtx.Provider
-      value={{ active, open: (p) => setActive(p), close: () => setActive(null) }}
+      value={{
+        activeId,
+        open: (id) => setActiveId(id),
+        close: () => setActiveId(null),
+        editingId,
+        openEdit: (id) => setEditingId(id),
+        closeEdit: () => setEditingId(null),
+      }}
     >
       {children}
     </ProductCtx.Provider>
@@ -185,11 +244,6 @@ function Nav() {
           <a href="#collections" className="hover:text-accent transition-colors">Coleção</a>
           <a href="#edit" className="hover:text-accent transition-colors">O Editorial</a>
           <a href="#about" className="hover:text-accent transition-colors">Sobre</a>
-          {isAdmin && (
-            <span className="inline-flex items-center gap-1.5 border border-accent/60 px-2 py-1 text-accent">
-              <Shield className="h-3 w-3" strokeWidth={1.5} /> Admin
-            </span>
-          )}
         </nav>
         <a
           href="#"
@@ -215,7 +269,7 @@ function Nav() {
             <button
               onClick={() => signOut()}
               aria-label="Sair"
-              title={user.email ?? "Conta"}
+              title={`${user.email}${isAdmin ? " · Admin" : ""}`}
               className="hidden hover:text-accent transition-colors sm:block"
             >
               <LogOut className="h-4 w-4" strokeWidth={1.5} />
@@ -288,16 +342,18 @@ function Hero() {
 /* ---------- Products ---------- */
 function Products() {
   const { query, setQuery } = useSearch();
+  const { products, resetCatalog } = useCatalog();
+  const isAdmin = useIsAdmin();
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return PRODUCTS;
-    return PRODUCTS.filter(
+    if (!q) return products;
+    return products.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
         p.description.toLowerCase().includes(q) ||
         (p.longDescription ?? "").toLowerCase().includes(q),
     );
-  }, [query]);
+  }, [query, products]);
 
   return (
     <section id="collections" className="py-28 md:py-40">
@@ -320,6 +376,17 @@ function Products() {
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => {
+                if (confirm("Restaurar catálogo original? Todas as edições serão perdidas."))
+                  resetCatalog();
+              }}
+              className="mt-6 inline-flex items-center gap-2 border border-accent/50 px-3 py-1.5 text-[10px] tracking-luxe uppercase text-accent hover:bg-accent/10 transition-colors"
+            >
+              <RotateCcw className="h-3 w-3" strokeWidth={1.5} /> Restaurar catálogo
+            </button>
           )}
         </div>
 
@@ -364,35 +431,9 @@ function StockBadge({ qty }: { qty: number }) {
   return null;
 }
 
-function AdminStockEditor({ id }: { id: string }) {
-  const { stock, setStock } = useStock();
-  const [val, setVal] = useState(String(stock[id] ?? 0));
-  useEffect(() => setVal(String(stock[id] ?? 0)), [stock, id]);
-  return (
-    <div
-      onClick={(e) => e.stopPropagation()}
-      className="mt-3 flex items-center gap-2 border border-accent/40 bg-accent/5 px-2 py-1.5"
-    >
-      <Shield className="h-3 w-3 text-accent" strokeWidth={1.5} />
-      <span className="text-[10px] tracking-luxe uppercase text-accent">Estoque</span>
-      <input
-        type="number"
-        min={0}
-        value={val}
-        onChange={(e) => setVal(e.target.value)}
-        onBlur={() => setStock(id, Number(val) || 0)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-        }}
-        className="ml-auto w-16 border border-border bg-background px-2 py-1 text-right text-xs tabular-nums outline-none focus:border-accent"
-      />
-    </div>
-  );
-}
-
 function ProductCard({ product }: { product: Product }) {
-  const { open } = useProduct();
-  const { stock } = useStock();
+  const { open, openEdit } = useProduct();
+  const { stock } = useCatalog();
   const isAdmin = useIsAdmin();
   const qty = stock[product.id] ?? 0;
   const soldOut = qty === 0;
@@ -403,7 +444,7 @@ function ProductCard({ product }: { product: Product }) {
         className={`relative aspect-[3/4] w-full overflow-hidden bg-secondary ${
           soldOut ? "" : "cursor-pointer"
         }`}
-        onClick={() => !soldOut && open(product)}
+        onClick={() => !soldOut && open(product.id)}
       >
         <img
           src={product.image}
@@ -418,6 +459,18 @@ function ProductCard({ product }: { product: Product }) {
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
           <StockBadge qty={qty} />
         </div>
+        {isAdmin && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              openEdit(product.id);
+            }}
+            aria-label="Editar produto"
+            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center border border-accent/70 bg-background/90 text-accent shadow-sm backdrop-blur transition-colors hover:bg-accent hover:text-ivory"
+          >
+            <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
+          </button>
+        )}
         {soldOut ? (
           <div className="absolute inset-x-4 bottom-4 border border-ivory/40 bg-charcoal/80 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory/80 backdrop-blur-sm">
             Produto Esgotado
@@ -437,26 +490,31 @@ function ProductCard({ product }: { product: Product }) {
         </div>
         <span className="shrink-0 text-xs md:text-sm tabular-nums">{formatBRL(product.price)}</span>
       </div>
-      {isAdmin && <AdminStockEditor id={product.id} />}
+      {isAdmin && (
+        <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
+          Estoque: <span className="text-accent">{qty}</span>
+        </p>
+      )}
     </article>
   );
 }
 
 /* ---------- Product Modal ---------- */
 function ProductModal() {
-  const { active, close } = useProduct();
+  const { activeId, close } = useProduct();
   const { add } = useCart();
-  const { stock, decrement } = useStock();
+  const { products, stock, decrementStock } = useCatalog();
   const [size, setSize] = useState<string>("M");
   const [activeImg, setActiveImg] = useState(0);
+  const active = activeId ? products.find((p) => p.id === activeId) ?? null : null;
 
   useEffect(() => {
     setSize("M");
     setActiveImg(0);
-  }, [active]);
+  }, [activeId]);
 
   if (!active) return null;
-  const gallery = active.gallery ?? [active.image];
+  const gallery = active.gallery && active.gallery.length ? active.gallery : [active.image];
   const qty = stock[active.id] ?? 0;
   const soldOut = qty === 0;
 
@@ -535,7 +593,7 @@ function ProductModal() {
                 onClick={() => {
                   if (soldOut) return;
                   add(active, size);
-                  decrement(active.id, 1);
+                  decrementStock(active.id, 1);
                   close();
                 }}
                 disabled={soldOut}
@@ -557,6 +615,178 @@ function ProductModal() {
         </div>
       </div>
     </>
+  );
+}
+
+/* ---------- Admin Edit Modal ---------- */
+function AdminEditModal() {
+  const { editingId, closeEdit } = useProduct();
+  const { products, updateProduct, stock, setStock } = useCatalog();
+  const isAdmin = useIsAdmin();
+  const product = editingId ? products.find((p) => p.id === editingId) ?? null : null;
+
+  const [form, setForm] = useState({
+    name: "",
+    description: "",
+    longDescription: "",
+    price: 0,
+    image: "",
+    gallery: "",
+    stock: 0,
+  });
+
+  useEffect(() => {
+    if (!product) return;
+    setForm({
+      name: product.name,
+      description: product.description,
+      longDescription: product.longDescription ?? "",
+      price: product.price,
+      image: product.image,
+      gallery: (product.gallery ?? [product.image]).join("\n"),
+      stock: stock[product.id] ?? 0,
+    });
+  }, [product, stock]);
+
+  if (!isAdmin || !product) return null;
+
+  const onSave = () => {
+    const gallery = form.gallery
+      .split("\n")
+      .map((g) => g.trim())
+      .filter(Boolean);
+    updateProduct(product.id, {
+      name: form.name.trim() || product.name,
+      description: form.description.trim(),
+      longDescription: form.longDescription.trim() || undefined,
+      price: Math.max(0, Number(form.price) || 0),
+      image: form.image.trim() || product.image,
+      gallery: gallery.length ? gallery : [form.image.trim() || product.image],
+    });
+    setStock(product.id, Math.max(0, Math.floor(Number(form.stock) || 0)));
+    closeEdit();
+  };
+
+  return (
+    <>
+      <div
+        onClick={closeEdit}
+        className="fixed inset-0 z-[100] bg-charcoal/80 backdrop-blur-sm animate-in fade-in duration-300"
+      />
+      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 pointer-events-none">
+        <div className="pointer-events-auto relative w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+          <div className="flex items-center justify-between border-b border-border px-6 py-4">
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-accent" strokeWidth={1.5} />
+              <p className="text-[11px] tracking-luxe uppercase text-accent">Editor · Admin</p>
+            </div>
+            <button onClick={closeEdit} aria-label="Fechar" className="hover:text-accent">
+              <X className="h-4 w-4" strokeWidth={1.5} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-[160px_1fr]">
+            <div>
+              <div className="aspect-[3/4] w-full overflow-hidden border border-border bg-secondary">
+                <img src={form.image || product.image} alt="" className="h-full w-full object-cover" />
+              </div>
+              <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Prévia
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <Field label="Nome do produto">
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className="w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent"
+                />
+              </Field>
+              <Field label="Descrição curta">
+                <input
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  className="w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent"
+                />
+              </Field>
+              <Field label="Descrição longa">
+                <textarea
+                  value={form.longDescription}
+                  onChange={(e) => setForm({ ...form, longDescription: e.target.value })}
+                  rows={4}
+                  className="w-full border border-border bg-transparent p-2 text-sm outline-none focus:border-accent"
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Preço (R$)">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.price}
+                    onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+                    className="w-full border-b border-foreground/30 bg-transparent py-2 text-sm tabular-nums outline-none focus:border-accent"
+                  />
+                </Field>
+                <Field label="Estoque">
+                  <input
+                    type="number"
+                    min={0}
+                    step="1"
+                    value={form.stock}
+                    onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })}
+                    className="w-full border-b border-foreground/30 bg-transparent py-2 text-sm tabular-nums outline-none focus:border-accent"
+                  />
+                </Field>
+              </div>
+              <Field label="Foto principal (URL)">
+                <input
+                  value={form.image}
+                  onChange={(e) => setForm({ ...form, image: e.target.value })}
+                  placeholder="https://..."
+                  className="w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent"
+                />
+              </Field>
+              <Field label="Galeria (uma URL por linha)">
+                <textarea
+                  value={form.gallery}
+                  onChange={(e) => setForm({ ...form, gallery: e.target.value })}
+                  rows={3}
+                  className="w-full border border-border bg-transparent p-2 text-xs font-mono outline-none focus:border-accent"
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
+            <button
+              onClick={closeEdit}
+              className="border border-border px-6 py-2.5 text-[11px] tracking-luxe uppercase hover:bg-secondary transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={onSave}
+              className="inline-flex items-center gap-2 bg-accent px-6 py-2.5 text-[11px] tracking-luxe uppercase text-charcoal transition-colors hover:bg-accent/90"
+            >
+              <Save className="h-3.5 w-3.5" strokeWidth={1.5} /> Salvar Alterações
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }
 
@@ -923,7 +1153,6 @@ function AuthModal() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [info, setInfo] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && isOpen) closeAuth();
@@ -934,23 +1163,11 @@ function AuthModal() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setInfo(null);
     setLoading(true);
     const { error } =
       mode === "login" ? await signIn(email, password) : await signUp(email, password);
     setLoading(false);
     if (error) setError(error);
-    else if (mode === "signup") setInfo("Conta criada! Verifique seu e-mail para confirmar.");
-  };
-
-  const fillDemo = (kind: "cliente" | "admin") => {
-    if (kind === "admin") {
-      setEmail("admin@asconcept.com");
-      setPassword("admin123");
-    } else {
-      setEmail("cliente@asconcept.com");
-      setPassword("cliente123");
-    }
   };
 
   return (
@@ -980,35 +1197,15 @@ function AuthModal() {
               : "Registre-se para prosseguir com o pagamento e envio."}
           </p>
 
-          <div className="mt-6 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => fillDemo("cliente")}
-              className="flex items-center justify-center gap-2 border border-border py-2.5 text-[10px] tracking-luxe uppercase hover:border-foreground transition-colors"
-            >
-              <UserIcon className="h-3.5 w-3.5" strokeWidth={1.5} /> Cliente
-            </button>
-            <button
-              type="button"
-              onClick={() => fillDemo("admin")}
-              className="flex items-center justify-center gap-2 border border-accent/60 bg-accent/5 py-2.5 text-[10px] tracking-luxe uppercase text-accent hover:bg-accent/10 transition-colors"
-            >
-              <Shield className="h-3.5 w-3.5" strokeWidth={1.5} /> Admin
-            </button>
-          </div>
-          <p className="mt-2 text-[10px] text-muted-foreground">
-            Contas de demonstração — clique para preencher. Contas com “admin” no e-mail liberam o
-            gerenciamento de estoque <Package className="inline h-3 w-3" strokeWidth={1.5} />.
-          </p>
-
-          <form onSubmit={onSubmit} className="mt-6 space-y-4">
+          <form onSubmit={onSubmit} className="mt-8 space-y-4">
             <div>
               <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
                 E-mail
               </label>
               <input
-                type="email"
+                type="text"
                 required
+                autoComplete={mode === "login" ? "username" : "email"}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
@@ -1021,7 +1218,8 @@ function AuthModal() {
               <input
                 type="password"
                 required
-                minLength={6}
+                minLength={4}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
@@ -1029,7 +1227,6 @@ function AuthModal() {
             </div>
 
             {error && <p className="text-xs text-destructive">{error}</p>}
-            {info && <p className="text-xs text-accent">{info}</p>}
 
             <button
               type="submit"
@@ -1048,7 +1245,6 @@ function AuthModal() {
                   onClick={() => {
                     setMode("signup");
                     setError(null);
-                    setInfo(null);
                   }}
                   className="text-foreground hover:text-accent underline underline-offset-4"
                 >
@@ -1062,7 +1258,6 @@ function AuthModal() {
                   onClick={() => {
                     setMode("login");
                     setError(null);
-                    setInfo(null);
                   }}
                   className="text-foreground hover:text-accent underline underline-offset-4"
                 >
