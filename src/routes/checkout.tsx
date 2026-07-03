@@ -164,11 +164,7 @@ function CheckoutForm({
       total,
       paymentMethod: payment,
     });
-    if (typeof clear === "function") clear();
-    else {
-      // Fallback: esvazia removendo cada item
-      cart.items.forEach((i) => cart.remove(i.id, i.size));
-    }
+    clear();
     setPlacing(false);
     navigate({ to: "/pedidos/$id", params: { id: order.id } });
   };
