@@ -85,6 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const next = [...customers, { email: id, password }];
     writeJSON(USERS_KEY, next);
     persist({ email: id, isAdmin: false });
+    // Dispara boas-vindas (simulado/console por padrão; usa Resend/SendGrid se configurado)
+    void triggerWelcomeMail(id);
     return { error: null };
   };
 
