@@ -28,6 +28,7 @@ type CartCtx = {
   add: (p: Product, size?: string) => void;
   remove: (id: string, size: string) => void;
   updateQty: (id: string, size: string, delta: number) => void;
+  clear: () => void;
   open: () => void;
   close: () => void;
   toggle: () => void;

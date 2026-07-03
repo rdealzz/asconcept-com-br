@@ -191,7 +191,7 @@ function CheckoutForm({
                     value={formatCep(address.cep)}
                     onChange={(e) => setAddress((a) => ({ ...a, cep: normalizeCep(e.target.value) }))}
                     placeholder="00000-000"
-                    className="input-luxe w-full"
+                    className="w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-charcoal"
                     maxLength={9}
                     required
                   />
@@ -205,7 +205,7 @@ function CheckoutForm({
                 <input
                   value={address.logradouro}
                   onChange={(e) => setAddress((a) => ({ ...a, logradouro: e.target.value }))}
-                  className="input-luxe w-full"
+                  className="w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-charcoal"
                   required
                 />
               </Field>
@@ -213,7 +213,7 @@ function CheckoutForm({
                 <input
                   value={address.numero}
                   onChange={(e) => setAddress((a) => ({ ...a, numero: e.target.value }))}
-                  className="input-luxe w-full"
+                  className="w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-charcoal"
                   required
                 />
               </Field>
@@ -221,7 +221,7 @@ function CheckoutForm({
                 <input
                   value={address.complemento}
                   onChange={(e) => setAddress((a) => ({ ...a, complemento: e.target.value }))}
-                  className="input-luxe w-full"
+                  className="w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-charcoal"
                   placeholder="Apto, bloco, referência"
                 />
               </Field>
@@ -229,7 +229,7 @@ function CheckoutForm({
                 <input
                   value={address.bairro}
                   onChange={(e) => setAddress((a) => ({ ...a, bairro: e.target.value }))}
-                  className="input-luxe w-full"
+                  className="w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-charcoal"
                   required
                 />
               </Field>
@@ -237,7 +237,7 @@ function CheckoutForm({
                 <input
                   value={address.cidade}
                   onChange={(e) => setAddress((a) => ({ ...a, cidade: e.target.value }))}
-                  className="input-luxe w-full"
+                  className="w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-charcoal"
                   required
                 />
               </Field>
@@ -245,7 +245,7 @@ function CheckoutForm({
                 <input
                   value={address.uf}
                   onChange={(e) => setAddress((a) => ({ ...a, uf: e.target.value.toUpperCase().slice(0, 2) }))}
-                  className="input-luxe w-full uppercase"
+                  className="w-full border border-border bg-background px-3 py-2 text-sm uppercase outline-none focus:border-charcoal"
                   maxLength={2}
                   required
                 />
