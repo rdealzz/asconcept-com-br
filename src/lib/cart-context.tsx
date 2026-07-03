@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
+export type ProductCategory = "clothes" | "sneakers";
+
 export type Product = {
   id: string;
   name: string;
@@ -8,6 +10,7 @@ export type Product = {
   price: number;
   image: string;
   gallery?: string[];
+  category?: ProductCategory;
 };
 
 export type CartItem = {
