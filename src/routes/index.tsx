@@ -704,8 +704,11 @@ function ProductCard({ product }: { product: Product }) {
   const { open, openEdit } = useProduct();
   const { stock, deleteProduct } = useCatalog();
   const isAdmin = useIsAdmin();
-  const qty = stock[product.id] ?? 0;
-  const soldOut = qty === 0;
+  const sizeStock = stock[product.id];
+  const total = totalStock(sizeStock);
+  const soldOut = total === 0;
+  const showLastItem =
+    !soldOut && (product.forceLastItem === true || hasLastSize(sizeStock) || total === 1);
 
   return (
     <article className="group flex flex-col">
@@ -724,7 +727,12 @@ function ProductCard({ product }: { product: Product }) {
           }`}
         />
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
-          <StockBadge qty={qty} />
+          <StockBadge qty={total} />
+          {showLastItem && (
+            <span className="inline-flex items-center gap-1 border border-[color:var(--gold)] bg-background/95 px-2 py-1 text-[10px] font-medium tracking-luxe uppercase text-[color:var(--gold)] shadow-sm backdrop-blur">
+              ✦ Último Item
+            </span>
+          )}
         </div>
         {isAdmin && (
           <div className="absolute right-3 top-3 flex flex-col gap-2">
@@ -776,19 +784,23 @@ function ProductCard({ product }: { product: Product }) {
         </div>
         <span className="shrink-0 text-xs md:text-sm tabular-nums">{formatBRL(product.price)}</span>
       </div>
-      {qty === 1 && (
-        <p className="mt-2 text-[10px] font-semibold uppercase tracking-luxe text-accent">
+      {showLastItem && (
+        <p className="mt-2 text-[10px] font-semibold uppercase tracking-luxe text-[color:var(--gold)]">
           Garanta o seu antes que acabe!
         </p>
       )}
-      {isAdmin && (
+      {isAdmin && sizeStock && (
         <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
-          Estoque: <span className="text-accent">{qty}</span>
+          Estoque · P{sizeStock.P} · M{sizeStock.M} · G{sizeStock.G} · GG{sizeStock.GG}
+          {product.forceLastItem && (
+            <span className="ml-2 text-[color:var(--gold)]">· Último Item forçado</span>
+          )}
         </p>
       )}
     </article>
   );
 }
+
 
 /* ---------- Product Modal ---------- */
 function ProductModal() {
