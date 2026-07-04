@@ -1225,9 +1225,9 @@ function AdminEditModal() {
                   Forçar tag "Último Item"
                 </span>
               </label>
-              </div>
             </div>
           </div>
+
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4">
             {!isCreate && product ? (
