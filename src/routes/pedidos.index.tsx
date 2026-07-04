@@ -122,7 +122,7 @@ function OrdersPage() {
             }
           />
         ) : user.isAdmin ? (
-          <AdminOrdersList orders={visible} />
+          <AdminDashboard orders={visible} />
         ) : (
           <ul className="mt-10 space-y-6">
             {visible.map((o) => (
