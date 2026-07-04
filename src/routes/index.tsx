@@ -989,7 +989,8 @@ function AdminEditModal() {
     longDescription: "",
     price: 0,
     image: "",
-    stock: 0,
+    stock: emptyStock(),
+    forceLastItem: false,
     category: (creatingCategory ?? tab) as ProductCategory,
   });
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -1003,7 +1004,8 @@ function AdminEditModal() {
         longDescription: "",
         price: 0,
         image: "",
-        stock: 1,
+        stock: { P: 1, M: 1, G: 1, GG: 1 },
+        forceLastItem: false,
         category: creatingCategory ?? tab,
       });
     } else if (product) {
@@ -1013,7 +1015,8 @@ function AdminEditModal() {
         longDescription: product.longDescription ?? "",
         price: product.price,
         image: product.image,
-        stock: stock[product.id] ?? 0,
+        stock: coerceSizeStock(stock[product.id]),
+        forceLastItem: product.forceLastItem === true,
         category: (product.category ?? "clothes") as ProductCategory,
       });
     }
@@ -1040,12 +1043,18 @@ function AdminEditModal() {
     }
   };
 
+  const setSizeQty = (s: Size, v: number) =>
+    setForm((f) => ({
+      ...f,
+      stock: { ...f.stock, [s]: Math.max(0, Math.floor(v || 0)) },
+    }));
+
   const onSave = () => {
     const name = form.name.trim();
     if (!name) return alert("Informe o nome do produto.");
     if (!form.image) return alert("Envie uma foto do produto.");
     const price = Math.max(0, Number(form.price) || 0);
-    const qty = Math.max(0, Math.floor(Number(form.stock) || 0));
+    const stockObj = coerceSizeStock(form.stock);
 
     if (isCreate) {
       const id = `p_${Date.now()}`;
@@ -1059,8 +1068,9 @@ function AdminEditModal() {
           image: form.image,
           gallery: [form.image],
           category: form.category,
+          forceLastItem: form.forceLastItem || undefined,
         },
-        qty,
+        stockObj,
       );
     } else if (product) {
       updateProduct(product.id, {
@@ -1071,8 +1081,9 @@ function AdminEditModal() {
         image: form.image,
         gallery: [form.image],
         category: form.category,
+        forceLastItem: form.forceLastItem || undefined,
       });
-      setStock(product.id, qty);
+      setStock(product.id, stockObj);
     }
     closeEdit();
   };
