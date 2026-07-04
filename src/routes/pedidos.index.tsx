@@ -26,15 +26,10 @@ export const Route = createFileRoute("/pedidos/")({
 });
 
 const STATUS_META: Record<OrderStatus, { label: string; icon: string; className: string }> = {
-  Pendente: {
-    label: "Pendente de Aprovação",
+  "Aguardando Aprovação": {
+    label: "Aguardando Aprovação",
     icon: "⏳",
     className: "bg-[#FDF6E3] text-[#7A5B10] border-[#E9CE79]",
-  },
-  Aprovado: {
-    label: "Pedido Aprovado",
-    icon: "✨",
-    className: "bg-[#F1F3FF] text-[#141B2E] border-[#B7C0E0]",
   },
   "Preparando pedido": {
     label: "Preparando Pedido",
