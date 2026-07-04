@@ -113,7 +113,7 @@ export function orderCreatedTemplate(
     </h1>
     <p style="font-size:13px;line-height:1.7;color:${BRAND.charcoal};margin:0 0 12px;">
       Seu pedido <strong style="font-family:monospace;color:${BRAND.navy};">${escapeHtml(orderId)}</strong>
-      está agora com o status <strong>Pendente</strong> e será avaliado pelo nosso ateliê em instantes.
+      está agora com o status <strong>Aguardando Aprovação</strong> e será avaliado pelo nosso ateliê em instantes.
     </p>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;">
       ${rows}
