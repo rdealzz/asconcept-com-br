@@ -18,15 +18,30 @@ type OrdersCtx = {
 
 const Ctx = createContext<OrdersCtx | null>(null);
 
+function migrateStatus(s: unknown): Order["status"] {
+  if (s === "Pendente" || s === "Aguardando Aprovação") return "Aguardando Aprovação";
+  if (s === "Aprovado" || s === "Preparando pedido") return "Preparando pedido";
+  if (s === "Em trânsito") return "Em trânsito";
+  if (s === "Entregue") return "Entregue";
+  return "Aguardando Aprovação";
+}
+
+function normalize(orders: Order[]): Order[] {
+  return orders.map((o) => ({ ...o, status: migrateStatus(o.status) }));
+}
+
 function loadInitial(): Order[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(ORDERS_KEY);
-    if (raw) return JSON.parse(raw) as Order[];
-    // Migração de dados legados
+    if (raw) {
+      const parsed = normalize(JSON.parse(raw) as Order[]);
+      localStorage.setItem(ORDERS_KEY, JSON.stringify(parsed));
+      return parsed;
+    }
     const legacy = localStorage.getItem(LEGACY_KEY);
     if (legacy) {
-      const parsed = JSON.parse(legacy) as Order[];
+      const parsed = normalize(JSON.parse(legacy) as Order[]);
       localStorage.setItem(ORDERS_KEY, JSON.stringify(parsed));
       return parsed;
     }
