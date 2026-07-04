@@ -1189,16 +1189,42 @@ function AdminEditModal() {
                     className="w-full border-b border-foreground/30 bg-transparent py-2 text-sm tabular-nums outline-none focus:border-accent"
                   />
                 </Field>
-                <Field label="Estoque">
-                  <input
-                    type="number"
-                    min={0}
-                    step="1"
-                    value={form.stock}
-                    onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })}
-                    className="w-full border-b border-foreground/30 bg-transparent py-2 text-sm tabular-nums outline-none focus:border-accent"
-                  />
+                <Field label="Total em estoque">
+                  <div className="w-full border-b border-foreground/30 bg-transparent py-2 text-sm tabular-nums">
+                    {totalStock(form.stock)} unidades
+                  </div>
                 </Field>
+              </div>
+              <Field label="Estoque por tamanho">
+                <div className="grid grid-cols-4 gap-2">
+                  {SIZES.map((s) => (
+                    <label key={s} className="block">
+                      <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">
+                        {s}
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="1"
+                        value={form.stock[s]}
+                        onChange={(e) => setSizeQty(s, Number(e.target.value))}
+                        className="w-full border border-border bg-transparent px-2 py-1.5 text-sm tabular-nums outline-none focus:border-accent"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </Field>
+              <label className="flex cursor-pointer items-center gap-3 border border-[color:var(--gold)]/40 bg-[color:var(--gold)]/5 px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={form.forceLastItem}
+                  onChange={(e) => setForm({ ...form, forceLastItem: e.target.checked })}
+                  className="h-4 w-4 accent-[color:var(--gold)]"
+                />
+                <span className="text-[11px] tracking-luxe uppercase text-[color:var(--gold)]">
+                  Forçar tag "Último Item"
+                </span>
+              </label>
               </div>
             </div>
           </div>
