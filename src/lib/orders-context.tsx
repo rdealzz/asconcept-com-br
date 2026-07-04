@@ -62,7 +62,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     const order: Order = {
       ...o,
       id,
-      status: o.status ?? "Pendente",
+      status: o.status ?? "Aguardando Aprovação",
       createdAt: new Date().toISOString(),
     };
     commit((prev) => [order, ...prev]);
