@@ -807,19 +807,31 @@ function ProductModal() {
   const { activeId, close } = useProduct();
   const { add } = useCart();
   const { products, stock, decrementStock } = useCatalog();
-  const [size, setSize] = useState<string>("M");
+  const [size, setSize] = useState<Size>("M");
   const [activeImg, setActiveImg] = useState(0);
   const active = activeId ? products.find((p) => p.id === activeId) ?? null : null;
 
+  const sizeStock = active ? stock[active.id] : undefined;
+  const total = totalStock(sizeStock);
+  const soldOut = total === 0;
+  const availableQty = sizeStock?.[size] ?? 0;
+  const sizeSoldOut = availableQty === 0;
+  const lastItem =
+    !soldOut &&
+    !!active &&
+    (active.forceLastItem === true || hasLastSize(sizeStock) || total === 1);
+
   useEffect(() => {
-    setSize("M");
+    // Ao abrir um produto, selecionar automaticamente o primeiro tamanho com estoque.
+    if (!active) return;
     setActiveImg(0);
-  }, [activeId]);
+    const s = stock[active.id];
+    const firstAvailable = SIZES.find((sz) => (s?.[sz] ?? 0) > 0) ?? "M";
+    setSize(firstAvailable);
+  }, [activeId, active, stock]);
 
   if (!active) return null;
   const gallery = active.gallery && active.gallery.length ? active.gallery : [active.image];
-  const qty = stock[active.id] ?? 0;
-  const soldOut = qty === 0;
 
   return (
     <>
@@ -866,7 +878,14 @@ function ProductModal() {
               <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Concept</p>
               <h2 className="mt-3 font-serif text-3xl md:text-4xl leading-tight">{active.name}</h2>
               <p className="mt-3 text-lg tabular-nums">{formatBRL(active.price)}</p>
-              <div className="mt-3"><StockBadge qty={qty} /></div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <StockBadge qty={total} />
+                {lastItem && (
+                  <span className="inline-flex items-center gap-1 border border-[color:var(--gold)] bg-[color:var(--gold)]/10 px-2 py-1 text-[10px] font-medium tracking-luxe uppercase text-[color:var(--gold)]">
+                    ✦ Último Item
+                  </span>
+                )}
+              </div>
               <p className="mt-6 text-sm leading-relaxed text-muted-foreground font-light">
                 {active.longDescription ?? active.description}
               </p>
@@ -876,33 +895,57 @@ function ProductModal() {
                   Tamanho
                 </p>
                 <div className="flex gap-2">
-                  {SIZES.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setSize(s)}
-                      className={`h-11 w-14 border text-sm transition-all ${
-                        size === s
-                          ? "border-foreground bg-foreground text-ivory"
-                          : "border-border hover:border-foreground"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
+                  {SIZES.map((s) => {
+                    const q = sizeStock?.[s] ?? 0;
+                    const isOut = q === 0;
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => !isOut && setSize(s)}
+                        disabled={isOut}
+                        title={isOut ? "Tamanho esgotado" : `${q} em estoque`}
+                        className={`relative h-11 w-14 border text-sm transition-all ${
+                          size === s
+                            ? "border-foreground bg-foreground text-ivory"
+                            : "border-border hover:border-foreground"
+                        } ${
+                          isOut
+                            ? "cursor-not-allowed opacity-40 line-through"
+                            : ""
+                        }`}
+                      >
+                        {s}
+                        {q === 1 && !isOut && (
+                          <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[color:var(--gold)]" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
+                <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                  {sizeSoldOut
+                    ? "Tamanho selecionado sem disponibilidade."
+                    : availableQty === 1
+                      ? "Última peça em estoque neste tamanho."
+                      : `${availableQty} unidades disponíveis no tamanho ${size}.`}
+                </p>
               </div>
 
               <button
                 onClick={() => {
-                  if (soldOut) return;
+                  if (soldOut || sizeSoldOut) return;
                   add(active, size);
-                  decrementStock(active.id, 1);
+                  decrementStock(active.id, size, 1);
                   close();
                 }}
-                disabled={soldOut}
+                disabled={soldOut || sizeSoldOut}
                 className="mt-10 bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
               >
-                {soldOut ? "Produto Esgotado" : "Adicionar à Sacola"}
+                {soldOut
+                  ? "Produto Esgotado"
+                  : sizeSoldOut
+                    ? `Tamanho ${size} esgotado`
+                    : "Adicionar à Sacola"}
               </button>
 
               <div className="mt-8">
