@@ -20,8 +20,7 @@ export interface OrderItem {
 export type PaymentMethod = "credit_card" | "pix" | "boleto";
 
 export type OrderStatus =
-  | "Pendente"
-  | "Aprovado"
+  | "Aguardando Aprovação"
   | "Preparando pedido"
   | "Em trânsito"
   | "Entregue";
