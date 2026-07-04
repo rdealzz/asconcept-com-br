@@ -144,8 +144,8 @@ export function statusUpdateTemplate(
   trackingCode?: string,
 ) {
   const copy: Record<OrderStatus, string> = {
-    Pendente: "Seu pedido retornou ao status pendente e será revisado novamente.",
-    Aprovado: "Seu pedido foi aprovado e entra agora em nossa esteira de preparo.",
+    "Aguardando Aprovação":
+      "Seu pedido está aguardando aprovação e será avaliado pelo nosso ateliê em instantes.",
     "Preparando pedido":
       "Nosso ateliê está preparando cuidadosamente cada peça do seu pedido.",
     "Em trânsito":
