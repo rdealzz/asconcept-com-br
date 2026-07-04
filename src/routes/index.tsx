@@ -1358,6 +1358,17 @@ function Newsletter() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            const clean = email.trim().toLowerCase();
+            if (clean && typeof window !== "undefined") {
+              try {
+                const raw = localStorage.getItem(NEWSLETTER_KEY);
+                const list: { email: string; createdAt: string }[] = raw ? JSON.parse(raw) : [];
+                if (!list.some((l) => l.email.toLowerCase() === clean)) {
+                  list.push({ email: clean, createdAt: new Date().toISOString() });
+                  localStorage.setItem(NEWSLETTER_KEY, JSON.stringify(list));
+                }
+              } catch {}
+            }
             setSent(true);
           }}
           className="mx-auto mt-12 flex max-w-md items-center border-b border-foreground/40 pb-2 transition-colors focus-within:border-accent"
