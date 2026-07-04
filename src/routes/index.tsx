@@ -42,6 +42,14 @@ export const Route = createFileRoute("/")({
 });
 
 const SIZES = ["P", "M", "G", "GG"] as const;
+export type Size = (typeof SIZES)[number];
+export type SizeStock = Record<Size, number>;
+
+const emptyStock = (): SizeStock => ({ P: 0, M: 0, G: 0, GG: 0 });
+const totalStock = (s: SizeStock | undefined) =>
+  s ? s.P + s.M + s.G + s.GG : 0;
+const hasLastSize = (s: SizeStock | undefined) =>
+  !!s && (s.P === 1 || s.M === 1 || s.G === 1 || s.GG === 1);
 
 const DEFAULT_PRODUCTS: Product[] = [
   { id: "1", category: "clothes", name: "Camisa de Linho Cornwall", description: "Linho italiano acabado à mão. Modelagem relaxada.", longDescription: "Confeccionada em linho italiano de fio longo, com botões de madrepérola natural e pespontos internos.", price: 1590, image: p1, gallery: [p1] },
@@ -54,8 +62,15 @@ const DEFAULT_PRODUCTS: Product[] = [
   { id: "8", category: "clothes", name: "Lenço de Bolso Belgravia", description: "Seda doze dobras, ourela marfim.", longDescription: "Lenço de bolso em seda dobrada doze vezes à mão, com bainha em contraste marfim.", price: 790, image: p8, gallery: [p8] },
 ];
 
-const DEFAULT_STOCK: Record<string, number> = {
-  "1": 5, "2": 3, "3": 1, "4": 0, "5": 8, "6": 2, "7": 1, "8": 4,
+const DEFAULT_STOCK: Record<string, SizeStock> = {
+  "1": { P: 2, M: 2, G: 1, GG: 0 },
+  "2": { P: 1, M: 1, G: 1, GG: 0 },
+  "3": { P: 0, M: 1, G: 0, GG: 0 },
+  "4": { P: 0, M: 0, G: 0, GG: 0 },
+  "5": { P: 2, M: 3, G: 2, GG: 1 },
+  "6": { P: 0, M: 1, G: 1, GG: 0 },
+  "7": { P: 0, M: 1, G: 0, GG: 0 },
+  "8": { P: 1, M: 2, G: 1, GG: 0 },
 };
 
 const PRODUCTS_KEY = "as_products_v2";
