@@ -74,7 +74,8 @@ const DEFAULT_STOCK: Record<string, SizeStock> = {
 };
 
 const PRODUCTS_KEY = "as_products_v2";
-const STOCK_KEY = "as_stock_v2";
+const STOCK_KEY = "as_stock_v3"; // v3: fracionado por tamanho (P/M/G/GG)
+const NEWSLETTER_KEY = "as_newsletter";
 const SNEAKERS_LAUNCH = new Date("2026-09-01T00:00:00-03:00").getTime();
 
 function useIsAdmin() {
@@ -85,12 +86,12 @@ function useIsAdmin() {
 /* ---------- Catalog Context ---------- */
 type CatalogCtx = {
   products: Product[];
-  stock: Record<string, number>;
+  stock: Record<string, SizeStock>;
   updateProduct: (id: string, patch: Partial<Product>) => void;
-  addProduct: (p: Product, qty: number) => void;
+  addProduct: (p: Product, stock: SizeStock) => void;
   deleteProduct: (id: string) => void;
-  setStock: (id: string, qty: number) => void;
-  decrementStock: (id: string, by?: number) => void;
+  setStock: (id: string, stock: SizeStock) => void;
+  decrementStock: (id: string, size: Size, by?: number) => void;
   resetCatalog: () => void;
 };
 const CatalogContext = createContext<CatalogCtx | null>(null);
@@ -101,18 +102,56 @@ function loadProductsInitial(): Product[] {
     const raw = localStorage.getItem(PRODUCTS_KEY);
     if (raw) return JSON.parse(raw) as Product[];
   } catch {}
-  // Primeiro acesso — grava o padrão de fábrica imediatamente para blindar contra F5.
   try {
     localStorage.setItem(PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
   } catch {}
   return DEFAULT_PRODUCTS;
 }
 
-function loadStockInitial(): Record<string, number> {
+function coerceSizeStock(v: unknown): SizeStock {
+  if (typeof v === "number") {
+    // Migração legada: distribui o total priorizando M.
+    const n = Math.max(0, Math.floor(v));
+    if (n === 0) return emptyStock();
+    if (n === 1) return { P: 0, M: 1, G: 0, GG: 0 };
+    const base = Math.floor(n / 4);
+    const rem = n - base * 4;
+    const out: SizeStock = { P: base, M: base, G: base, GG: base };
+    const order: Size[] = ["M", "G", "P", "GG"];
+    for (let i = 0; i < rem; i++) out[order[i]] += 1;
+    return out;
+  }
+  if (v && typeof v === "object") {
+    const src = v as Partial<Record<Size, unknown>>;
+    return {
+      P: Math.max(0, Math.floor(Number(src.P) || 0)),
+      M: Math.max(0, Math.floor(Number(src.M) || 0)),
+      G: Math.max(0, Math.floor(Number(src.G) || 0)),
+      GG: Math.max(0, Math.floor(Number(src.GG) || 0)),
+    };
+  }
+  return emptyStock();
+}
+
+function loadStockInitial(): Record<string, SizeStock> {
   if (typeof window === "undefined") return DEFAULT_STOCK;
   try {
     const raw = localStorage.getItem(STOCK_KEY);
-    if (raw) return JSON.parse(raw) as Record<string, number>;
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const out: Record<string, SizeStock> = {};
+      for (const k of Object.keys(parsed)) out[k] = coerceSizeStock(parsed[k]);
+      return out;
+    }
+    // Migração da chave antiga (as_stock_v2 - numérica)
+    const legacy = localStorage.getItem("as_stock_v2");
+    if (legacy) {
+      const parsed = JSON.parse(legacy) as Record<string, unknown>;
+      const out: Record<string, SizeStock> = {};
+      for (const k of Object.keys(parsed)) out[k] = coerceSizeStock(parsed[k]);
+      localStorage.setItem(STOCK_KEY, JSON.stringify(out));
+      return out;
+    }
   } catch {}
   try {
     localStorage.setItem(STOCK_KEY, JSON.stringify(DEFAULT_STOCK));
@@ -127,7 +166,7 @@ function persistProducts(next: Product[]) {
   } catch {}
 }
 
-function persistStock(next: Record<string, number>) {
+function persistStock(next: Record<string, SizeStock>) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STOCK_KEY, JSON.stringify(next));
@@ -135,9 +174,8 @@ function persistStock(next: Record<string, number>) {
 }
 
 function CatalogProvider({ children }: { children: React.ReactNode }) {
-  // Lazy init — carrega diretamente do localStorage evitando qualquer reset em F5.
   const [products, setProducts] = useState<Product[]>(loadProductsInitial);
-  const [stock, setStockMap] = useState<Record<string, number>>(loadStockInitial);
+  const [stock, setStockMap] = useState<Record<string, SizeStock>>(loadStockInitial);
 
   const commitProducts = (updater: (prev: Product[]) => Product[]) =>
     setProducts((prev) => {
@@ -146,7 +184,9 @@ function CatalogProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
 
-  const commitStock = (updater: (prev: Record<string, number>) => Record<string, number>) =>
+  const commitStock = (
+    updater: (prev: Record<string, SizeStock>) => Record<string, SizeStock>,
+  ) =>
     setStockMap((prev) => {
       const next = updater(prev);
       persistStock(next);
@@ -156,9 +196,9 @@ function CatalogProvider({ children }: { children: React.ReactNode }) {
   const updateProduct = (id: string, patch: Partial<Product>) =>
     commitProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
 
-  const addProduct = (p: Product, qty: number) => {
+  const addProduct = (p: Product, s: SizeStock) => {
     commitProducts((prev) => [...prev, p]);
-    commitStock((prev) => ({ ...prev, [p.id]: Math.max(0, Math.floor(qty)) }));
+    commitStock((prev) => ({ ...prev, [p.id]: coerceSizeStock(s) }));
   };
 
   const deleteProduct = (id: string) => {
@@ -169,11 +209,17 @@ function CatalogProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const setStock = (id: string, qty: number) =>
-    commitStock((prev) => ({ ...prev, [id]: Math.max(0, Math.floor(qty)) }));
+  const setStock = (id: string, s: SizeStock) =>
+    commitStock((prev) => ({ ...prev, [id]: coerceSizeStock(s) }));
 
-  const decrementStock = (id: string, by = 1) =>
-    commitStock((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) - by) }));
+  const decrementStock = (id: string, size: Size, by = 1) =>
+    commitStock((prev) => {
+      const cur = prev[id] ?? emptyStock();
+      return {
+        ...prev,
+        [id]: { ...cur, [size]: Math.max(0, (cur[size] ?? 0) - by) },
+      };
+    });
 
   const resetCatalog = () => {
     commitProducts(() => DEFAULT_PRODUCTS);
@@ -193,6 +239,7 @@ function useCatalog() {
   if (!c) throw new Error("CatalogProvider missing");
   return c;
 }
+
 
 /* ---------- Search + Tabs Context ---------- */
 type SearchCtx = {
