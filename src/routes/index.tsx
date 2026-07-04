@@ -42,6 +42,14 @@ export const Route = createFileRoute("/")({
 });
 
 const SIZES = ["P", "M", "G", "GG"] as const;
+export type Size = (typeof SIZES)[number];
+export type SizeStock = Record<Size, number>;
+
+const emptyStock = (): SizeStock => ({ P: 0, M: 0, G: 0, GG: 0 });
+const totalStock = (s: SizeStock | undefined) =>
+  s ? s.P + s.M + s.G + s.GG : 0;
+const hasLastSize = (s: SizeStock | undefined) =>
+  !!s && (s.P === 1 || s.M === 1 || s.G === 1 || s.GG === 1);
 
 const DEFAULT_PRODUCTS: Product[] = [
   { id: "1", category: "clothes", name: "Camisa de Linho Cornwall", description: "Linho italiano acabado à mão. Modelagem relaxada.", longDescription: "Confeccionada em linho italiano de fio longo, com botões de madrepérola natural e pespontos internos.", price: 1590, image: p1, gallery: [p1] },
@@ -54,12 +62,20 @@ const DEFAULT_PRODUCTS: Product[] = [
   { id: "8", category: "clothes", name: "Lenço de Bolso Belgravia", description: "Seda doze dobras, ourela marfim.", longDescription: "Lenço de bolso em seda dobrada doze vezes à mão, com bainha em contraste marfim.", price: 790, image: p8, gallery: [p8] },
 ];
 
-const DEFAULT_STOCK: Record<string, number> = {
-  "1": 5, "2": 3, "3": 1, "4": 0, "5": 8, "6": 2, "7": 1, "8": 4,
+const DEFAULT_STOCK: Record<string, SizeStock> = {
+  "1": { P: 2, M: 2, G: 1, GG: 0 },
+  "2": { P: 1, M: 1, G: 1, GG: 0 },
+  "3": { P: 0, M: 1, G: 0, GG: 0 },
+  "4": { P: 0, M: 0, G: 0, GG: 0 },
+  "5": { P: 2, M: 3, G: 2, GG: 1 },
+  "6": { P: 0, M: 1, G: 1, GG: 0 },
+  "7": { P: 0, M: 1, G: 0, GG: 0 },
+  "8": { P: 1, M: 2, G: 1, GG: 0 },
 };
 
 const PRODUCTS_KEY = "as_products_v2";
-const STOCK_KEY = "as_stock_v2";
+const STOCK_KEY = "as_stock_v3"; // v3: fracionado por tamanho (P/M/G/GG)
+const NEWSLETTER_KEY = "as_newsletter";
 const SNEAKERS_LAUNCH = new Date("2026-09-01T00:00:00-03:00").getTime();
 
 function useIsAdmin() {
@@ -70,12 +86,12 @@ function useIsAdmin() {
 /* ---------- Catalog Context ---------- */
 type CatalogCtx = {
   products: Product[];
-  stock: Record<string, number>;
+  stock: Record<string, SizeStock>;
   updateProduct: (id: string, patch: Partial<Product>) => void;
-  addProduct: (p: Product, qty: number) => void;
+  addProduct: (p: Product, stock: SizeStock) => void;
   deleteProduct: (id: string) => void;
-  setStock: (id: string, qty: number) => void;
-  decrementStock: (id: string, by?: number) => void;
+  setStock: (id: string, stock: SizeStock) => void;
+  decrementStock: (id: string, size: Size, by?: number) => void;
   resetCatalog: () => void;
 };
 const CatalogContext = createContext<CatalogCtx | null>(null);
@@ -86,18 +102,56 @@ function loadProductsInitial(): Product[] {
     const raw = localStorage.getItem(PRODUCTS_KEY);
     if (raw) return JSON.parse(raw) as Product[];
   } catch {}
-  // Primeiro acesso — grava o padrão de fábrica imediatamente para blindar contra F5.
   try {
     localStorage.setItem(PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
   } catch {}
   return DEFAULT_PRODUCTS;
 }
 
-function loadStockInitial(): Record<string, number> {
+function coerceSizeStock(v: unknown): SizeStock {
+  if (typeof v === "number") {
+    // Migração legada: distribui o total priorizando M.
+    const n = Math.max(0, Math.floor(v));
+    if (n === 0) return emptyStock();
+    if (n === 1) return { P: 0, M: 1, G: 0, GG: 0 };
+    const base = Math.floor(n / 4);
+    const rem = n - base * 4;
+    const out: SizeStock = { P: base, M: base, G: base, GG: base };
+    const order: Size[] = ["M", "G", "P", "GG"];
+    for (let i = 0; i < rem; i++) out[order[i]] += 1;
+    return out;
+  }
+  if (v && typeof v === "object") {
+    const src = v as Partial<Record<Size, unknown>>;
+    return {
+      P: Math.max(0, Math.floor(Number(src.P) || 0)),
+      M: Math.max(0, Math.floor(Number(src.M) || 0)),
+      G: Math.max(0, Math.floor(Number(src.G) || 0)),
+      GG: Math.max(0, Math.floor(Number(src.GG) || 0)),
+    };
+  }
+  return emptyStock();
+}
+
+function loadStockInitial(): Record<string, SizeStock> {
   if (typeof window === "undefined") return DEFAULT_STOCK;
   try {
     const raw = localStorage.getItem(STOCK_KEY);
-    if (raw) return JSON.parse(raw) as Record<string, number>;
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const out: Record<string, SizeStock> = {};
+      for (const k of Object.keys(parsed)) out[k] = coerceSizeStock(parsed[k]);
+      return out;
+    }
+    // Migração da chave antiga (as_stock_v2 - numérica)
+    const legacy = localStorage.getItem("as_stock_v2");
+    if (legacy) {
+      const parsed = JSON.parse(legacy) as Record<string, unknown>;
+      const out: Record<string, SizeStock> = {};
+      for (const k of Object.keys(parsed)) out[k] = coerceSizeStock(parsed[k]);
+      localStorage.setItem(STOCK_KEY, JSON.stringify(out));
+      return out;
+    }
   } catch {}
   try {
     localStorage.setItem(STOCK_KEY, JSON.stringify(DEFAULT_STOCK));
@@ -112,7 +166,7 @@ function persistProducts(next: Product[]) {
   } catch {}
 }
 
-function persistStock(next: Record<string, number>) {
+function persistStock(next: Record<string, SizeStock>) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STOCK_KEY, JSON.stringify(next));
@@ -120,9 +174,8 @@ function persistStock(next: Record<string, number>) {
 }
 
 function CatalogProvider({ children }: { children: React.ReactNode }) {
-  // Lazy init — carrega diretamente do localStorage evitando qualquer reset em F5.
   const [products, setProducts] = useState<Product[]>(loadProductsInitial);
-  const [stock, setStockMap] = useState<Record<string, number>>(loadStockInitial);
+  const [stock, setStockMap] = useState<Record<string, SizeStock>>(loadStockInitial);
 
   const commitProducts = (updater: (prev: Product[]) => Product[]) =>
     setProducts((prev) => {
@@ -131,7 +184,9 @@ function CatalogProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
 
-  const commitStock = (updater: (prev: Record<string, number>) => Record<string, number>) =>
+  const commitStock = (
+    updater: (prev: Record<string, SizeStock>) => Record<string, SizeStock>,
+  ) =>
     setStockMap((prev) => {
       const next = updater(prev);
       persistStock(next);
@@ -141,9 +196,9 @@ function CatalogProvider({ children }: { children: React.ReactNode }) {
   const updateProduct = (id: string, patch: Partial<Product>) =>
     commitProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
 
-  const addProduct = (p: Product, qty: number) => {
+  const addProduct = (p: Product, s: SizeStock) => {
     commitProducts((prev) => [...prev, p]);
-    commitStock((prev) => ({ ...prev, [p.id]: Math.max(0, Math.floor(qty)) }));
+    commitStock((prev) => ({ ...prev, [p.id]: coerceSizeStock(s) }));
   };
 
   const deleteProduct = (id: string) => {
@@ -154,11 +209,17 @@ function CatalogProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const setStock = (id: string, qty: number) =>
-    commitStock((prev) => ({ ...prev, [id]: Math.max(0, Math.floor(qty)) }));
+  const setStock = (id: string, s: SizeStock) =>
+    commitStock((prev) => ({ ...prev, [id]: coerceSizeStock(s) }));
 
-  const decrementStock = (id: string, by = 1) =>
-    commitStock((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) - by) }));
+  const decrementStock = (id: string, size: Size, by = 1) =>
+    commitStock((prev) => {
+      const cur = prev[id] ?? emptyStock();
+      return {
+        ...prev,
+        [id]: { ...cur, [size]: Math.max(0, (cur[size] ?? 0) - by) },
+      };
+    });
 
   const resetCatalog = () => {
     commitProducts(() => DEFAULT_PRODUCTS);
@@ -178,6 +239,7 @@ function useCatalog() {
   if (!c) throw new Error("CatalogProvider missing");
   return c;
 }
+
 
 /* ---------- Search + Tabs Context ---------- */
 type SearchCtx = {
@@ -642,8 +704,11 @@ function ProductCard({ product }: { product: Product }) {
   const { open, openEdit } = useProduct();
   const { stock, deleteProduct } = useCatalog();
   const isAdmin = useIsAdmin();
-  const qty = stock[product.id] ?? 0;
-  const soldOut = qty === 0;
+  const sizeStock = stock[product.id];
+  const total = totalStock(sizeStock);
+  const soldOut = total === 0;
+  const showLastItem =
+    !soldOut && (product.forceLastItem === true || hasLastSize(sizeStock) || total === 1);
 
   return (
     <article className="group flex flex-col">
@@ -662,7 +727,12 @@ function ProductCard({ product }: { product: Product }) {
           }`}
         />
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
-          <StockBadge qty={qty} />
+          <StockBadge qty={total} />
+          {showLastItem && (
+            <span className="inline-flex items-center gap-1 border border-[color:var(--gold)] bg-background/95 px-2 py-1 text-[10px] font-medium tracking-luxe uppercase text-[color:var(--gold)] shadow-sm backdrop-blur">
+              ✦ Último Item
+            </span>
+          )}
         </div>
         {isAdmin && (
           <div className="absolute right-3 top-3 flex flex-col gap-2">
@@ -714,38 +784,54 @@ function ProductCard({ product }: { product: Product }) {
         </div>
         <span className="shrink-0 text-xs md:text-sm tabular-nums">{formatBRL(product.price)}</span>
       </div>
-      {qty === 1 && (
-        <p className="mt-2 text-[10px] font-semibold uppercase tracking-luxe text-accent">
+      {showLastItem && (
+        <p className="mt-2 text-[10px] font-semibold uppercase tracking-luxe text-[color:var(--gold)]">
           Garanta o seu antes que acabe!
         </p>
       )}
-      {isAdmin && (
+      {isAdmin && sizeStock && (
         <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
-          Estoque: <span className="text-accent">{qty}</span>
+          Estoque · P{sizeStock.P} · M{sizeStock.M} · G{sizeStock.G} · GG{sizeStock.GG}
+          {product.forceLastItem && (
+            <span className="ml-2 text-[color:var(--gold)]">· Último Item forçado</span>
+          )}
         </p>
       )}
     </article>
   );
 }
 
+
 /* ---------- Product Modal ---------- */
 function ProductModal() {
   const { activeId, close } = useProduct();
   const { add } = useCart();
   const { products, stock, decrementStock } = useCatalog();
-  const [size, setSize] = useState<string>("M");
+  const [size, setSize] = useState<Size>("M");
   const [activeImg, setActiveImg] = useState(0);
   const active = activeId ? products.find((p) => p.id === activeId) ?? null : null;
 
+  const sizeStock = active ? stock[active.id] : undefined;
+  const total = totalStock(sizeStock);
+  const soldOut = total === 0;
+  const availableQty = sizeStock?.[size] ?? 0;
+  const sizeSoldOut = availableQty === 0;
+  const lastItem =
+    !soldOut &&
+    !!active &&
+    (active.forceLastItem === true || hasLastSize(sizeStock) || total === 1);
+
   useEffect(() => {
-    setSize("M");
+    // Ao abrir um produto, selecionar automaticamente o primeiro tamanho com estoque.
+    if (!active) return;
     setActiveImg(0);
-  }, [activeId]);
+    const s = stock[active.id];
+    const firstAvailable = SIZES.find((sz) => (s?.[sz] ?? 0) > 0) ?? "M";
+    setSize(firstAvailable);
+  }, [activeId, active, stock]);
 
   if (!active) return null;
   const gallery = active.gallery && active.gallery.length ? active.gallery : [active.image];
-  const qty = stock[active.id] ?? 0;
-  const soldOut = qty === 0;
 
   return (
     <>
@@ -792,7 +878,14 @@ function ProductModal() {
               <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Concept</p>
               <h2 className="mt-3 font-serif text-3xl md:text-4xl leading-tight">{active.name}</h2>
               <p className="mt-3 text-lg tabular-nums">{formatBRL(active.price)}</p>
-              <div className="mt-3"><StockBadge qty={qty} /></div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <StockBadge qty={total} />
+                {lastItem && (
+                  <span className="inline-flex items-center gap-1 border border-[color:var(--gold)] bg-[color:var(--gold)]/10 px-2 py-1 text-[10px] font-medium tracking-luxe uppercase text-[color:var(--gold)]">
+                    ✦ Último Item
+                  </span>
+                )}
+              </div>
               <p className="mt-6 text-sm leading-relaxed text-muted-foreground font-light">
                 {active.longDescription ?? active.description}
               </p>
@@ -802,33 +895,57 @@ function ProductModal() {
                   Tamanho
                 </p>
                 <div className="flex gap-2">
-                  {SIZES.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setSize(s)}
-                      className={`h-11 w-14 border text-sm transition-all ${
-                        size === s
-                          ? "border-foreground bg-foreground text-ivory"
-                          : "border-border hover:border-foreground"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
+                  {SIZES.map((s) => {
+                    const q = sizeStock?.[s] ?? 0;
+                    const isOut = q === 0;
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => !isOut && setSize(s)}
+                        disabled={isOut}
+                        title={isOut ? "Tamanho esgotado" : `${q} em estoque`}
+                        className={`relative h-11 w-14 border text-sm transition-all ${
+                          size === s
+                            ? "border-foreground bg-foreground text-ivory"
+                            : "border-border hover:border-foreground"
+                        } ${
+                          isOut
+                            ? "cursor-not-allowed opacity-40 line-through"
+                            : ""
+                        }`}
+                      >
+                        {s}
+                        {q === 1 && !isOut && (
+                          <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[color:var(--gold)]" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
+                <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                  {sizeSoldOut
+                    ? "Tamanho selecionado sem disponibilidade."
+                    : availableQty === 1
+                      ? "Última peça em estoque neste tamanho."
+                      : `${availableQty} unidades disponíveis no tamanho ${size}.`}
+                </p>
               </div>
 
               <button
                 onClick={() => {
-                  if (soldOut) return;
+                  if (soldOut || sizeSoldOut) return;
                   add(active, size);
-                  decrementStock(active.id, 1);
+                  decrementStock(active.id, size, 1);
                   close();
                 }}
-                disabled={soldOut}
+                disabled={soldOut || sizeSoldOut}
                 className="mt-10 bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
               >
-                {soldOut ? "Produto Esgotado" : "Adicionar à Sacola"}
+                {soldOut
+                  ? "Produto Esgotado"
+                  : sizeSoldOut
+                    ? `Tamanho ${size} esgotado`
+                    : "Adicionar à Sacola"}
               </button>
 
               <div className="mt-8">
@@ -872,7 +989,8 @@ function AdminEditModal() {
     longDescription: "",
     price: 0,
     image: "",
-    stock: 0,
+    stock: emptyStock(),
+    forceLastItem: false,
     category: (creatingCategory ?? tab) as ProductCategory,
   });
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -886,7 +1004,8 @@ function AdminEditModal() {
         longDescription: "",
         price: 0,
         image: "",
-        stock: 1,
+        stock: { P: 1, M: 1, G: 1, GG: 1 },
+        forceLastItem: false,
         category: creatingCategory ?? tab,
       });
     } else if (product) {
@@ -896,7 +1015,8 @@ function AdminEditModal() {
         longDescription: product.longDescription ?? "",
         price: product.price,
         image: product.image,
-        stock: stock[product.id] ?? 0,
+        stock: coerceSizeStock(stock[product.id]),
+        forceLastItem: product.forceLastItem === true,
         category: (product.category ?? "clothes") as ProductCategory,
       });
     }
@@ -923,12 +1043,18 @@ function AdminEditModal() {
     }
   };
 
+  const setSizeQty = (s: Size, v: number) =>
+    setForm((f) => ({
+      ...f,
+      stock: { ...f.stock, [s]: Math.max(0, Math.floor(v || 0)) },
+    }));
+
   const onSave = () => {
     const name = form.name.trim();
     if (!name) return alert("Informe o nome do produto.");
     if (!form.image) return alert("Envie uma foto do produto.");
     const price = Math.max(0, Number(form.price) || 0);
-    const qty = Math.max(0, Math.floor(Number(form.stock) || 0));
+    const stockObj = coerceSizeStock(form.stock);
 
     if (isCreate) {
       const id = `p_${Date.now()}`;
@@ -942,8 +1068,9 @@ function AdminEditModal() {
           image: form.image,
           gallery: [form.image],
           category: form.category,
+          forceLastItem: form.forceLastItem || undefined,
         },
-        qty,
+        stockObj,
       );
     } else if (product) {
       updateProduct(product.id, {
@@ -954,8 +1081,9 @@ function AdminEditModal() {
         image: form.image,
         gallery: [form.image],
         category: form.category,
+        forceLastItem: form.forceLastItem || undefined,
       });
-      setStock(product.id, qty);
+      setStock(product.id, stockObj);
     }
     closeEdit();
   };
@@ -1061,19 +1189,45 @@ function AdminEditModal() {
                     className="w-full border-b border-foreground/30 bg-transparent py-2 text-sm tabular-nums outline-none focus:border-accent"
                   />
                 </Field>
-                <Field label="Estoque">
-                  <input
-                    type="number"
-                    min={0}
-                    step="1"
-                    value={form.stock}
-                    onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })}
-                    className="w-full border-b border-foreground/30 bg-transparent py-2 text-sm tabular-nums outline-none focus:border-accent"
-                  />
+                <Field label="Total em estoque">
+                  <div className="w-full border-b border-foreground/30 bg-transparent py-2 text-sm tabular-nums">
+                    {totalStock(form.stock)} unidades
+                  </div>
                 </Field>
               </div>
+              <Field label="Estoque por tamanho">
+                <div className="grid grid-cols-4 gap-2">
+                  {SIZES.map((s) => (
+                    <label key={s} className="block">
+                      <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">
+                        {s}
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="1"
+                        value={form.stock[s]}
+                        onChange={(e) => setSizeQty(s, Number(e.target.value))}
+                        className="w-full border border-border bg-transparent px-2 py-1.5 text-sm tabular-nums outline-none focus:border-accent"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </Field>
+              <label className="flex cursor-pointer items-center gap-3 border border-[color:var(--gold)]/40 bg-[color:var(--gold)]/5 px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={form.forceLastItem}
+                  onChange={(e) => setForm({ ...form, forceLastItem: e.target.checked })}
+                  className="h-4 w-4 accent-[color:var(--gold)]"
+                />
+                <span className="text-[11px] tracking-luxe uppercase text-[color:var(--gold)]">
+                  Forçar tag "Último Item"
+                </span>
+              </label>
             </div>
           </div>
+
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4">
             {!isCreate && product ? (
@@ -1204,6 +1358,17 @@ function Newsletter() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            const clean = email.trim().toLowerCase();
+            if (clean && typeof window !== "undefined") {
+              try {
+                const raw = localStorage.getItem(NEWSLETTER_KEY);
+                const list: { email: string; createdAt: string }[] = raw ? JSON.parse(raw) : [];
+                if (!list.some((l) => l.email.toLowerCase() === clean)) {
+                  list.push({ email: clean, createdAt: new Date().toISOString() });
+                  localStorage.setItem(NEWSLETTER_KEY, JSON.stringify(list));
+                }
+              } catch {}
+            }
             setSent(true);
           }}
           className="mx-auto mt-12 flex max-w-md items-center border-b border-foreground/40 pb-2 transition-colors focus-within:border-accent"

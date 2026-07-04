@@ -26,15 +26,10 @@ export const Route = createFileRoute("/pedidos/")({
 });
 
 const STATUS_META: Record<OrderStatus, { label: string; icon: string; className: string }> = {
-  Pendente: {
-    label: "Pendente de Aprovação",
+  "Aguardando Aprovação": {
+    label: "Aguardando Aprovação",
     icon: "⏳",
     className: "bg-[#FDF6E3] text-[#7A5B10] border-[#E9CE79]",
-  },
-  Aprovado: {
-    label: "Pedido Aprovado",
-    icon: "✨",
-    className: "bg-[#F1F3FF] text-[#141B2E] border-[#B7C0E0]",
   },
   "Preparando pedido": {
     label: "Preparando Pedido",
@@ -83,7 +78,7 @@ function OrdersPage() {
           </h1>
           {user?.isAdmin && (
             <span className="rounded-sm border border-[color:var(--gold)] px-2 py-0.5 text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
-              Admin · rdealzz
+              Admin · {user.name ?? user.email}
             </span>
           )}
         </div>
@@ -127,7 +122,7 @@ function OrdersPage() {
             }
           />
         ) : user.isAdmin ? (
-          <AdminOrdersList orders={visible} />
+          <AdminDashboard orders={visible} />
         ) : (
           <ul className="mt-10 space-y-6">
             {visible.map((o) => (
@@ -158,7 +153,131 @@ function EmptyCard({
   );
 }
 
-/* ---------- Admin ---------- */
+/* ---------- Admin Dashboard (Tabs) ---------- */
+
+type Customer = { email: string; name?: string; createdAt?: string };
+type NewsletterLead = { email: string; createdAt: string };
+
+function readLS<T>(k: string, fb: T): T {
+  if (typeof window === "undefined") return fb;
+  try {
+    const raw = localStorage.getItem(k);
+    return raw ? (JSON.parse(raw) as T) : fb;
+  } catch {
+    return fb;
+  }
+}
+
+function AdminDashboard({ orders }: { orders: Order[] }) {
+  const [tab, setTab] = useState<"pedidos" | "clientes">("pedidos");
+  return (
+    <div className="mt-8">
+      <div className="flex gap-1 border-b border-border">
+        {(
+          [
+            { id: "pedidos", label: "Controle de Pedidos" },
+            { id: "clientes", label: "Banco de Clientes" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`relative px-5 py-3 text-[11px] tracking-luxe uppercase transition-colors ${
+              tab === t.id
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.label}
+            {tab === t.id && (
+              <span className="absolute inset-x-2 -bottom-[1px] h-[2px] bg-[color:var(--gold)]" />
+            )}
+          </button>
+        ))}
+      </div>
+      {tab === "pedidos" ? (
+        <AdminOrdersList orders={orders} />
+      ) : (
+        <AdminClientsPanel />
+      )}
+    </div>
+  );
+}
+
+function AdminClientsPanel() {
+  const customers = readLS<Customer[]>("as_customers", []);
+  const leads = readLS<NewsletterLead[]>("as_newsletter", []);
+
+  return (
+    <div className="mt-10 grid gap-8 lg:grid-cols-2 animate-[fade-in_0.4s_ease-out]">
+      <section className="border border-border bg-card">
+        <header className="flex items-baseline justify-between border-b border-border px-5 py-4">
+          <div>
+            <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
+              Cadastros
+            </p>
+            <h3 className="font-serif text-xl">Clientes registrados</h3>
+          </div>
+          <span className="font-serif text-2xl tabular-nums">{customers.length}</span>
+        </header>
+        {customers.length === 0 ? (
+          <p className="px-5 py-10 text-center text-sm text-muted-foreground">
+            Nenhum cliente cadastrado ainda.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {customers.map((c) => (
+              <li key={c.email} className="flex items-center justify-between gap-4 px-5 py-3">
+                <div className="min-w-0">
+                  <p className="truncate font-serif text-sm">
+                    {c.name ?? c.email.split("@")[0]}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">{c.email}</p>
+                </div>
+                {c.createdAt && (
+                  <span className="shrink-0 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    {new Date(c.createdAt).toLocaleDateString("pt-BR")}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="border border-border bg-card">
+        <header className="flex items-baseline justify-between border-b border-border px-5 py-4">
+          <div>
+            <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
+              Newsletter · Clube A&amp;S
+            </p>
+            <h3 className="font-serif text-xl">Leads captados</h3>
+          </div>
+          <span className="font-serif text-2xl tabular-nums">{leads.length}</span>
+        </header>
+        {leads.length === 0 ? (
+          <p className="px-5 py-10 text-center text-sm text-muted-foreground">
+            Nenhum e-mail captado pelo rodapé ainda.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {leads.map((l) => (
+              <li key={l.email} className="flex items-center justify-between gap-4 px-5 py-3">
+                <p className="truncate text-sm">{l.email}</p>
+                <span className="shrink-0 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                  {new Date(l.createdAt).toLocaleDateString("pt-BR")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="border-t border-border px-5 py-3 text-[10px] leading-relaxed text-muted-foreground">
+          Lista consultada em tempo real do localStorage. Use para monitoramento manual nesta fase inicial.
+        </p>
+      </section>
+    </div>
+  );
+}
 
 function AdminOrdersList({ orders }: { orders: Order[] }) {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "todos">("todos");
@@ -499,8 +618,7 @@ export function StatusBadge({ status }: { status: OrderStatus }) {
 
 function StatusIcon({ status }: { status: OrderStatus }) {
   const cls = "h-3.5 w-3.5";
-  if (status === "Pendente") return <Clock className={cls} strokeWidth={1.5} />;
-  if (status === "Aprovado") return <Sparkles className={cls} strokeWidth={1.5} />;
+  if (status === "Aguardando Aprovação") return <Clock className={cls} strokeWidth={1.5} />;
   if (status === "Preparando pedido") return <Package className={cls} strokeWidth={1.5} />;
   if (status === "Em trânsito") return <Truck className={cls} strokeWidth={1.5} />;
   return <CheckCircle2 className={cls} strokeWidth={1.5} />;

@@ -11,6 +11,7 @@ export type Product = {
   image: string;
   gallery?: string[];
   category?: ProductCategory;
+  forceLastItem?: boolean;
 };
 
 export type CartItem = {

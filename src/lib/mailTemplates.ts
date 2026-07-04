@@ -113,7 +113,7 @@ export function orderCreatedTemplate(
     </h1>
     <p style="font-size:13px;line-height:1.7;color:${BRAND.charcoal};margin:0 0 12px;">
       Seu pedido <strong style="font-family:monospace;color:${BRAND.navy};">${escapeHtml(orderId)}</strong>
-      está agora com o status <strong>Pendente</strong> e será avaliado pelo nosso ateliê em instantes.
+      está agora com o status <strong>Aguardando Aprovação</strong> e será avaliado pelo nosso ateliê em instantes.
     </p>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;">
       ${rows}
@@ -144,8 +144,8 @@ export function statusUpdateTemplate(
   trackingCode?: string,
 ) {
   const copy: Record<OrderStatus, string> = {
-    Pendente: "Seu pedido retornou ao status pendente e será revisado novamente.",
-    Aprovado: "Seu pedido foi aprovado e entra agora em nossa esteira de preparo.",
+    "Aguardando Aprovação":
+      "Seu pedido está aguardando aprovação e será avaliado pelo nosso ateliê em instantes.",
     "Preparando pedido":
       "Nosso ateliê está preparando cuidadosamente cada peça do seu pedido.",
     "Em trânsito":
