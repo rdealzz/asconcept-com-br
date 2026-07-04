@@ -78,7 +78,7 @@ function OrdersPage() {
           </h1>
           {user?.isAdmin && (
             <span className="rounded-sm border border-[color:var(--gold)] px-2 py-0.5 text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
-              Admin · rdealzz
+              Admin · {user.name ?? user.email}
             </span>
           )}
         </div>
