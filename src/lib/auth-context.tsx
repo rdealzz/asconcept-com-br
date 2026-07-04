@@ -3,10 +3,11 @@ import { triggerWelcomeMail } from "./mail";
 
 export type AppUser = {
   email: string;
+  name?: string;
   isAdmin: boolean;
 };
 
-type StoredCustomer = { email: string; password: string };
+type StoredCustomer = { email: string; password: string; name?: string; createdAt?: string };
 
 type AuthCtx = {
   user: AppUser | null;
@@ -15,7 +16,7 @@ type AuthCtx = {
   openAuth: () => void;
   closeAuth: () => void;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, name?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -23,8 +24,12 @@ const Ctx = createContext<AuthCtx | null>(null);
 
 const USERS_KEY = "as_customers";
 const SESSION_KEY = "as_session";
-const MASTER_USER = "rdealzz";
-const MASTER_PASS = "2311$";
+
+// Contas administrativas (desenvolvedor + sócio)
+const ADMINS: { id: string; password: string; name: string }[] = [
+  { id: "rdealzz", password: "2311$", name: "rdealzz" },
+  { id: "gui", password: "@Bonito123", name: "Gui" },
+];
 
 function readJSON<T>(k: string, fb: T): T {
   if (typeof window === "undefined") return fb;
@@ -60,8 +65,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn: AuthCtx["signIn"] = async (email, password) => {
     const id = email.trim();
-    if (id === MASTER_USER && password === MASTER_PASS) {
-      persist({ email: MASTER_USER, isAdmin: true });
+    const admin = ADMINS.find(
+      (a) => a.id.toLowerCase() === id.toLowerCase() && a.password === password,
+    );
+    if (admin) {
+      persist({ email: admin.id, name: admin.name, isAdmin: true });
       return { error: null };
     }
     const customers = readJSON<StoredCustomer[]>(USERS_KEY, []);
@@ -69,24 +77,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (c) => c.email.toLowerCase() === id.toLowerCase() && c.password === password,
     );
     if (!found) return { error: "E-mail ou senha inválidos." };
-    persist({ email: found.email, isAdmin: false });
+    persist({ email: found.email, name: found.name, isAdmin: false });
     return { error: null };
   };
 
-  const signUp: AuthCtx["signUp"] = async (email, password) => {
+  const signUp: AuthCtx["signUp"] = async (email, password, name) => {
     const id = email.trim();
     if (!id || !password) return { error: "Preencha e-mail e senha." };
-    if (id.toLowerCase() === MASTER_USER.toLowerCase())
+    if (ADMINS.some((a) => a.id.toLowerCase() === id.toLowerCase()))
       return { error: "Este identificador não está disponível." };
     if (password.length < 4) return { error: "A senha deve ter ao menos 4 caracteres." };
     const customers = readJSON<StoredCustomer[]>(USERS_KEY, []);
     if (customers.some((c) => c.email.toLowerCase() === id.toLowerCase()))
       return { error: "Já existe uma conta com este e-mail." };
-    const next = [...customers, { email: id, password }];
+    const cleanName = (name ?? "").trim() || undefined;
+    const next = [
+      ...customers,
+      { email: id, password, name: cleanName, createdAt: new Date().toISOString() },
+    ];
     writeJSON(USERS_KEY, next);
-    persist({ email: id, isAdmin: false });
-    // Dispara boas-vindas (simulado/console por padrão; usa Resend/SendGrid se configurado)
-    void triggerWelcomeMail(id);
+    persist({ email: id, name: cleanName, isAdmin: false });
+    void triggerWelcomeMail(id, cleanName);
     return { error: null };
   };
 
