@@ -494,8 +494,7 @@ export function StatusBadge({ status }: { status: OrderStatus }) {
 
 function StatusIcon({ status }: { status: OrderStatus }) {
   const cls = "h-3.5 w-3.5";
-  if (status === "Pendente") return <Clock className={cls} strokeWidth={1.5} />;
-  if (status === "Aprovado") return <Sparkles className={cls} strokeWidth={1.5} />;
+  if (status === "Aguardando Aprovação") return <Clock className={cls} strokeWidth={1.5} />;
   if (status === "Preparando pedido") return <Package className={cls} strokeWidth={1.5} />;
   if (status === "Em trânsito") return <Truck className={cls} strokeWidth={1.5} />;
   return <CheckCircle2 className={cls} strokeWidth={1.5} />;
