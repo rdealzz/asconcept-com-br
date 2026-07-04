@@ -37,16 +37,21 @@ export const Route = createFileRoute("/checkout")({
   component: CheckoutPage,
 });
 
-const STOCK_KEY = "as_stock_v2";
+const STOCK_KEY = "as_stock_v3";
+type SizeStock = { P: number; M: number; G: number; GG: number };
 
-function decrementStockLocalStorage(items: { id: string; qty: number }[]) {
+function decrementStockLocalStorage(items: { id: string; size: string; qty: number }[]) {
   if (typeof window === "undefined") return;
   try {
     const raw = localStorage.getItem(STOCK_KEY);
-    const stock: Record<string, number> = raw ? JSON.parse(raw) : {};
-    items.forEach(({ id, qty }) => {
-      const current = typeof stock[id] === "number" ? stock[id] : 0;
-      stock[id] = Math.max(0, current - qty);
+    const stock: Record<string, SizeStock> = raw ? JSON.parse(raw) : {};
+    items.forEach(({ id, size, qty }) => {
+      const cur = stock[id] ?? { P: 0, M: 0, G: 0, GG: 0 };
+      const key = (["P", "M", "G", "GG"] as const).includes(size as never)
+        ? (size as keyof SizeStock)
+        : "M";
+      cur[key] = Math.max(0, (cur[key] ?? 0) - qty);
+      stock[id] = cur;
     });
     localStorage.setItem(STOCK_KEY, JSON.stringify(stock));
   } catch {}
