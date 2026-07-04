@@ -255,7 +255,7 @@ function CheckoutForm({
       total,
       paymentMethod: payment,
     });
-    decrementStockLocalStorage(items.map((i) => ({ id: i.id, qty: i.qty })));
+    decrementStockLocalStorage(items.map((i) => ({ id: i.id, size: i.size, qty: i.qty })));
     void triggerOrderCreatedMail(email, order.id, total, orderItems);
     clear();
     setPlacing(false);
