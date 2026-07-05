@@ -248,6 +248,7 @@ function useCatalog() {
 
 
 /* ---------- Search + Tabs Context ---------- */
+export type SubFilter = "todos" | "blusa" | "camiseta" | "calca";
 type SearchCtx = {
   query: string;
   setQuery: (q: string) => void;
@@ -256,12 +257,15 @@ type SearchCtx = {
   close: () => void;
   tab: ProductCategory;
   setTab: (t: ProductCategory) => void;
+  subFilter: SubFilter;
+  setSubFilter: (s: SubFilter) => void;
 };
 const SearchContext = createContext<SearchCtx | null>(null);
 function SearchProvider({ children }: { children: React.ReactNode }) {
   const [query, setQuery] = useState("");
   const [isOpen, setOpen] = useState(false);
   const [tab, setTab] = useState<ProductCategory>("clothes");
+  const [subFilter, setSubFilter] = useState<SubFilter>("todos");
   return (
     <SearchContext.Provider
       value={{
@@ -272,6 +276,8 @@ function SearchProvider({ children }: { children: React.ReactNode }) {
         close: () => setOpen(false),
         tab,
         setTab,
+        subFilter,
+        setSubFilter,
       }}
     >
       {children}
