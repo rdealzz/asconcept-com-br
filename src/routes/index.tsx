@@ -547,15 +547,30 @@ function CategoryTabs() {
 }
 
 /* ---------- Products ---------- */
+const SUB_PATTERNS: Record<Exclude<SubFilter, "todos">, RegExp> = {
+  blusa: /(blusa|su[ée]ter|polo)/i,
+  camiseta: /(camisa|camiseta|t-?shirt)/i,
+  calca: /(cal[çc]a|pants|trouser)/i,
+};
+
+function matchesSub(name: string, description: string, sub: SubFilter) {
+  if (sub === "todos") return true;
+  const re = SUB_PATTERNS[sub];
+  return re.test(name) || re.test(description);
+}
+
 function Products() {
-  const { query, setQuery, tab } = useSearch();
+  const { query, setQuery, tab, subFilter, setSubFilter } = useSearch();
   const { products, resetCatalog } = useCatalog();
   const { openCreate } = useProduct();
   const isAdmin = useIsAdmin();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const inTab = products.filter((p) => (p.category ?? "clothes") === tab);
+    let inTab = products.filter((p) => (p.category ?? "clothes") === tab);
+    if (tab === "clothes" && subFilter !== "todos") {
+      inTab = inTab.filter((p) => matchesSub(p.name, p.description, subFilter));
+    }
     if (!q) return inTab;
     return inTab.filter(
       (p) =>
@@ -563,7 +578,7 @@ function Products() {
         p.description.toLowerCase().includes(q) ||
         (p.longDescription ?? "").toLowerCase().includes(q),
     );
-  }, [query, products, tab]);
+  }, [query, products, tab, subFilter]);
 
   const showSneakersComingSoon = tab === "sneakers" && !isAdmin && filtered.length === 0;
 
