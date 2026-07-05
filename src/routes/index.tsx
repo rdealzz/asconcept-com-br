@@ -482,11 +482,6 @@ function Nav({
     </header>
   );
 }
-        </div>
-      </div>
-    </header>
-  );
-}
 
 /* ---------- Hero ---------- */
 function Hero() {
