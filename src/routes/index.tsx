@@ -612,6 +612,22 @@ function Products() {
             </div>
           )}
 
+          {subFilter !== "todos" && tab === "clothes" && (
+            <div className="mt-4 flex items-center gap-3 border border-accent/50 bg-accent/5 px-4 py-2 text-xs">
+              <span className="text-muted-foreground">Filtro:</span>
+              <span className="font-serif italic capitalize">
+                {subFilter === "calca" ? "Calça" : subFilter}
+              </span>
+              <button
+                onClick={() => setSubFilter("todos")}
+                className="ml-2 text-muted-foreground hover:text-accent"
+                aria-label="Limpar filtro"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
           {isAdmin && (
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <button
