@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Search,
@@ -15,7 +15,13 @@ import {
   Trash2,
   Upload,
   Sparkles,
+  Menu,
+  Settings,
+  MapPin,
+  Package,
 } from "lucide-react";
+import { useOrders } from "@/lib/orders-context";
+import type { OrderStatus } from "@/lib/types";
 import {
   useCart,
   formatBRL,
