@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Search,
@@ -15,7 +15,13 @@ import {
   Trash2,
   Upload,
   Sparkles,
+  Menu,
+  Settings,
+  MapPin,
+  Package,
 } from "lucide-react";
+import { useOrders } from "@/lib/orders-context";
+import type { OrderStatus } from "@/lib/types";
 import {
   useCart,
   formatBRL,
@@ -242,6 +248,7 @@ function useCatalog() {
 
 
 /* ---------- Search + Tabs Context ---------- */
+export type SubFilter = "todos" | "blusa" | "camiseta" | "calca";
 type SearchCtx = {
   query: string;
   setQuery: (q: string) => void;
@@ -250,12 +257,15 @@ type SearchCtx = {
   close: () => void;
   tab: ProductCategory;
   setTab: (t: ProductCategory) => void;
+  subFilter: SubFilter;
+  setSubFilter: (s: SubFilter) => void;
 };
 const SearchContext = createContext<SearchCtx | null>(null);
 function SearchProvider({ children }: { children: React.ReactNode }) {
   const [query, setQuery] = useState("");
   const [isOpen, setOpen] = useState(false);
   const [tab, setTab] = useState<ProductCategory>("clothes");
+  const [subFilter, setSubFilter] = useState<SubFilter>("todos");
   return (
     <SearchContext.Provider
       value={{
@@ -266,6 +276,8 @@ function SearchProvider({ children }: { children: React.ReactNode }) {
         close: () => setOpen(false),
         tab,
         setTab,
+        subFilter,
+        setSubFilter,
       }}
     >
       {children}
@@ -279,12 +291,19 @@ function useSearch() {
 }
 
 function Index() {
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   return (
     <CatalogProvider>
       <SearchProvider>
         <ProductProvider>
           <div className="min-h-screen bg-background text-foreground">
-            <Nav />
+            <Nav
+              onOpenFilter={() => setFilterOpen(true)}
+              onOpenAccount={() => setAccountOpen(true)}
+              onOpenAdmin={() => setAdminOpen(true)}
+            />
             <Hero />
             <CategoryTabs />
             <Products />
@@ -296,6 +315,9 @@ function Index() {
             <AuthModal />
             <SearchOverlay />
             <AdminEditModal />
+            <FilterSidebar open={filterOpen} onClose={() => setFilterOpen(false)} />
+            <MinhaContaModal open={accountOpen} onClose={() => setAccountOpen(false)} />
+            <AdminPanelModal open={adminOpen} onClose={() => setAdminOpen(false)} />
           </div>
         </ProductProvider>
       </SearchProvider>
@@ -352,11 +374,20 @@ function useProduct() {
 }
 
 /* ---------- Nav ---------- */
-function Nav() {
+function Nav({
+  onOpenFilter,
+  onOpenAccount,
+  onOpenAdmin,
+}: {
+  onOpenFilter: () => void;
+  onOpenAccount: () => void;
+  onOpenAdmin: () => void;
+}) {
   const { open, count } = useCart();
-  const { user, openAuth, signOut } = useAuth();
+  const { user, openAuth } = useAuth();
   const { open: openSearch } = useSearch();
   const isAdmin = useIsAdmin();
+  const isDevMaster = user?.email?.toLowerCase() === "rdealzz";
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -372,15 +403,24 @@ function Nav() {
       }`}
     >
       <div className="mx-auto grid max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center px-6 py-5 md:px-12">
-        <nav
-          className={`hidden items-center gap-8 text-[11px] tracking-luxe uppercase md:flex ${
+        <div
+          className={`flex items-center gap-5 ${
             scrolled ? "text-foreground" : "text-ivory"
           }`}
         >
-          <a href="#collections" className="hover:text-accent transition-colors">Coleção</a>
-          <a href="#edit" className="hover:text-accent transition-colors">O Editorial</a>
-          <a href="#about" className="hover:text-accent transition-colors">Sobre</a>
-        </nav>
+          <button
+            aria-label="Filtrar categoria"
+            onClick={onOpenFilter}
+            className="hover:text-accent transition-colors"
+          >
+            <Menu className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <nav className="hidden items-center gap-8 text-[11px] tracking-luxe uppercase md:flex">
+            <a href="#collections" className="hover:text-accent transition-colors">Coleção</a>
+            <a href="#edit" className="hover:text-accent transition-colors">O Editorial</a>
+            <a href="#about" className="hover:text-accent transition-colors">Sobre</a>
+          </nav>
+        </div>
         <a
           href="#"
           className={`font-serif text-xl md:text-2xl tracking-wider text-center whitespace-nowrap ${
@@ -406,24 +446,14 @@ function Nav() {
           >
             <Search className="h-4 w-4" strokeWidth={1.5} />
           </button>
-          {user ? (
-            <button
-              onClick={() => signOut()}
-              aria-label="Sair"
-              title={`${user.email}${isAdmin ? " · Admin" : ""}`}
-              className="hidden hover:text-accent transition-colors sm:block"
-            >
-              <LogOut className="h-4 w-4" strokeWidth={1.5} />
-            </button>
-          ) : (
-            <button
-              onClick={openAuth}
-              aria-label="Conta"
-              className="hidden hover:text-accent transition-colors sm:block"
-            >
-              <UserIcon className="h-4 w-4" strokeWidth={1.5} />
-            </button>
-          )}
+          <button
+            onClick={() => (user ? onOpenAccount() : openAuth())}
+            aria-label={user ? "Minha Conta" : "Entrar"}
+            title={user ? `${user.email}` : "Entrar"}
+            className="hover:text-accent transition-colors"
+          >
+            <UserIcon className="h-4 w-4" strokeWidth={1.5} />
+          </button>
           <button
             aria-label="Sacola"
             onClick={open}
@@ -436,6 +466,17 @@ function Nav() {
               </span>
             )}
           </button>
+          {isDevMaster && (
+            <button
+              aria-label="Painel Admin"
+              onClick={onOpenAdmin}
+              title="Painel Admin — rdealzz"
+              className="relative hover:text-accent transition-colors"
+            >
+              <Settings className="h-4 w-4" strokeWidth={1.5} />
+              <span className="absolute -right-2 -top-2 h-1.5 w-1.5 rounded-full bg-accent" />
+            </button>
+          )}
         </div>
       </div>
     </header>
@@ -506,15 +547,30 @@ function CategoryTabs() {
 }
 
 /* ---------- Products ---------- */
+const SUB_PATTERNS: Record<Exclude<SubFilter, "todos">, RegExp> = {
+  blusa: /(blusa|su[ée]ter|polo)/i,
+  camiseta: /(camisa|camiseta|t-?shirt)/i,
+  calca: /(cal[çc]a|pants|trouser)/i,
+};
+
+function matchesSub(name: string, description: string, sub: SubFilter) {
+  if (sub === "todos") return true;
+  const re = SUB_PATTERNS[sub];
+  return re.test(name) || re.test(description);
+}
+
 function Products() {
-  const { query, setQuery, tab } = useSearch();
+  const { query, setQuery, tab, subFilter, setSubFilter } = useSearch();
   const { products, resetCatalog } = useCatalog();
   const { openCreate } = useProduct();
   const isAdmin = useIsAdmin();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const inTab = products.filter((p) => (p.category ?? "clothes") === tab);
+    let inTab = products.filter((p) => (p.category ?? "clothes") === tab);
+    if (tab === "clothes" && subFilter !== "todos") {
+      inTab = inTab.filter((p) => matchesSub(p.name, p.description, subFilter));
+    }
     if (!q) return inTab;
     return inTab.filter(
       (p) =>
@@ -522,7 +578,7 @@ function Products() {
         p.description.toLowerCase().includes(q) ||
         (p.longDescription ?? "").toLowerCase().includes(q),
     );
-  }, [query, products, tab]);
+  }, [query, products, tab, subFilter]);
 
   const showSneakersComingSoon = tab === "sneakers" && !isAdmin && filtered.length === 0;
 
@@ -550,6 +606,22 @@ function Products() {
                 onClick={() => setQuery("")}
                 className="ml-2 text-muted-foreground hover:text-accent"
                 aria-label="Limpar busca"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {subFilter !== "todos" && tab === "clothes" && (
+            <div className="mt-4 flex items-center gap-3 border border-accent/50 bg-accent/5 px-4 py-2 text-xs">
+              <span className="text-muted-foreground">Filtro:</span>
+              <span className="font-serif italic capitalize">
+                {subFilter === "calca" ? "Calça" : subFilter}
+              </span>
+              <button
+                onClick={() => setSubFilter("todos")}
+                className="ml-2 text-muted-foreground hover:text-accent"
+                aria-label="Limpar filtro"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -1779,6 +1851,471 @@ function AuthModal() {
                   Entrar
                 </button>
               </>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ---------- Filter Sidebar ---------- */
+const SUB_OPTIONS: { id: SubFilter; label: string }[] = [
+  { id: "todos", label: "Todos os produtos" },
+  { id: "blusa", label: "Blusa" },
+  { id: "camiseta", label: "Camiseta" },
+  { id: "calca", label: "Calça" },
+];
+
+function FilterSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { subFilter, setSubFilter, setTab } = useSearch();
+  const select = (id: SubFilter) => {
+    setTab("clothes");
+    setSubFilter(id);
+    onClose();
+    setTimeout(
+      () => document.getElementById("collections")?.scrollIntoView({ behavior: "smooth" }),
+      120,
+    );
+  };
+  return (
+    <>
+      <div
+        onClick={onClose}
+        className={`fixed inset-0 z-[85] bg-charcoal/60 backdrop-blur-sm transition-opacity duration-300 ${
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      />
+      <aside
+        className={`fixed inset-y-0 left-0 z-[90] flex w-full max-w-xs flex-col bg-background shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-border px-6 py-5">
+          <div>
+            <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+              Filtrar
+            </p>
+            <h3 className="font-serif text-xl">Categorias</h3>
+          </div>
+          <button onClick={onClose} aria-label="Fechar" className="hover:text-accent">
+            <X className="h-5 w-5" strokeWidth={1.5} />
+          </button>
+        </div>
+        <nav className="flex-1 overflow-y-auto px-2 py-4">
+          {SUB_OPTIONS.map((o) => {
+            const active = subFilter === o.id;
+            return (
+              <button
+                key={o.id}
+                onClick={() => select(o.id)}
+                className={`flex w-full items-center justify-between border-l-2 px-4 py-3 text-left text-sm transition-colors ${
+                  active
+                    ? "border-accent bg-accent/10 text-foreground"
+                    : "border-transparent text-muted-foreground hover:border-border hover:bg-secondary/50 hover:text-foreground"
+                }`}
+              >
+                <span className="font-serif text-base">{o.label}</span>
+                {active && (
+                  <span className="text-[10px] tracking-luxe uppercase text-accent">
+                    Ativo
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+        <p className="border-t border-border px-6 py-4 text-[10px] leading-relaxed text-muted-foreground">
+          Selecione uma categoria para refinar a vitrine de Roupas.
+        </p>
+      </aside>
+    </>
+  );
+}
+
+/* ---------- Minha Conta Modal ---------- */
+function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { user, updateProfile, getAddress, saveAddress, signOut } = useAuth();
+  const { orders, byUser } = useOrders();
+  const isDevMaster = user?.email?.toLowerCase() === "rdealzz";
+  const myOrders = user
+    ? isDevMaster || user.isAdmin
+      ? orders
+      : byUser(user.email)
+    : [];
+
+  const [name, setName] = useState(user?.name ?? "");
+  const [address, setAddress] = useState(() => getAddress() ?? {});
+  const [savedFlash, setSavedFlash] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setName(user?.name ?? "");
+      setAddress(getAddress() ?? {});
+      setSavedFlash(null);
+    }
+  }, [open, user, getAddress]);
+
+  if (!open || !user) return null;
+
+  const onSave = () => {
+    updateProfile({ name });
+    saveAddress(address);
+    setSavedFlash("Dados salvos com sucesso.");
+    setTimeout(() => setSavedFlash(null), 2400);
+  };
+
+  return (
+    <>
+      <div
+        onClick={onClose}
+        className="fixed inset-0 z-[95] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
+      />
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 pointer-events-none">
+        <div className="pointer-events-auto relative w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="absolute right-4 top-4 z-10 rounded-full bg-background/80 p-2 backdrop-blur hover:text-accent"
+          >
+            <X className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <div className="border-b border-border px-8 py-6">
+            <p className="text-[11px] tracking-luxe uppercase text-accent">Minha Conta</p>
+            <h2 className="mt-1 font-serif text-3xl">Olá, {user.name || user.email.split("@")[0]}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{user.email}</p>
+          </div>
+
+          <div className="grid gap-8 px-8 py-8 md:grid-cols-2">
+            <section>
+              <h3 className="mb-3 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Dados Pessoais
+              </h3>
+              <label className="block">
+                <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">
+                  Nome completo
+                </span>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Seu nome"
+                  className="w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+                />
+              </label>
+            </section>
+
+            <section>
+              <h3 className="mb-3 flex items-center gap-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                <MapPin className="h-3 w-3" /> Morada de Entrega
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="col-span-2 sm:col-span-1 block">
+                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">CEP</span>
+                  <input
+                    value={address.cep ?? ""}
+                    onChange={(e) => setAddress({ ...address, cep: e.target.value })}
+                    className="w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+                  />
+                </label>
+                <label className="col-span-2 sm:col-span-1 block">
+                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">Número</span>
+                  <input
+                    value={address.numero ?? ""}
+                    onChange={(e) => setAddress({ ...address, numero: e.target.value })}
+                    className="w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+                  />
+                </label>
+                <label className="col-span-2 block">
+                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">Logradouro</span>
+                  <input
+                    value={address.logradouro ?? ""}
+                    onChange={(e) => setAddress({ ...address, logradouro: e.target.value })}
+                    className="w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+                  />
+                </label>
+                <label className="col-span-2 block">
+                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">Complemento</span>
+                  <input
+                    value={address.complemento ?? ""}
+                    onChange={(e) => setAddress({ ...address, complemento: e.target.value })}
+                    className="w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+                  />
+                </label>
+                <label className="col-span-2 sm:col-span-1 block">
+                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">Bairro</span>
+                  <input
+                    value={address.bairro ?? ""}
+                    onChange={(e) => setAddress({ ...address, bairro: e.target.value })}
+                    className="w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+                  />
+                </label>
+                <label className="col-span-2 sm:col-span-1 block">
+                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">Cidade / UF</span>
+                  <div className="flex gap-2">
+                    <input
+                      value={address.cidade ?? ""}
+                      onChange={(e) => setAddress({ ...address, cidade: e.target.value })}
+                      className="w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+                    />
+                    <input
+                      value={address.uf ?? ""}
+                      maxLength={2}
+                      onChange={(e) => setAddress({ ...address, uf: e.target.value.toUpperCase() })}
+                      className="w-16 border border-border bg-transparent px-2 py-2 text-sm uppercase outline-none focus:border-accent"
+                    />
+                  </div>
+                </label>
+              </div>
+            </section>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-8 py-4">
+            <button
+              onClick={() => {
+                signOut();
+                onClose();
+              }}
+              className="inline-flex items-center gap-2 border border-border px-4 py-2 text-[11px] tracking-luxe uppercase hover:bg-secondary transition-colors"
+            >
+              <LogOut className="h-3.5 w-3.5" /> Sair da conta
+            </button>
+            <div className="flex items-center gap-3">
+              {savedFlash && (
+                <span className="text-[11px] text-accent animate-in fade-in duration-300">
+                  ✦ {savedFlash}
+                </span>
+              )}
+              <button
+                onClick={onSave}
+                className="inline-flex items-center gap-2 bg-charcoal px-6 py-2.5 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
+              >
+                <Save className="h-3.5 w-3.5" /> Salvar dados
+              </button>
+            </div>
+          </div>
+
+          <div className="border-t border-border px-8 py-6">
+            <h3 className="mb-4 flex items-center gap-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
+              <Package className="h-3 w-3" /> Histórico de Pedidos
+            </h3>
+            {myOrders.length === 0 ? (
+              <p className="border border-dashed border-border px-6 py-8 text-center text-sm text-muted-foreground">
+                Você ainda não realizou pedidos.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {myOrders.slice(0, 8).map((o) => (
+                  <li
+                    key={o.id}
+                    className="flex items-center justify-between gap-4 border border-border bg-card px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <Link
+                        to="/pedidos/$id"
+                        params={{ id: o.id }}
+                        onClick={onClose}
+                        className="font-mono text-sm hover:text-accent"
+                      >
+                        {o.id}
+                      </Link>
+                      <p className="text-[11px] text-muted-foreground">
+                        {new Date(o.createdAt).toLocaleString("pt-BR")}
+                      </p>
+                    </div>
+                    <span className="hidden sm:inline text-[10px] tracking-luxe uppercase text-muted-foreground">
+                      {o.status}
+                    </span>
+                    <span className="font-serif tabular-nums">{formatBRL(o.total)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-4 text-right">
+              <Link
+                to="/pedidos"
+                onClick={onClose}
+                className="text-[11px] tracking-luxe uppercase text-accent hover:underline underline-offset-4"
+              >
+                Ver todos os pedidos →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ---------- Admin Panel Modal (rdealzz) ---------- */
+const ADMIN_STATUSES: OrderStatus[] = [
+  "Aguardando Aprovação",
+  "Preparando pedido",
+  "Em trânsito",
+  "Entregue",
+];
+
+function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { user, listCustomers } = useAuth();
+  const { orders, updateStatus } = useOrders();
+  const [tab, setTab] = useState<"clientes" | "pedidos">("pedidos");
+  if (!open) return null;
+  if (user?.email?.toLowerCase() !== "rdealzz") return null;
+
+  const customers = listCustomers();
+
+  return (
+    <>
+      <div
+        onClick={onClose}
+        className="fixed inset-0 z-[95] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
+      />
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 pointer-events-none">
+        <div className="pointer-events-auto relative w-full max-w-5xl max-h-[92vh] overflow-y-auto bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="absolute right-4 top-4 z-10 rounded-full bg-background/80 p-2 backdrop-blur hover:text-accent"
+          >
+            <X className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <div className="border-b border-border px-8 py-6">
+            <p className="flex items-center gap-2 text-[11px] tracking-luxe uppercase text-accent">
+              <Shield className="h-3 w-3" /> Painel Admin · rdealzz
+            </p>
+            <h2 className="mt-1 font-serif text-3xl">Gestão Interna</h2>
+          </div>
+          <div className="flex gap-1 border-b border-border px-8">
+            {(
+              [
+                { id: "pedidos" as const, label: `Pedidos (${orders.length})` },
+                { id: "clientes" as const, label: `Clientes (${customers.length})` },
+              ]
+            ).map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`relative px-5 py-3 text-[11px] tracking-luxe uppercase transition-colors ${
+                  tab === t.id
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t.label}
+                {tab === t.id && (
+                  <span className="absolute inset-x-2 -bottom-[1px] h-[2px] bg-accent" />
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="px-8 py-6">
+            {tab === "clientes" ? (
+              customers.length === 0 ? (
+                <p className="border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
+                  Nenhum cliente registrado ainda.
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-[10px] tracking-luxe uppercase text-muted-foreground">
+                      <th className="py-3 pr-4">Nome</th>
+                      <th className="py-3 pr-4">E-mail</th>
+                      <th className="py-3 pr-4 text-right">Cadastrado em</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customers.map((c) => (
+                      <tr key={c.email} className="border-b border-border/50">
+                        <td className="py-3 pr-4 font-serif">
+                          {c.name ?? c.email.split("@")[0]}
+                        </td>
+                        <td className="py-3 pr-4 text-muted-foreground">{c.email}</td>
+                        <td className="py-3 pr-4 text-right text-[11px] text-muted-foreground">
+                          {c.createdAt
+                            ? new Date(c.createdAt).toLocaleDateString("pt-BR")
+                            : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+            ) : orders.length === 0 ? (
+              <p className="border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
+                Nenhum pedido registrado no momento.
+              </p>
+            ) : (
+              <ul className="space-y-4">
+                {orders.map((o) => (
+                  <li
+                    key={o.id}
+                    className="border border-border bg-card p-4 shadow-sm"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
+                      <div>
+                        <p className="font-mono text-sm">{o.id}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {new Date(o.createdAt).toLocaleString("pt-BR")} ·{" "}
+                          {o.customerName ?? o.customerEmail}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                          Status
+                        </label>
+                        <select
+                          value={o.status}
+                          onChange={(e) =>
+                            updateStatus(o.id, e.target.value as OrderStatus)
+                          }
+                          className="border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-accent"
+                        >
+                          {ADMIN_STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                              {s === "Preparando pedido"
+                                ? "Preparando"
+                                : s === "Em trânsito"
+                                  ? "Em Trânsito"
+                                  : s}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] items-center">
+                      <ul className="flex flex-wrap gap-3">
+                        {o.items.map((i) => (
+                          <li
+                            key={`${i.id}-${i.size}`}
+                            className="flex items-center gap-2 border border-border/60 bg-background px-2 py-1.5"
+                          >
+                            <img
+                              src={i.image}
+                              alt={i.name}
+                              className="h-10 w-8 flex-none object-cover"
+                            />
+                            <div>
+                              <p className="text-xs font-serif leading-tight">
+                                {i.name}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                Tam {i.size} · x{i.quantity}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="text-right sm:min-w-[140px]">
+                        <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                          Total
+                        </p>
+                        <p className="font-serif text-lg tabular-nums">
+                          {formatBRL(o.total)}
+                        </p>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </div>

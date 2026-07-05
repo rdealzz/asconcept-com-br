@@ -9,6 +9,16 @@ export type AppUser = {
 
 type StoredCustomer = { email: string; password: string; name?: string; createdAt?: string };
 
+export type CustomerAddress = {
+  cep?: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  cidade?: string;
+  uf?: string;
+};
+
 type AuthCtx = {
   user: AppUser | null;
   loading: boolean;
@@ -18,12 +28,17 @@ type AuthCtx = {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, name?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  updateProfile: (patch: { name?: string }) => void;
+  getAddress: (email?: string) => CustomerAddress | null;
+  saveAddress: (address: CustomerAddress) => void;
+  listCustomers: () => { email: string; name?: string; createdAt?: string }[];
 };
 
 const Ctx = createContext<AuthCtx | null>(null);
 
 const USERS_KEY = "as_customers";
 const SESSION_KEY = "as_session";
+const ADDRESSES_KEY = "as_addresses";
 
 // Contas administrativas (desenvolvedor + sócio)
 const ADMINS: { id: string; password: string; name: string }[] = [
@@ -103,6 +118,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => persist(null);
 
+  const updateProfile: AuthCtx["updateProfile"] = (patch) => {
+    if (!user) return;
+    const nextName = patch.name?.trim() || undefined;
+    const nextUser: AppUser = { ...user, name: nextName };
+    persist(nextUser);
+    // Persistir também no cadastro de clientes (não-admin)
+    if (!user.isAdmin) {
+      const customers = readJSON<StoredCustomer[]>(USERS_KEY, []);
+      const idx = customers.findIndex(
+        (c) => c.email.toLowerCase() === user.email.toLowerCase(),
+      );
+      if (idx >= 0) {
+        customers[idx] = { ...customers[idx], name: nextName };
+        writeJSON(USERS_KEY, customers);
+      }
+    }
+  };
+
+  const getAddress: AuthCtx["getAddress"] = (email) => {
+    const key = (email ?? user?.email ?? "").toLowerCase();
+    if (!key) return null;
+    const map = readJSON<Record<string, CustomerAddress>>(ADDRESSES_KEY, {});
+    return map[key] ?? null;
+  };
+
+  const saveAddress: AuthCtx["saveAddress"] = (address) => {
+    if (!user) return;
+    const map = readJSON<Record<string, CustomerAddress>>(ADDRESSES_KEY, {});
+    map[user.email.toLowerCase()] = address;
+    writeJSON(ADDRESSES_KEY, map);
+  };
+
+  const listCustomers: AuthCtx["listCustomers"] = () => {
+    return readJSON<StoredCustomer[]>(USERS_KEY, []).map((c) => ({
+      email: c.email,
+      name: c.name,
+      createdAt: c.createdAt,
+    }));
+  };
+
   return (
     <Ctx.Provider
       value={{
@@ -114,6 +169,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signUp,
         signOut,
+        updateProfile,
+        getAddress,
+        saveAddress,
+        listCustomers,
       }}
     >
       {children}
