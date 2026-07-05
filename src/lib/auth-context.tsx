@@ -9,6 +9,16 @@ export type AppUser = {
 
 type StoredCustomer = { email: string; password: string; name?: string; createdAt?: string };
 
+export type CustomerAddress = {
+  cep?: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  cidade?: string;
+  uf?: string;
+};
+
 type AuthCtx = {
   user: AppUser | null;
   loading: boolean;
@@ -18,6 +28,10 @@ type AuthCtx = {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, name?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  updateProfile: (patch: { name?: string }) => void;
+  getAddress: (email?: string) => CustomerAddress | null;
+  saveAddress: (address: CustomerAddress) => void;
+  listCustomers: () => { email: string; name?: string; createdAt?: string }[];
 };
 
 const Ctx = createContext<AuthCtx | null>(null);
