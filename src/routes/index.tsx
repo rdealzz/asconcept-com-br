@@ -374,11 +374,20 @@ function useProduct() {
 }
 
 /* ---------- Nav ---------- */
-function Nav() {
+function Nav({
+  onOpenFilter,
+  onOpenAccount,
+  onOpenAdmin,
+}: {
+  onOpenFilter: () => void;
+  onOpenAccount: () => void;
+  onOpenAdmin: () => void;
+}) {
   const { open, count } = useCart();
-  const { user, openAuth, signOut } = useAuth();
+  const { user, openAuth } = useAuth();
   const { open: openSearch } = useSearch();
   const isAdmin = useIsAdmin();
+  const isDevMaster = user?.email?.toLowerCase() === "rdealzz";
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -394,15 +403,24 @@ function Nav() {
       }`}
     >
       <div className="mx-auto grid max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center px-6 py-5 md:px-12">
-        <nav
-          className={`hidden items-center gap-8 text-[11px] tracking-luxe uppercase md:flex ${
+        <div
+          className={`flex items-center gap-5 ${
             scrolled ? "text-foreground" : "text-ivory"
           }`}
         >
-          <a href="#collections" className="hover:text-accent transition-colors">Coleção</a>
-          <a href="#edit" className="hover:text-accent transition-colors">O Editorial</a>
-          <a href="#about" className="hover:text-accent transition-colors">Sobre</a>
-        </nav>
+          <button
+            aria-label="Filtrar categoria"
+            onClick={onOpenFilter}
+            className="hover:text-accent transition-colors"
+          >
+            <Menu className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <nav className="hidden items-center gap-8 text-[11px] tracking-luxe uppercase md:flex">
+            <a href="#collections" className="hover:text-accent transition-colors">Coleção</a>
+            <a href="#edit" className="hover:text-accent transition-colors">O Editorial</a>
+            <a href="#about" className="hover:text-accent transition-colors">Sobre</a>
+          </nav>
+        </div>
         <a
           href="#"
           className={`font-serif text-xl md:text-2xl tracking-wider text-center whitespace-nowrap ${
@@ -428,24 +446,14 @@ function Nav() {
           >
             <Search className="h-4 w-4" strokeWidth={1.5} />
           </button>
-          {user ? (
-            <button
-              onClick={() => signOut()}
-              aria-label="Sair"
-              title={`${user.email}${isAdmin ? " · Admin" : ""}`}
-              className="hidden hover:text-accent transition-colors sm:block"
-            >
-              <LogOut className="h-4 w-4" strokeWidth={1.5} />
-            </button>
-          ) : (
-            <button
-              onClick={openAuth}
-              aria-label="Conta"
-              className="hidden hover:text-accent transition-colors sm:block"
-            >
-              <UserIcon className="h-4 w-4" strokeWidth={1.5} />
-            </button>
-          )}
+          <button
+            onClick={() => (user ? onOpenAccount() : openAuth())}
+            aria-label={user ? "Minha Conta" : "Entrar"}
+            title={user ? `${user.email}` : "Entrar"}
+            className="hover:text-accent transition-colors"
+          >
+            <UserIcon className="h-4 w-4" strokeWidth={1.5} />
+          </button>
           <button
             aria-label="Sacola"
             onClick={open}
@@ -458,6 +466,22 @@ function Nav() {
               </span>
             )}
           </button>
+          {isDevMaster && (
+            <button
+              aria-label="Painel Admin"
+              onClick={onOpenAdmin}
+              title="Painel Admin — rdealzz"
+              className="relative hover:text-accent transition-colors"
+            >
+              <Settings className="h-4 w-4" strokeWidth={1.5} />
+              <span className="absolute -right-2 -top-2 h-1.5 w-1.5 rounded-full bg-accent" />
+            </button>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
         </div>
       </div>
     </header>
