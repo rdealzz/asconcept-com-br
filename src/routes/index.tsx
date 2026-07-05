@@ -291,12 +291,19 @@ function useSearch() {
 }
 
 function Index() {
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   return (
     <CatalogProvider>
       <SearchProvider>
         <ProductProvider>
           <div className="min-h-screen bg-background text-foreground">
-            <Nav />
+            <Nav
+              onOpenFilter={() => setFilterOpen(true)}
+              onOpenAccount={() => setAccountOpen(true)}
+              onOpenAdmin={() => setAdminOpen(true)}
+            />
             <Hero />
             <CategoryTabs />
             <Products />
@@ -308,6 +315,9 @@ function Index() {
             <AuthModal />
             <SearchOverlay />
             <AdminEditModal />
+            <FilterSidebar open={filterOpen} onClose={() => setFilterOpen(false)} />
+            <MinhaContaModal open={accountOpen} onClose={() => setAccountOpen(false)} />
+            <AdminPanelModal open={adminOpen} onClose={() => setAdminOpen(false)} />
           </div>
         </ProductProvider>
       </SearchProvider>
