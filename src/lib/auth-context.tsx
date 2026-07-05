@@ -38,6 +38,7 @@ const Ctx = createContext<AuthCtx | null>(null);
 
 const USERS_KEY = "as_customers";
 const SESSION_KEY = "as_session";
+const ADDRESSES_KEY = "as_addresses";
 
 // Contas administrativas (desenvolvedor + sócio)
 const ADMINS: { id: string; password: string; name: string }[] = [
