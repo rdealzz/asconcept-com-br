@@ -563,7 +563,7 @@ function matchesSub(name: string, description: string, sub: SubFilter) {
 
 function Products() {
   const { query, setQuery, tab, subFilter, setSubFilter } = useSearch();
-  const { products, resetCatalog } = useCatalog();
+  const { products, refresh: resetCatalog } = useCatalog();
   const { openCreate } = useProduct();
   const isAdmin = useIsAdmin();
 
