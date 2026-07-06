@@ -14,6 +14,7 @@ import { useCart, formatBRL } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { useOrders } from "@/lib/orders-context";
 import { triggerOrderCreatedMail } from "@/lib/mail";
+import { supabase } from "@/integrations/supabase/client";
 import type { CheckoutAddress, PaymentMethod } from "@/lib/types";
 import {
   formatCep,
@@ -37,24 +38,18 @@ export const Route = createFileRoute("/checkout")({
   component: CheckoutPage,
 });
 
-const STOCK_KEY = "as_stock_v3";
-type SizeStock = { P: number; M: number; G: number; GG: number };
-
-function decrementStockLocalStorage(items: { id: string; size: string; qty: number }[]) {
-  if (typeof window === "undefined") return;
-  try {
-    const raw = localStorage.getItem(STOCK_KEY);
-    const stock: Record<string, SizeStock> = raw ? JSON.parse(raw) : {};
-    items.forEach(({ id, size, qty }) => {
-      const cur = stock[id] ?? { P: 0, M: 0, G: 0, GG: 0 };
-      const key = (["P", "M", "G", "GG"] as const).includes(size as never)
-        ? (size as keyof SizeStock)
-        : "M";
-      cur[key] = Math.max(0, (cur[key] ?? 0) - qty);
-      stock[id] = cur;
-    });
-    localStorage.setItem(STOCK_KEY, JSON.stringify(stock));
-  } catch {}
+async function decrementStockRemote(
+  items: { id: string; size: string; qty: number }[],
+) {
+  await Promise.all(
+    items.map((i) =>
+      supabase.rpc("decrement_product_stock", {
+        _product_id: i.id,
+        _size: i.size,
+        _qty: i.qty,
+      }),
+    ),
+  );
 }
 
 function CheckoutPage() {
