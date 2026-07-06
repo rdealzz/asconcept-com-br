@@ -1131,10 +1131,8 @@ function AdminEditModal() {
     const stockObj = coerceSizeStock(form.stock);
 
     if (isCreate) {
-      const id = `p_${Date.now()}`;
-      addProduct(
+      void addProduct(
         {
-          id,
           name,
           description: form.description.trim() || name,
           longDescription: form.longDescription.trim() || undefined,
