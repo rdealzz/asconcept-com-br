@@ -240,21 +240,30 @@ function CheckoutForm({
       size: i.size,
       image: i.image,
     }));
-    const order = createOrder({
-      customerEmail: email,
-      customerName: customerName.trim(),
-      items: orderItems,
-      address: { ...address, cep: formatCep(address.cep) },
-      shippingCost,
-      subtotal,
-      total,
-      paymentMethod: payment,
-    });
-    decrementStockLocalStorage(items.map((i) => ({ id: i.id, size: i.size, qty: i.qty })));
-    void triggerOrderCreatedMail(email, order.id, total, orderItems);
-    clear();
-    setPlacing(false);
-    navigate({ to: "/pedidos/$id", params: { id: order.id } });
+    try {
+      const order = await createOrder({
+        customerEmail: email,
+        customerName: customerName.trim(),
+        items: orderItems,
+        address: { ...address, cep: formatCep(address.cep) },
+        shippingCost,
+        subtotal,
+        total,
+        paymentMethod: payment,
+      });
+      await decrementStockRemote(
+        items.map((i) => ({ id: i.id, size: i.size, qty: i.qty })),
+      );
+      void triggerOrderCreatedMail(email, order.id, total, orderItems);
+      clear();
+      setPlacing(false);
+      navigate({ to: "/pedidos/$id", params: { id: order.id } });
+    } catch (err) {
+      setPlacing(false);
+      setFormError(
+        err instanceof Error ? err.message : "Não foi possível registrar o pedido.",
+      );
+    }
   };
 
   return (
