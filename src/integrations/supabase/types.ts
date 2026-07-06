@@ -74,8 +74,10 @@ export type Database = {
           created_at: string
           description: string | null
           force_last_item: boolean
+          gallery: Json
           id: string
           image: string | null
+          long_description: string | null
           name: string
           price: number
           sizes: Json
@@ -87,8 +89,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           force_last_item?: boolean
+          gallery?: Json
           id?: string
           image?: string | null
+          long_description?: string | null
           name: string
           price?: number
           sizes?: Json
@@ -100,8 +104,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           force_last_item?: boolean
+          gallery?: Json
           id?: string
           image?: string | null
+          long_description?: string | null
           name?: string
           price?: number
           sizes?: Json
