@@ -2149,7 +2149,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
   const { orders, updateStatus } = useOrders();
   const [tab, setTab] = useState<"clientes" | "pedidos">("pedidos");
   if (!open) return null;
-  if (user?.email?.toLowerCase() !== "rdealzz") return null;
+  if (!user?.isAdmin) return null;
 
   const customers = listCustomers();
 
