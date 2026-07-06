@@ -1,13 +1,13 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { triggerWelcomeMail } from "./mail";
 
 export type AppUser = {
+  id: string;
   email: string;
   name?: string;
   isAdmin: boolean;
 };
-
-type StoredCustomer = { email: string; password: string; name?: string; createdAt?: string };
 
 export type CustomerAddress = {
   cep?: string;
@@ -19,6 +19,12 @@ export type CustomerAddress = {
   uf?: string;
 };
 
+export type CustomerRecord = {
+  email: string;
+  name?: string;
+  createdAt?: string;
+};
+
 type AuthCtx = {
   user: AppUser | null;
   loading: boolean;
@@ -28,135 +34,171 @@ type AuthCtx = {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, name?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
-  updateProfile: (patch: { name?: string }) => void;
+  updateProfile: (patch: { name?: string }) => Promise<void>;
   getAddress: (email?: string) => CustomerAddress | null;
-  saveAddress: (address: CustomerAddress) => void;
-  listCustomers: () => { email: string; name?: string; createdAt?: string }[];
+  saveAddress: (address: CustomerAddress) => Promise<void>;
+  listCustomers: () => CustomerRecord[];
+  refreshCustomers: () => Promise<void>;
 };
 
 const Ctx = createContext<AuthCtx | null>(null);
 
-const USERS_KEY = "as_customers";
-const SESSION_KEY = "as_session";
-const ADDRESSES_KEY = "as_addresses";
-
-// Contas administrativas (desenvolvedor + sócio)
-const ADMINS: { id: string; password: string; name: string }[] = [
-  { id: "rdealzz", password: "2311$", name: "rdealzz" },
-  { id: "gui", password: "@Bonito123", name: "Gui" },
-];
-
-function readJSON<T>(k: string, fb: T): T {
-  if (typeof window === "undefined") return fb;
-  try {
-    const v = localStorage.getItem(k);
-    return v ? (JSON.parse(v) as T) : fb;
-  } catch {
-    return fb;
-  }
+async function loadProfile(id: string) {
+  const { data } = await supabase
+    .from("profiles")
+    .select("email, name, address")
+    .eq("id", id)
+    .maybeSingle();
+  return data;
 }
-function writeJSON(k: string, v: unknown) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(k, JSON.stringify(v));
-  } catch {}
+
+async function checkIsAdmin(id: string) {
+  const { data } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", id)
+    .eq("role", "admin")
+    .maybeSingle();
+  return !!data;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
+  const [address, setAddressState] = useState<CustomerAddress | null>(null);
+  const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setOpen] = useState(false);
 
-  useEffect(() => {
-    setUser(readJSON<AppUser | null>(SESSION_KEY, null));
-    setLoading(false);
+  const hydrateSession = useCallback(async (userId: string, email: string) => {
+    const [profile, admin] = await Promise.all([
+      loadProfile(userId),
+      checkIsAdmin(userId),
+    ]);
+    setUser({
+      id: userId,
+      email: profile?.email ?? email,
+      name: profile?.name ?? undefined,
+      isAdmin: admin,
+    });
+    setAddressState((profile?.address as CustomerAddress | null) ?? null);
   }, []);
 
-  const persist = (u: AppUser | null) => {
-    setUser(u);
-    if (u) writeJSON(SESSION_KEY, u);
-    else if (typeof window !== "undefined") localStorage.removeItem(SESSION_KEY);
-  };
+  useEffect(() => {
+    let mounted = true;
+
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!mounted) return;
+      const session = data.session;
+      if (session?.user) {
+        await hydrateSession(session.user.id, session.user.email ?? "");
+      }
+      setLoading(false);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session?.user) {
+        setUser(null);
+        setAddressState(null);
+        setCustomers([]);
+        return;
+      }
+      if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
+        // Defer to avoid deadlocks
+        setTimeout(() => {
+          void hydrateSession(session.user.id, session.user.email ?? "");
+        }, 0);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [hydrateSession]);
+
+  const refreshCustomers = useCallback(async () => {
+    if (!user?.isAdmin) return;
+    const { data } = await supabase
+      .from("profiles")
+      .select("email, name, created_at")
+      .order("created_at", { ascending: false });
+    if (data) {
+      setCustomers(
+        data.map((r) => ({
+          email: r.email,
+          name: r.name ?? undefined,
+          createdAt: r.created_at,
+        })),
+      );
+    }
+  }, [user?.isAdmin]);
+
+  useEffect(() => {
+    if (user?.isAdmin) void refreshCustomers();
+  }, [user?.isAdmin, refreshCustomers]);
 
   const signIn: AuthCtx["signIn"] = async (email, password) => {
-    const id = email.trim();
-    const admin = ADMINS.find(
-      (a) => a.id.toLowerCase() === id.toLowerCase() && a.password === password,
-    );
-    if (admin) {
-      persist({ email: admin.id, name: admin.name, isAdmin: true });
-      return { error: null };
-    }
-    const customers = readJSON<StoredCustomer[]>(USERS_KEY, []);
-    const found = customers.find(
-      (c) => c.email.toLowerCase() === id.toLowerCase() && c.password === password,
-    );
-    if (!found) return { error: "E-mail ou senha inválidos." };
-    persist({ email: found.email, name: found.name, isAdmin: false });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    if (error) return { error: "E-mail ou senha inválidos." };
     return { error: null };
   };
 
   const signUp: AuthCtx["signUp"] = async (email, password, name) => {
     const id = email.trim();
     if (!id || !password) return { error: "Preencha e-mail e senha." };
-    if (ADMINS.some((a) => a.id.toLowerCase() === id.toLowerCase()))
-      return { error: "Este identificador não está disponível." };
-    if (password.length < 4) return { error: "A senha deve ter ao menos 4 caracteres." };
-    const customers = readJSON<StoredCustomer[]>(USERS_KEY, []);
-    if (customers.some((c) => c.email.toLowerCase() === id.toLowerCase()))
-      return { error: "Já existe uma conta com este e-mail." };
+    if (password.length < 6) return { error: "A senha deve ter ao menos 6 caracteres." };
     const cleanName = (name ?? "").trim() || undefined;
-    const next = [
-      ...customers,
-      { email: id, password, name: cleanName, createdAt: new Date().toISOString() },
-    ];
-    writeJSON(USERS_KEY, next);
-    persist({ email: id, name: cleanName, isAdmin: false });
+    const { error } = await supabase.auth.signUp({
+      email: id,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+        data: cleanName ? { name: cleanName } : undefined,
+      },
+    });
+    if (error) {
+      if (error.message.toLowerCase().includes("already"))
+        return { error: "Já existe uma conta com este e-mail." };
+      return { error: error.message };
+    }
     void triggerWelcomeMail(id, cleanName);
     return { error: null };
   };
 
-  const signOut = async () => persist(null);
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
 
-  const updateProfile: AuthCtx["updateProfile"] = (patch) => {
+  const updateProfile: AuthCtx["updateProfile"] = async (patch) => {
     if (!user) return;
-    const nextName = patch.name?.trim() || undefined;
-    const nextUser: AppUser = { ...user, name: nextName };
-    persist(nextUser);
-    // Persistir também no cadastro de clientes (não-admin)
-    if (!user.isAdmin) {
-      const customers = readJSON<StoredCustomer[]>(USERS_KEY, []);
-      const idx = customers.findIndex(
-        (c) => c.email.toLowerCase() === user.email.toLowerCase(),
-      );
-      if (idx >= 0) {
-        customers[idx] = { ...customers[idx], name: nextName };
-        writeJSON(USERS_KEY, customers);
-      }
+    const nextName = patch.name?.trim() || null;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ name: nextName })
+      .eq("id", user.id);
+    if (!error) {
+      setUser({ ...user, name: nextName ?? undefined });
     }
   };
 
   const getAddress: AuthCtx["getAddress"] = (email) => {
-    const key = (email ?? user?.email ?? "").toLowerCase();
-    if (!key) return null;
-    const map = readJSON<Record<string, CustomerAddress>>(ADDRESSES_KEY, {});
-    return map[key] ?? null;
+    if (email && user && email.toLowerCase() !== user.email.toLowerCase()) return null;
+    return address;
   };
 
-  const saveAddress: AuthCtx["saveAddress"] = (address) => {
+  const saveAddress: AuthCtx["saveAddress"] = async (next) => {
     if (!user) return;
-    const map = readJSON<Record<string, CustomerAddress>>(ADDRESSES_KEY, {});
-    map[user.email.toLowerCase()] = address;
-    writeJSON(ADDRESSES_KEY, map);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ address: next })
+      .eq("id", user.id);
+    if (!error) setAddressState(next);
   };
 
-  const listCustomers: AuthCtx["listCustomers"] = () => {
-    return readJSON<StoredCustomer[]>(USERS_KEY, []).map((c) => ({
-      email: c.email,
-      name: c.name,
-      createdAt: c.createdAt,
-    }));
-  };
+  const listCustomers: AuthCtx["listCustomers"] = () => customers;
 
   return (
     <Ctx.Provider
@@ -173,6 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getAddress,
         saveAddress,
         listCustomers,
+        refreshCustomers,
       }}
     >
       {children}

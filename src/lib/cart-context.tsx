@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 
 export type ProductCategory = "clothes" | "sneakers";
 
@@ -38,28 +38,11 @@ type CartCtx = {
 };
 
 const Ctx = createContext<CartCtx | null>(null);
-const CART_KEY = "as_cart";
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setOpen] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = localStorage.getItem(CART_KEY);
-      if (raw) setItems(JSON.parse(raw));
-    } catch {}
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated || typeof window === "undefined") return;
-    try {
-      localStorage.setItem(CART_KEY, JSON.stringify(items));
-    } catch {}
-  }, [items, hydrated]);
 
   const add = (p: Product, size: string = "M") => {
     setItems((prev) => {
