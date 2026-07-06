@@ -155,19 +155,6 @@ function EmptyCard({
 
 /* ---------- Admin Dashboard (Tabs) ---------- */
 
-type Customer = { email: string; name?: string; createdAt?: string };
-type NewsletterLead = { email: string; createdAt: string };
-
-function readLS<T>(k: string, fb: T): T {
-  if (typeof window === "undefined") return fb;
-  try {
-    const raw = localStorage.getItem(k);
-    return raw ? (JSON.parse(raw) as T) : fb;
-  } catch {
-    return fb;
-  }
-}
-
 function AdminDashboard({ orders }: { orders: Order[] }) {
   const [tab, setTab] = useState<"pedidos" | "clientes">("pedidos");
   return (
@@ -205,11 +192,11 @@ function AdminDashboard({ orders }: { orders: Order[] }) {
 }
 
 function AdminClientsPanel() {
-  const customers = readLS<Customer[]>("as_customers", []);
-  const leads = readLS<NewsletterLead[]>("as_newsletter", []);
+  const { listCustomers } = useAuth();
+  const customers = listCustomers();
 
   return (
-    <div className="mt-10 grid gap-8 lg:grid-cols-2 animate-[fade-in_0.4s_ease-out]">
+    <div className="mt-10 animate-[fade-in_0.4s_ease-out]">
       <section className="border border-border bg-card">
         <header className="flex items-baseline justify-between border-b border-border px-5 py-4">
           <div>
@@ -243,41 +230,14 @@ function AdminClientsPanel() {
             ))}
           </ul>
         )}
-      </section>
-
-      <section className="border border-border bg-card">
-        <header className="flex items-baseline justify-between border-b border-border px-5 py-4">
-          <div>
-            <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
-              Newsletter · Clube A&amp;S
-            </p>
-            <h3 className="font-serif text-xl">Leads captados</h3>
-          </div>
-          <span className="font-serif text-2xl tabular-nums">{leads.length}</span>
-        </header>
-        {leads.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-            Nenhum e-mail captado pelo rodapé ainda.
-          </p>
-        ) : (
-          <ul className="divide-y divide-border">
-            {leads.map((l) => (
-              <li key={l.email} className="flex items-center justify-between gap-4 px-5 py-3">
-                <p className="truncate text-sm">{l.email}</p>
-                <span className="shrink-0 text-[10px] tracking-luxe uppercase text-muted-foreground">
-                  {new Date(l.createdAt).toLocaleDateString("pt-BR")}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
         <p className="border-t border-border px-5 py-3 text-[10px] leading-relaxed text-muted-foreground">
-          Lista consultada em tempo real do localStorage. Use para monitoramento manual nesta fase inicial.
+          Dados carregados diretamente do backend seguro.
         </p>
       </section>
     </div>
   );
 }
+
 
 function AdminOrdersList({ orders }: { orders: Order[] }) {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "todos">("todos");
