@@ -129,7 +129,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     if (trackingCode !== undefined) patch.tracking_code = trackingCode || null;
     const { error } = await supabase
       .from("orders")
-      .update(patch)
+      .update(patch as never)
       .eq("order_number", id);
     if (error) {
       console.error("[orders] updateStatus failed", error);
