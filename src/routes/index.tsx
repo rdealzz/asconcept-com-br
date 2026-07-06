@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Search,
   User as UserIcon,
@@ -29,19 +29,12 @@ import {
   type ProductCategory,
 } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/integrations/supabase/client";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 
 import hero from "@/assets/hero.jpg";
 import editorial from "@/assets/editorial.jpg";
-import p1 from "@/assets/product-1.jpg";
-import p2 from "@/assets/product-2.jpg";
-import p3 from "@/assets/product-3.jpg";
-import p4 from "@/assets/product-4.jpg";
-import p5 from "@/assets/product-5.jpg";
-import p6 from "@/assets/product-6.jpg";
-import p7 from "@/assets/product-7.jpg";
-import p8 from "@/assets/product-8.jpg";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -57,31 +50,6 @@ const totalStock = (s: SizeStock | undefined) =>
 const hasLastSize = (s: SizeStock | undefined) =>
   !!s && (s.P === 1 || s.M === 1 || s.G === 1 || s.GG === 1);
 
-const DEFAULT_PRODUCTS: Product[] = [
-  { id: "1", category: "clothes", name: "Camisa de Linho Cornwall", description: "Linho italiano acabado à mão. Modelagem relaxada.", longDescription: "Confeccionada em linho italiano de fio longo, com botões de madrepérola natural e pespontos internos.", price: 1590, image: p1, gallery: [p1] },
-  { id: "2", category: "clothes", name: "Suéter de Cashmere Kensington", description: "Cashmere puro da Mongólia em azul meia-noite.", longDescription: "Tricô fino em cashmere mongol grade A, com gola careca ribana e punhos em canelado.", price: 3290, image: p2, gallery: [p2] },
-  { id: "3", category: "clothes", name: "Blazer Trespassado Mayfair", description: "Lã com lapela pico, alfaiataria napolitana.", longDescription: "Alfaiataria napolitana em lã super 120, com lapela pico, ombro natural e forro em cupro.", price: 7890, image: p3, gallery: [p3] },
-  { id: "4", category: "clothes", name: "Calça de Prega Windsor", description: "Cintura alta em crepe de lã marfim.", longDescription: "Cintura alta com pregas duplas, corte reto e caimento fluido em crepe de lã fresca.", price: 2590, image: p4, gallery: [p4] },
-  { id: "5", category: "clothes", name: "Lenço de Seda Saint-Tropez", description: "Twill de seda com bainha rolada à mão, estampado em Como.", longDescription: "Sarja de seda 100% italiana, estampada digitalmente em Como e finalizada com bainha rolada à mão.", price: 1850, image: p5, gallery: [p5] },
-  { id: "6", category: "clothes", name: "Mocassim Belgrave", description: "Couro de bezerro costurado Blake, conhaque.", longDescription: "Mocassim penny loafer em couro de bezerro full-grain, com forro interno em pelica.", price: 4290, image: p6, gallery: [p6] },
-  { id: "7", category: "clothes", name: "Polo Trançado Hampton", description: "Algodão egípcio com costuras finalizadas à mão.", longDescription: "Malha piquê em algodão egípcio de fibra longa, com padronagem trançada exclusiva.", price: 2190, image: p7, gallery: [p7] },
-  { id: "8", category: "clothes", name: "Lenço de Bolso Belgravia", description: "Seda doze dobras, ourela marfim.", longDescription: "Lenço de bolso em seda dobrada doze vezes à mão, com bainha em contraste marfim.", price: 790, image: p8, gallery: [p8] },
-];
-
-const DEFAULT_STOCK: Record<string, SizeStock> = {
-  "1": { P: 2, M: 2, G: 1, GG: 0 },
-  "2": { P: 1, M: 1, G: 1, GG: 0 },
-  "3": { P: 0, M: 1, G: 0, GG: 0 },
-  "4": { P: 0, M: 0, G: 0, GG: 0 },
-  "5": { P: 2, M: 3, G: 2, GG: 1 },
-  "6": { P: 0, M: 1, G: 1, GG: 0 },
-  "7": { P: 0, M: 1, G: 0, GG: 0 },
-  "8": { P: 1, M: 2, G: 1, GG: 0 },
-};
-
-const PRODUCTS_KEY = "as_products_v2";
-const STOCK_KEY = "as_stock_v3"; // v3: fracionado por tamanho (P/M/G/GG)
-const NEWSLETTER_KEY = "as_newsletter";
 const SNEAKERS_LAUNCH = new Date("2026-09-01T00:00:00-03:00").getTime();
 
 function useIsAdmin() {
@@ -89,44 +57,23 @@ function useIsAdmin() {
   return !!user?.isAdmin;
 }
 
-/* ---------- Catalog Context ---------- */
+/* ---------- Catalog Context (Supabase-backed) ---------- */
+type ProductInput = Omit<Product, "id">;
+
 type CatalogCtx = {
   products: Product[];
   stock: Record<string, SizeStock>;
-  updateProduct: (id: string, patch: Partial<Product>) => void;
-  addProduct: (p: Product, stock: SizeStock) => void;
-  deleteProduct: (id: string) => void;
-  setStock: (id: string, stock: SizeStock) => void;
+  loading: boolean;
+  updateProduct: (id: string, patch: Partial<Product>) => Promise<void>;
+  addProduct: (p: ProductInput, stock: SizeStock) => Promise<string | null>;
+  deleteProduct: (id: string) => Promise<void>;
+  setStock: (id: string, stock: SizeStock) => Promise<void>;
   decrementStock: (id: string, size: Size, by?: number) => void;
-  resetCatalog: () => void;
+  refresh: () => Promise<void>;
 };
 const CatalogContext = createContext<CatalogCtx | null>(null);
 
-function loadProductsInitial(): Product[] {
-  if (typeof window === "undefined") return DEFAULT_PRODUCTS;
-  try {
-    const raw = localStorage.getItem(PRODUCTS_KEY);
-    if (raw) return JSON.parse(raw) as Product[];
-  } catch {}
-  try {
-    localStorage.setItem(PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
-  } catch {}
-  return DEFAULT_PRODUCTS;
-}
-
 function coerceSizeStock(v: unknown): SizeStock {
-  if (typeof v === "number") {
-    // Migração legada: distribui o total priorizando M.
-    const n = Math.max(0, Math.floor(v));
-    if (n === 0) return emptyStock();
-    if (n === 1) return { P: 0, M: 1, G: 0, GG: 0 };
-    const base = Math.floor(n / 4);
-    const rem = n - base * 4;
-    const out: SizeStock = { P: base, M: base, G: base, GG: base };
-    const order: Size[] = ["M", "G", "P", "GG"];
-    for (let i = 0; i < rem; i++) out[order[i]] += 1;
-    return out;
-  }
   if (v && typeof v === "object") {
     const src = v as Partial<Record<Size, unknown>>;
     return {
@@ -139,87 +86,145 @@ function coerceSizeStock(v: unknown): SizeStock {
   return emptyStock();
 }
 
-function loadStockInitial(): Record<string, SizeStock> {
-  if (typeof window === "undefined") return DEFAULT_STOCK;
-  try {
-    const raw = localStorage.getItem(STOCK_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const out: Record<string, SizeStock> = {};
-      for (const k of Object.keys(parsed)) out[k] = coerceSizeStock(parsed[k]);
-      return out;
-    }
-    // Migração da chave antiga (as_stock_v2 - numérica)
-    const legacy = localStorage.getItem("as_stock_v2");
-    if (legacy) {
-      const parsed = JSON.parse(legacy) as Record<string, unknown>;
-      const out: Record<string, SizeStock> = {};
-      for (const k of Object.keys(parsed)) out[k] = coerceSizeStock(parsed[k]);
-      localStorage.setItem(STOCK_KEY, JSON.stringify(out));
-      return out;
-    }
-  } catch {}
-  try {
-    localStorage.setItem(STOCK_KEY, JSON.stringify(DEFAULT_STOCK));
-  } catch {}
-  return DEFAULT_STOCK;
-}
+type ProductRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  long_description: string | null;
+  price: string | number;
+  category: string;
+  image: string | null;
+  gallery: unknown;
+  sizes: unknown;
+  force_last_item: boolean;
+  sort_order: number;
+};
 
-function persistProducts(next: Product[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(PRODUCTS_KEY, JSON.stringify(next));
-  } catch {}
-}
-
-function persistStock(next: Record<string, SizeStock>) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STOCK_KEY, JSON.stringify(next));
-  } catch {}
+function rowToProduct(r: ProductRow): Product {
+  const image = r.image ?? "";
+  const galleryArr = Array.isArray(r.gallery)
+    ? (r.gallery as unknown[]).filter((g): g is string => typeof g === "string")
+    : [];
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description ?? "",
+    longDescription: r.long_description ?? undefined,
+    price: Number(r.price),
+    image,
+    gallery: galleryArr.length ? galleryArr : image ? [image] : [],
+    category: (r.category === "sneakers" ? "sneakers" : "clothes") as ProductCategory,
+    forceLastItem: r.force_last_item || undefined,
+  };
 }
 
 function CatalogProvider({ children }: { children: React.ReactNode }) {
-  const [products, setProducts] = useState<Product[]>(loadProductsInitial);
-  const [stock, setStockMap] = useState<Record<string, SizeStock>>(loadStockInitial);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [stock, setStockMap] = useState<Record<string, SizeStock>>({});
+  const [loading, setLoading] = useState(true);
 
-  const commitProducts = (updater: (prev: Product[]) => Product[]) =>
-    setProducts((prev) => {
-      const next = updater(prev);
-      persistProducts(next);
-      return next;
-    });
+  const refresh = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    setLoading(false);
+    if (error) {
+      console.error("[catalog] fetch failed", error);
+      return;
+    }
+    const rows = (data ?? []) as ProductRow[];
+    setProducts(rows.map(rowToProduct));
+    const nextStock: Record<string, SizeStock> = {};
+    for (const r of rows) nextStock[r.id] = coerceSizeStock(r.sizes);
+    setStockMap(nextStock);
+  }, []);
 
-  const commitStock = (
-    updater: (prev: Record<string, SizeStock>) => Record<string, SizeStock>,
-  ) =>
-    setStockMap((prev) => {
-      const next = updater(prev);
-      persistStock(next);
-      return next;
-    });
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
-  const updateProduct = (id: string, patch: Partial<Product>) =>
-    commitProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  const updateProduct: CatalogCtx["updateProduct"] = async (id, patch) => {
+    const dbPatch: Record<string, unknown> = {};
+    if (patch.name !== undefined) dbPatch.name = patch.name;
+    if (patch.description !== undefined) dbPatch.description = patch.description;
+    if (patch.longDescription !== undefined) dbPatch.long_description = patch.longDescription ?? null;
+    if (patch.price !== undefined) dbPatch.price = patch.price;
+    if (patch.image !== undefined) dbPatch.image = patch.image;
+    if (patch.gallery !== undefined) dbPatch.gallery = patch.gallery;
+    if (patch.category !== undefined) dbPatch.category = patch.category;
+    if (patch.forceLastItem !== undefined)
+      dbPatch.force_last_item = patch.forceLastItem === true;
 
-  const addProduct = (p: Product, s: SizeStock) => {
-    commitProducts((prev) => [...prev, p]);
-    commitStock((prev) => ({ ...prev, [p.id]: coerceSizeStock(s) }));
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+    const { error } = await supabase
+      .from("products")
+      .update(dbPatch as never)
+      .eq("id", id);
+    if (error) {
+      console.error("[catalog] update failed", error);
+      await refresh();
+    }
   };
 
-  const deleteProduct = (id: string) => {
-    commitProducts((prev) => prev.filter((p) => p.id !== id));
-    commitStock((prev) => {
-      const { [id]: _, ...rest } = prev;
+  const addProduct: CatalogCtx["addProduct"] = async (p, s) => {
+    const payload = {
+      name: p.name,
+      description: p.description,
+      long_description: p.longDescription ?? null,
+      price: p.price,
+      image: p.image,
+      gallery: p.gallery ?? [p.image],
+      category: p.category ?? "clothes",
+      force_last_item: p.forceLastItem === true,
+      sizes: coerceSizeStock(s),
+    };
+    const { data, error } = await supabase
+      .from("products")
+      .insert(payload as never)
+      .select("*")
+      .single();
+    if (error || !data) {
+      console.error("[catalog] insert failed", error);
+      return null;
+    }
+    const row = data as ProductRow;
+    const product = rowToProduct(row);
+    setProducts((prev) => [...prev, product]);
+    setStockMap((prev) => ({ ...prev, [product.id]: coerceSizeStock(row.sizes) }));
+    return product.id;
+  };
+
+  const deleteProduct: CatalogCtx["deleteProduct"] = async (id) => {
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+    setStockMap((prev) => {
+      const { [id]: _drop, ...rest } = prev;
       return rest;
     });
+    const { error } = await supabase.from("products").delete().eq("id", id);
+    if (error) {
+      console.error("[catalog] delete failed", error);
+      await refresh();
+    }
   };
 
-  const setStock = (id: string, s: SizeStock) =>
-    commitStock((prev) => ({ ...prev, [id]: coerceSizeStock(s) }));
+  const setStock: CatalogCtx["setStock"] = async (id, s) => {
+    const next = coerceSizeStock(s);
+    setStockMap((prev) => ({ ...prev, [id]: next }));
+    const { error } = await supabase
+      .from("products")
+      .update({ sizes: next } as never)
+      .eq("id", id);
+    if (error) {
+      console.error("[catalog] setStock failed", error);
+      await refresh();
+    }
+  };
 
-  const decrementStock = (id: string, size: Size, by = 1) =>
-    commitStock((prev) => {
+  // Optimistic local decrement — DB decrement runs server-side on checkout via RPC.
+  const decrementStock: CatalogCtx["decrementStock"] = (id, size, by = 1) =>
+    setStockMap((prev) => {
       const cur = prev[id] ?? emptyStock();
       return {
         ...prev,
@@ -227,14 +232,9 @@ function CatalogProvider({ children }: { children: React.ReactNode }) {
       };
     });
 
-  const resetCatalog = () => {
-    commitProducts(() => DEFAULT_PRODUCTS);
-    commitStock(() => DEFAULT_STOCK);
-  };
-
   return (
     <CatalogContext.Provider
-      value={{ products, stock, updateProduct, addProduct, deleteProduct, setStock, decrementStock, resetCatalog }}
+      value={{ products, stock, loading, updateProduct, addProduct, deleteProduct, setStock, decrementStock, refresh }}
     >
       {children}
     </CatalogContext.Provider>
@@ -245,6 +245,8 @@ function useCatalog() {
   if (!c) throw new Error("CatalogProvider missing");
   return c;
 }
+
+
 
 
 /* ---------- Search + Tabs Context ---------- */
