@@ -103,8 +103,8 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
       user_id: user.id,
       customer_email: o.customerEmail,
       customer_name: o.customerName ?? null,
-      items: o.items,
-      address: o.address,
+      items: o.items as unknown,
+      address: o.address as unknown,
       shipping_cost: o.shippingCost,
       subtotal: o.subtotal,
       total: o.total,
@@ -113,7 +113,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     };
     const { data, error } = await supabase
       .from("orders")
-      .insert(payload)
+      .insert(payload as never)
       .select("*")
       .single();
     if (error || !data) throw error ?? new Error("Falha ao criar pedido.");
