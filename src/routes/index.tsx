@@ -389,7 +389,7 @@ function Nav({
   const { user, openAuth } = useAuth();
   const { open: openSearch } = useSearch();
   const isAdmin = useIsAdmin();
-  const isDevMaster = user?.email?.toLowerCase() === "rdealzz";
+  const isDevMaster = !!user?.isAdmin;
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -1927,7 +1927,7 @@ function FilterSidebar({ open, onClose }: { open: boolean; onClose: () => void }
 function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, updateProfile, getAddress, saveAddress, signOut } = useAuth();
   const { orders, byUser } = useOrders();
-  const isDevMaster = user?.email?.toLowerCase() === "rdealzz";
+  const isDevMaster = !!user?.isAdmin;
   const myOrders = user
     ? isDevMaster || user.isAdmin
       ? orders
