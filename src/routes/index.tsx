@@ -310,12 +310,14 @@ function Index() {
             <Hero />
             <CategoryTabs />
             <Products />
+            <Testimonials />
             <Concept />
             <Newsletter />
             <Footer />
             <CartDrawer />
             <ProductModal />
             <AuthModal />
+            <WelcomeCouponPopup />
             <SearchOverlay />
             <AdminEditModal />
             <FilterSidebar open={filterOpen} onClose={() => setFilterOpen(false)} />
