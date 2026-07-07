@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useOrders } from "@/lib/orders-context";
 import { triggerOrderCreatedMail } from "@/lib/mail";
 import { supabase } from "@/integrations/supabase/client";
+import { markCouponUsed } from "@/lib/coupons";
 import type { CheckoutAddress, PaymentMethod } from "@/lib/types";
 import {
   formatCep,
@@ -120,7 +121,8 @@ function CheckoutForm({
   count: number;
   navigate: ReturnType<typeof useNavigate>;
 }) {
-  const { items, clear } = useCart();
+  const { items, clear, couponCode, couponDiscount } = useCart();
+  const { user } = useAuth();
   const { createOrder } = useOrders();
 
   const [step, setStep] = useState<1 | 2>(1);
@@ -149,7 +151,9 @@ function CheckoutForm({
     [address.cep, subtotal],
   );
   const shippingCost = quote?.displayCost ?? 0;
-  const total = subtotal + shippingCost;
+  const discount = Math.min(subtotal, couponDiscount || 0);
+  const total = Math.max(0, subtotal - discount) + shippingCost;
+
 
   useEffect(() => {
     const digits = normalizeCep(address.cep);
@@ -250,10 +254,15 @@ function CheckoutForm({
         subtotal,
         total,
         paymentMethod: payment,
+        couponCode: couponCode ?? null,
+        discount,
       });
       await decrementStockRemote(
         items.map((i) => ({ id: i.id, size: i.size, qty: i.qty })),
       );
+      if (couponCode && user) {
+        try { await markCouponUsed(user.id, couponCode, order.id); } catch { /* ignore */ }
+      }
       void triggerOrderCreatedMail(email, order.id, total, orderItems);
       clear();
       setPlacing(false);
@@ -327,6 +336,12 @@ function CheckoutForm({
             </ul>
             <div className="mt-6 space-y-2 border-t border-border pt-4 text-sm">
               <Row label="Subtotal" value={formatBRL(subtotal)} />
+              {discount > 0 && (
+                <Row
+                  label={couponCode ? `Cupom ${couponCode}` : "Desconto"}
+                  value={`− ${formatBRL(discount)}`}
+                />
+              )}
               <Row
                 label={quote ? `Frete (${quote.stateName})` : "Frete"}
                 value={

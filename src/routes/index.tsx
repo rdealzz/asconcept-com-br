@@ -32,6 +32,7 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
+import { AVAILABLE_COUPONS, findCoupon, calcDiscount, hasUsedCoupon } from "@/lib/coupons";
 
 import hero from "@/assets/hero.jpg";
 import editorial from "@/assets/editorial.jpg";
@@ -309,12 +310,14 @@ function Index() {
             <Hero />
             <CategoryTabs />
             <Products />
+            <Testimonials />
             <Concept />
             <Newsletter />
             <Footer />
             <CartDrawer />
             <ProductModal />
             <AuthModal />
+            <WelcomeCouponPopup />
             <SearchOverlay />
             <AdminEditModal />
             <FilterSidebar open={filterOpen} onClose={() => setFilterOpen(false)} />
@@ -952,6 +955,9 @@ function ProductModal() {
               <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Concept</p>
               <h2 className="mt-3 font-serif text-3xl md:text-4xl leading-tight">{active.name}</h2>
               <p className="mt-3 text-lg tabular-nums">{formatBRL(active.price)}</p>
+              <p className="mt-1 text-[10px] font-light italic tracking-wide text-muted-foreground/80">
+                Novos membros recebem 10% de desconto ao criar uma conta.
+              </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <StockBadge qty={total} />
                 {lastItem && (
@@ -1415,7 +1421,25 @@ function Concept() {
 /* ---------- Newsletter ---------- */
 function Newsletter() {
   const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [msg, setMsg] = useState<string | null>(null);
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = email.trim().toLowerCase();
+    if (!clean) return;
+    setStatus("sending");
+    setMsg(null);
+    const { error } = await supabase
+      .from("newsletter_subscribers")
+      .insert({ email: clean } as never);
+    if (error && !/duplicate|unique/i.test(error.message)) {
+      setStatus("error");
+      setMsg("Não foi possível registrar. Tente novamente.");
+      return;
+    }
+    setStatus("sent");
+    setMsg("Convite reservado. Verificaremos e retornaremos em breve.");
+  };
   return (
     <section id="about" className="py-32 md:py-44">
       <div className="mx-auto max-w-2xl px-6 text-center">
@@ -1428,11 +1452,7 @@ function Newsletter() {
           Prévias privadas, histórias dos ateliês e acesso antecipado às edições limitadas.
         </p>
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setSent(true);
-          }}
-
+          onSubmit={onSubmit}
           className="mx-auto mt-12 flex max-w-md items-center border-b border-foreground/40 pb-2 transition-colors focus-within:border-accent"
         >
           <input
@@ -1443,22 +1463,36 @@ function Newsletter() {
             placeholder="seu@email.com"
             className="flex-1 bg-transparent px-1 py-2 text-sm outline-none placeholder:text-muted-foreground/60"
           />
-          <button className="text-[11px] tracking-luxe uppercase hover:text-accent transition-colors">
-            {sent ? "Recebido" : "Solicitar Convite"}
+          <button
+            disabled={status === "sending"}
+            className="text-[11px] tracking-luxe uppercase hover:text-accent transition-colors disabled:opacity-50"
+          >
+            {status === "sent" ? "Recebido ✦" : status === "sending" ? "Enviando..." : "Solicitar Convite"}
           </button>
         </form>
+        {msg && <p className="mt-4 text-xs text-muted-foreground">{msg}</p>}
       </div>
     </section>
   );
 }
 
 /* ---------- Footer ---------- */
+function InstagramIcon({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="0.8" fill="currentColor" />
+    </svg>
+  );
+}
+
 function Footer() {
   const cols = [
     { title: "Maison", links: ["Nossa História", "Ateliês", "Craftsmanship", "Sustentabilidade"] },
     { title: "Serviço", links: ["Concierge", "Envio", "Trocas", "Ajustes"] },
     { title: "Descobrir", links: ["O Editorial", "Journal", "Lookbook", "Revendedores"] },
-    { title: "Conectar", links: ["Instagram", "Contato", "Carreiras", "Imprensa"] },
+    { title: "Conectar", links: ["Contato", "Carreiras", "Imprensa"] },
   ];
   return (
     <footer className="border-t border-border bg-charcoal text-ivory">
@@ -1471,6 +1505,16 @@ function Footer() {
             <p className="mt-4 max-w-[220px] text-xs font-light leading-relaxed text-ivory/60">
               Luxo curado para a próxima geração. Estabelecido com propósito.
             </p>
+            <a
+              href="https://www.instagram.com/asconccept?igsh=MXYzNXhhNHRwMnlvcw%3D%3D&utm_source=qr"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram · @asconccept"
+              className="group mt-6 inline-flex items-center gap-3 border border-[color:var(--gold)]/40 bg-[color:var(--gold)]/5 px-4 py-2.5 text-[11px] tracking-luxe uppercase text-[color:var(--gold)] shadow-[0_0_16px_-4px_rgba(212,175,55,0.35)] transition-all duration-500 hover:border-[color:var(--gold)] hover:bg-[color:var(--gold)]/15 hover:shadow-[0_0_24px_-2px_rgba(212,175,55,0.65)]"
+            >
+              <InstagramIcon className="h-4 w-4 transition-transform duration-500 group-hover:scale-110" />
+              <span>@asconccept</span>
+            </a>
           </div>
           {cols.map((c) => (
             <div key={c.title}>
@@ -1498,6 +1542,7 @@ function Footer() {
     </footer>
   );
 }
+
 
 /* ---------- Cart Drawer ---------- */
 function CartDrawer() {
@@ -1630,6 +1675,7 @@ function CartDrawer() {
 
         {items.length > 0 && (
           <div className="space-y-4 border-t border-border px-6 py-6">
+            <CouponRow subtotal={subtotal} />
             <div className="flex items-center justify-between">
               <span className="text-[11px] tracking-luxe uppercase text-muted-foreground">
                 Subtotal
@@ -1724,28 +1770,61 @@ function SearchOverlay() {
 
 /* ---------- Auth Modal ---------- */
 function AuthModal() {
-  const { isOpen, closeAuth, signIn, signUp, user } = useAuth();
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const { isOpen, closeAuth, signIn, signUp, resetPassword, user } = useAuth();
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (user && isOpen) closeAuth();
   }, [user, isOpen, closeAuth]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      setError(null);
+      setInfo(null);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const switchMode = (m: "login" | "signup" | "forgot") => {
+    setMode(m);
+    setError(null);
+    setInfo(null);
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setInfo(null);
     setLoading(true);
-    const { error } =
-      mode === "login" ? await signIn(email, password) : await signUp(email, password);
+    if (mode === "login") {
+      const { error } = await signIn(email, password);
+      if (error) setError(error);
+    } else if (mode === "signup") {
+      const { error } = await signUp(email, password, name);
+      if (error) setError(error);
+    } else {
+      const { error } = await resetPassword(email);
+      if (error) setError(error);
+      else setInfo("Enviamos um link de recuperação para o seu e-mail.");
+    }
     setLoading(false);
-    if (error) setError(error);
   };
+
+  const title =
+    mode === "login" ? "Entrar" : mode === "signup" ? "Criar Conta" : "Recuperar acesso";
+  const eyebrow =
+    mode === "login"
+      ? "Bem-vindo de volta"
+      : mode === "signup"
+        ? "Nova conta"
+        : "Esqueci a senha";
 
   return (
     <>
@@ -1762,83 +1841,122 @@ function AuthModal() {
           >
             <X className="h-4 w-4" strokeWidth={1.5} />
           </button>
-          <p className="text-[11px] tracking-luxe uppercase text-accent">
-            {mode === "login" ? "Bem-vindo de volta" : "Nova conta"}
-          </p>
-          <h2 className="mt-2 font-serif text-3xl">
-            {mode === "login" ? "Entrar" : "Criar Conta"}
-          </h2>
+          <p className="text-[11px] tracking-luxe uppercase text-accent">{eyebrow}</p>
+          <h2 className="mt-2 font-serif text-3xl">{title}</h2>
           <p className="mt-2 text-sm font-light text-muted-foreground">
             {mode === "login"
               ? "Acesse sua conta para finalizar a compra."
-              : "Registre-se para prosseguir com o pagamento e envio."}
+              : mode === "signup"
+                ? "Registre-se e ganhe 10% OFF na primeira compra."
+                : "Digite o e-mail cadastrado para receber o link."}
           </p>
 
           <form onSubmit={onSubmit} className="mt-8 space-y-4">
+            {mode === "signup" && (
+              <div>
+                <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                  Nome completo
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoComplete="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
+                />
+              </div>
+            )}
             <div>
               <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
                 E-mail
               </label>
               <input
-                type="text"
+                type="email"
                 required
-                autoComplete={mode === "login" ? "username" : "email"}
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
               />
             </div>
-            <div>
-              <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                Senha
-              </label>
-              <input
-                type="password"
-                required
-                minLength={4}
-                autoComplete={mode === "login" ? "current-password" : "new-password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
-              />
-            </div>
+            {mode !== "forgot" && (
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    Senha
+                  </label>
+                  {mode === "login" && (
+                    <button
+                      type="button"
+                      onClick={() => switchMode("forgot")}
+                      className="text-[10px] tracking-luxe uppercase text-accent hover:underline underline-offset-4"
+                    >
+                      Esqueceu a senha?
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="password"
+                  required
+                  minLength={mode === "signup" ? 6 : 4}
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
+                />
+              </div>
+            )}
 
             {error && <p className="text-xs text-destructive">{error}</p>}
+            {info && <p className="text-xs text-accent">{info}</p>}
 
             <button
               type="submit"
               disabled={loading}
               className="w-full bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:opacity-50"
             >
-              {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar Conta"}
+              {loading
+                ? "Aguarde..."
+                : mode === "login"
+                  ? "Entrar"
+                  : mode === "signup"
+                    ? "Criar Conta"
+                    : "Enviar link de recuperação"}
             </button>
           </form>
 
           <div className="mt-6 text-center text-xs font-light text-muted-foreground">
-            {mode === "login" ? (
+            {mode === "login" && (
               <>
                 Não tem uma conta?{" "}
                 <button
-                  onClick={() => {
-                    setMode("signup");
-                    setError(null);
-                  }}
+                  onClick={() => switchMode("signup")}
                   className="text-foreground hover:text-accent underline underline-offset-4"
                 >
                   Criar conta
                 </button>
               </>
-            ) : (
+            )}
+            {mode === "signup" && (
               <>
                 Já tem uma conta?{" "}
                 <button
-                  onClick={() => {
-                    setMode("login");
-                    setError(null);
-                  }}
+                  onClick={() => switchMode("login")}
                   className="text-foreground hover:text-accent underline underline-offset-4"
                 >
                   Entrar
+                </button>
+              </>
+            )}
+            {mode === "forgot" && (
+              <>
+                Lembrou a senha?{" "}
+                <button
+                  onClick={() => switchMode("login")}
+                  className="text-foreground hover:text-accent underline underline-offset-4"
+                >
+                  Voltar ao login
                 </button>
               </>
             )}
@@ -1848,6 +1966,7 @@ function AuthModal() {
     </>
   );
 }
+
 
 /* ---------- Filter Sidebar ---------- */
 const SUB_OPTIONS: { id: SubFilter; label: string }[] = [
@@ -2307,6 +2426,315 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                 ))}
               </ul>
             )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ---------- Coupon Row (Cart) ---------- */
+function CouponRow({ subtotal }: { subtotal: number }) {
+  const { user, openAuth } = useAuth();
+  const { couponCode, couponDiscount, setCoupon } = useCart();
+  const [code, setCode] = useState(couponCode ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const apply = async () => {
+    setError(null);
+    if (!user) {
+      openAuth();
+      return;
+    }
+    const c = findCoupon(code);
+    if (!c) {
+      setError("Cupom inválido.");
+      return;
+    }
+    setLoading(true);
+    const already = await hasUsedCoupon(user.id, c.code);
+    setLoading(false);
+    if (already) {
+      setError("Este cupom já foi utilizado por você.");
+      return;
+    }
+    setCoupon(c.code, calcDiscount(c, subtotal));
+  };
+
+  const clear = () => {
+    setCoupon(null, 0);
+    setCode("");
+    setError(null);
+  };
+
+  if (couponCode) {
+    return (
+      <div className="flex items-center justify-between border border-[color:var(--gold)]/50 bg-[color:var(--gold)]/5 px-3 py-2 text-xs">
+        <span className="text-[color:var(--gold)] tracking-luxe uppercase">
+          ✦ {couponCode} · − {formatBRL(couponDiscount)}
+        </span>
+        <button onClick={clear} className="text-[10px] tracking-luxe uppercase text-muted-foreground hover:text-destructive">
+          Remover
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          placeholder="Cupom"
+          className="flex-1 border border-border bg-transparent px-2 py-1.5 text-xs uppercase outline-none focus:border-accent"
+        />
+        <button
+          onClick={apply}
+          disabled={loading}
+          className="border border-charcoal px-3 py-1.5 text-[10px] tracking-luxe uppercase hover:bg-charcoal hover:text-ivory transition-colors disabled:opacity-50"
+        >
+          Aplicar
+        </button>
+      </div>
+      {error && <p className="mt-1 text-[10px] text-destructive">{error}</p>}
+      {AVAILABLE_COUPONS.length > 0 && (
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Dica: use <span className="font-mono text-[color:var(--gold)]">10%OFFF</span> — válido uma vez por cliente.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Welcome Coupon Popup (post-signup) ---------- */
+function WelcomeCouponPopup() {
+  const { justSignedUp, clearJustSignedUp, user } = useAuth();
+  const [copied, setCopied] = useState(false);
+  if (!justSignedUp || !user) return null;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText("10%OFFF");
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch { /* ignore */ }
+  };
+  return (
+    <>
+      <div className="fixed inset-0 z-[120] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300" onClick={clearJustSignedUp} />
+      <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 pointer-events-none">
+        <div className="pointer-events-auto relative w-full max-w-md bg-[color:var(--ivory)] p-10 text-charcoal shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+          <button onClick={clearJustSignedUp} aria-label="Fechar" className="absolute right-4 top-4 hover:text-[color:var(--gold)]">
+            <X className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <p className="text-[11px] tracking-luxe uppercase text-[color:var(--gold)]">Bem-vindo à Maison</p>
+          <h2 className="mt-2 font-serif text-3xl leading-tight">
+            Um presente<br />de estreia ✦
+          </h2>
+          <p className="mt-4 text-sm font-light text-charcoal/80">
+            Sua adesão à A&amp;S Concept desbloqueia 10% de desconto na primeira compra.
+          </p>
+          <div className="mt-6 border border-dashed border-[color:var(--gold)] bg-white p-4 text-center">
+            <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">Cupom exclusivo</p>
+            <p className="mt-1 font-mono text-2xl tracking-widest text-[color:var(--gold)]">10%OFFF</p>
+            <button
+              onClick={copy}
+              className="mt-3 text-[10px] tracking-luxe uppercase text-charcoal hover:text-[color:var(--gold)] underline underline-offset-4"
+            >
+              {copied ? "Copiado ✦" : "Copiar código"}
+            </button>
+          </div>
+          <p className="mt-4 text-[10px] leading-relaxed text-muted-foreground">
+            Válido uma única vez por cliente, sobre o subtotal, sem cumulatividade com outras ofertas.
+          </p>
+          <button
+            onClick={clearJustSignedUp}
+            className="mt-6 w-full bg-charcoal py-3 text-[11px] tracking-luxe uppercase text-ivory hover:bg-navy transition-colors"
+          >
+            Explorar a coleção
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ---------- Testimonials ---------- */
+type TestimonialRow = {
+  id: string;
+  customer_name: string;
+  content: string;
+  rating: number;
+  sort_order: number;
+};
+
+function Stars({ n }: { n: number }) {
+  return (
+    <span className="inline-flex gap-0.5" aria-label={`${n} de 5 estrelas`}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <span key={i} className={i < n ? "text-[color:var(--gold)]" : "text-muted-foreground/30"}>★</span>
+      ))}
+    </span>
+  );
+}
+
+function Testimonials() {
+  const isAdmin = useIsAdmin();
+  const [rows, setRows] = useState<TestimonialRow[]>([]);
+  const [idx, setIdx] = useState(0);
+  const [editing, setEditing] = useState<TestimonialRow | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const load = useCallback(async () => {
+    const { data } = await supabase
+      .from("testimonials")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (data) setRows(data as TestimonialRow[]);
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (rows.length < 2) return;
+    const id = setInterval(() => setIdx((i) => (i + 1) % rows.length), 6500);
+    return () => clearInterval(id);
+  }, [rows.length]);
+
+  if (rows.length === 0 && !isAdmin) return null;
+  const current = rows[idx % Math.max(1, rows.length)];
+
+  const save = async (t: Partial<TestimonialRow> & { id?: string }) => {
+    if (t.id) {
+      await supabase.from("testimonials").update({
+        customer_name: t.customer_name, content: t.content, rating: t.rating, sort_order: t.sort_order ?? 0,
+      } as never).eq("id", t.id);
+    } else {
+      await supabase.from("testimonials").insert({
+        customer_name: t.customer_name, content: t.content, rating: t.rating ?? 5, sort_order: t.sort_order ?? rows.length,
+      } as never);
+    }
+    setEditing(null); setCreating(false); await load();
+  };
+  const remove = async (id: string) => {
+    if (!confirm("Excluir depoimento?")) return;
+    await supabase.from("testimonials").delete().eq("id", id);
+    await load();
+  };
+
+  return (
+    <section className="border-t border-border bg-secondary/30 py-20 md:py-28">
+      <div className="mx-auto max-w-3xl px-6 text-center">
+        <p className="mb-4 text-[11px] tracking-luxe uppercase text-accent">Prova Social</p>
+        <h2 className="font-serif text-3xl md:text-5xl">Vozes da Maison</h2>
+
+        {current && (
+          <figure key={current.id} className="mt-12 animate-in fade-in duration-700">
+            <Stars n={current.rating} />
+            <blockquote className="mt-6 font-serif text-xl md:text-2xl italic leading-relaxed text-charcoal">
+              “{current.content}”
+            </blockquote>
+            <figcaption className="mt-6 text-[11px] tracking-luxe uppercase text-muted-foreground">
+              — {current.customer_name}
+            </figcaption>
+          </figure>
+        )}
+
+        {rows.length > 1 && (
+          <div className="mt-8 flex justify-center gap-2">
+            {rows.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setIdx(i)}
+                aria-label={`Depoimento ${i + 1}`}
+                className={`h-1.5 rounded-full transition-all ${i === idx ? "w-8 bg-[color:var(--gold)]" : "w-2 bg-border hover:bg-muted-foreground"}`}
+              />
+            ))}
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="mt-10 border-t border-border pt-6 text-left">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">Admin · Depoimentos</p>
+              <button
+                onClick={() => { setCreating(true); setEditing({ id: "", customer_name: "", content: "", rating: 5, sort_order: rows.length }); }}
+                className="inline-flex items-center gap-1 border border-accent px-3 py-1.5 text-[10px] tracking-luxe uppercase text-accent hover:bg-accent hover:text-charcoal"
+              >
+                <Plus className="h-3 w-3" /> Novo
+              </button>
+            </div>
+            <ul className="space-y-2">
+              {rows.map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-2 border border-border bg-background px-3 py-2 text-xs">
+                  <div className="min-w-0">
+                    <p className="truncate font-serif">{r.customer_name} · <Stars n={r.rating} /></p>
+                    <p className="truncate text-muted-foreground">{r.content}</p>
+                  </div>
+                  <div className="flex flex-none gap-1">
+                    <button onClick={() => { setEditing(r); setCreating(false); }} className="border border-border p-1 hover:border-accent"><Pencil className="h-3 w-3" /></button>
+                    <button onClick={() => remove(r.id)} className="border border-destructive/60 p-1 text-destructive hover:bg-destructive hover:text-ivory"><Trash2 className="h-3 w-3" /></button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {editing && (
+        <TestimonialEditor
+          initial={editing}
+          isCreate={creating}
+          onCancel={() => { setEditing(null); setCreating(false); }}
+          onSave={save}
+        />
+      )}
+    </section>
+  );
+}
+
+function TestimonialEditor({
+  initial, isCreate, onCancel, onSave,
+}: {
+  initial: TestimonialRow;
+  isCreate: boolean;
+  onCancel: () => void;
+  onSave: (t: Partial<TestimonialRow> & { id?: string }) => Promise<void>;
+}) {
+  const [name, setName] = useState(initial.customer_name);
+  const [content, setContent] = useState(initial.content);
+  const [rating, setRating] = useState(initial.rating || 5);
+  return (
+    <>
+      <div onClick={onCancel} className="fixed inset-0 z-[100] bg-charcoal/70 backdrop-blur-sm" />
+      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 pointer-events-none">
+        <div className="pointer-events-auto w-full max-w-md bg-background p-6 shadow-2xl">
+          <p className="text-[11px] tracking-luxe uppercase text-accent">
+            {isCreate ? "Novo depoimento" : "Editar depoimento"}
+          </p>
+          <div className="mt-4 space-y-3">
+            <label className="block">
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">Nome</span>
+              <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full border border-border bg-transparent px-2 py-1.5 text-sm outline-none focus:border-accent" />
+            </label>
+            <label className="block">
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">Depoimento</span>
+              <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={4} className="mt-1 w-full border border-border bg-transparent px-2 py-1.5 text-sm outline-none focus:border-accent" />
+            </label>
+            <label className="block">
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">Estrelas (1-5)</span>
+              <input type="number" min={1} max={5} value={rating} onChange={(e) => setRating(Math.max(1, Math.min(5, Number(e.target.value) || 5)))} className="mt-1 w-24 border border-border bg-transparent px-2 py-1.5 text-sm outline-none focus:border-accent" />
+            </label>
+          </div>
+          <div className="mt-6 flex justify-end gap-2">
+            <button onClick={onCancel} className="border border-border px-4 py-2 text-[11px] tracking-luxe uppercase hover:bg-secondary">Cancelar</button>
+            <button
+              onClick={() => onSave({ id: isCreate ? undefined : initial.id, customer_name: name.trim(), content: content.trim(), rating })}
+              className="bg-accent px-4 py-2 text-[11px] tracking-luxe uppercase text-charcoal hover:bg-accent/90"
+            >
+              Salvar
+            </button>
           </div>
         </div>
       </div>

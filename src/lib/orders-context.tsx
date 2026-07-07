@@ -17,6 +17,8 @@ type OrdersCtx = {
     total: number;
     paymentMethod: PaymentMethod;
     status?: OrderStatus;
+    couponCode?: string | null;
+    discount?: number;
   }) => Promise<Order>;
   updateStatus: (id: string, status: OrderStatus, trackingCode?: string) => Promise<void>;
   setTrackingCode: (id: string, trackingCode: string) => Promise<void>;
@@ -110,6 +112,8 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
       total: o.total,
       payment_method: o.paymentMethod,
       status: o.status ?? "Aguardando Aprovação",
+      coupon_code: o.couponCode ?? null,
+      discount: o.discount ?? 0,
     };
     const { data, error } = await supabase
       .from("orders")

@@ -35,6 +35,9 @@ type CartCtx = {
   toggle: () => void;
   count: number;
   subtotal: number;
+  couponCode: string | null;
+  couponDiscount: number;
+  setCoupon: (code: string | null, discount: number) => void;
 };
 
 const Ctx = createContext<CartCtx | null>(null);
@@ -42,6 +45,9 @@ const Ctx = createContext<CartCtx | null>(null);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setOpen] = useState(false);
+  const [couponCode, setCouponCode] = useState<string | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+
 
 
   const add = (p: Product, size: string = "M") => {
@@ -81,12 +87,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
         add,
         remove,
         updateQty,
-        clear: () => setItems([]),
+        clear: () => {
+          setItems([]);
+          setCouponCode(null);
+          setCouponDiscount(0);
+        },
         count,
         subtotal,
         open: () => setOpen(true),
         close: () => setOpen(false),
         toggle: () => setOpen((o) => !o),
+        couponCode,
+        couponDiscount,
+        setCoupon: (code, discount) => {
+          setCouponCode(code);
+          setCouponDiscount(discount);
+        },
       }}
     >
       {children}
