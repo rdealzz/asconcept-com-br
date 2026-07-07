@@ -14,12 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      coupon_uses: {
+        Row: {
+          code: string
+          id: string
+          order_id: string | null
+          used_at: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          id?: string
+          order_id?: string | null
+          used_at?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          id?: string
+          order_id?: string | null
+          used_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      newsletter_subscribers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           address: Json
+          coupon_code: string | null
           created_at: string
           customer_email: string
           customer_name: string | null
+          discount: number
           id: string
           items: Json
           order_number: string
@@ -34,9 +78,11 @@ export type Database = {
         }
         Insert: {
           address?: Json
+          coupon_code?: string | null
           created_at?: string
           customer_email: string
           customer_name?: string | null
+          discount?: number
           id?: string
           items?: Json
           order_number: string
@@ -51,9 +97,11 @@ export type Database = {
         }
         Update: {
           address?: Json
+          coupon_code?: string | null
           created_at?: string
           customer_email?: string
           customer_name?: string | null
+          discount?: number
           id?: string
           items?: Json
           order_number?: string
@@ -139,6 +187,36 @@ export type Database = {
           email?: string
           id?: string
           name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      testimonials: {
+        Row: {
+          content: string
+          created_at: string
+          customer_name: string
+          id: string
+          rating: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          customer_name: string
+          id?: string
+          rating?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          customer_name?: string
+          id?: string
+          rating?: number
+          sort_order?: number
           updated_at?: string
         }
         Relationships: []

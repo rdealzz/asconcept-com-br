@@ -32,8 +32,11 @@ type AuthCtx = {
   openAuth: () => void;
   closeAuth: () => void;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, name?: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, name?: string) => Promise<{ error: string | null; justSignedUp?: boolean }>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: string | null }>;
+  justSignedUp: boolean;
+  clearJustSignedUp: () => void;
   updateProfile: (patch: { name?: string }) => Promise<void>;
   getAddress: (email?: string) => CustomerAddress | null;
   saveAddress: (address: CustomerAddress) => Promise<void>;
@@ -146,17 +149,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
+  const [justSignedUp, setJustSignedUp] = useState(false);
+
   const signUp: AuthCtx["signUp"] = async (email, password, name) => {
     const id = email.trim();
     if (!id || !password) return { error: "Preencha e-mail e senha." };
     if (password.length < 6) return { error: "A senha deve ter ao menos 6 caracteres." };
-    const cleanName = (name ?? "").trim() || undefined;
+    const cleanName = (name ?? "").trim();
+    if (!cleanName) return { error: "Informe seu nome completo." };
     const { error } = await supabase.auth.signUp({
       email: id,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
-        data: cleanName ? { name: cleanName } : undefined,
+        data: { name: cleanName, full_name: cleanName },
       },
     });
     if (error) {
@@ -165,12 +171,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: error.message };
     }
     void triggerWelcomeMail(id, cleanName);
-    return { error: null };
+    setJustSignedUp(true);
+    return { error: null, justSignedUp: true };
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
   };
+
+  const resetPassword: AuthCtx["resetPassword"] = async (email) => {
+    const id = email.trim();
+    if (!id) return { error: "Informe o e-mail cadastrado." };
+    const { error } = await supabase.auth.resetPasswordForEmail(id, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) return { error: error.message };
+    return { error: null };
+  };
+
 
   const updateProfile: AuthCtx["updateProfile"] = async (patch) => {
     if (!user) return;
@@ -211,6 +229,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signUp,
         signOut,
+        resetPassword,
+        justSignedUp,
+        clearJustSignedUp: () => setJustSignedUp(false),
         updateProfile,
         getAddress,
         saveAddress,
@@ -222,6 +243,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </Ctx.Provider>
   );
 }
+
+
 
 export function useAuth() {
   const c = useContext(Ctx);
