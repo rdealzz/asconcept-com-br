@@ -128,12 +128,12 @@ function OrdersPage() {
         ) : visible.length === 0 ? (
           <EmptyCard
             title={
-              user.isAdmin
+              isAllowedAdmin
                 ? "Nenhum pedido registrado no momento."
                 : "Nenhum pedido por aqui ainda"
             }
             subtitle={
-              user.isAdmin
+              isAllowedAdmin
                 ? "Quando um cliente concluir uma compra, ela aparecerá listada nesta área."
                 : "Quando você concluir uma compra, ela aparecerá aqui."
             }
@@ -146,7 +146,7 @@ function OrdersPage() {
               </Link>
             }
           />
-        ) : user.isAdmin ? (
+        ) : isAllowedAdmin ? (
           <AdminDashboard orders={visible} />
         ) : (
           <ul className="mt-10 space-y-6">
