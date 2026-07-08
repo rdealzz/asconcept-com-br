@@ -220,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateProfile: AuthCtx["updateProfile"] = async (patch) => {
     if (!user) return;
-    const nextName = patch.name?.trim() || null;
+    const nextName = sanitizeText(patch.name, { maxLength: 80 }) || null;
     const { error } = await supabase
       .from("profiles")
       .update({ name: nextName })
