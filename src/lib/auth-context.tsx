@@ -164,8 +164,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.isAdmin, refreshCustomers]);
 
   const signIn: AuthCtx["signIn"] = async (email, password) => {
+    const cleanEmail = sanitizeEmail(email);
+    if (!cleanEmail) return { error: "Informe um e-mail válido." };
+    if (typeof password !== "string" || password.length < 1 || password.length > 200)
+      return { error: "Senha inválida." };
     const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email: cleanEmail,
       password,
     });
     if (error) return { error: "E-mail ou senha inválidos." };
@@ -175,13 +179,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [justSignedUp, setJustSignedUp] = useState(false);
 
   const signUp: AuthCtx["signUp"] = async (email, password, name) => {
-    const id = email.trim();
-    if (!id || !password) return { error: "Preencha e-mail e senha." };
-    if (password.length < 6) return { error: "A senha deve ter ao menos 6 caracteres." };
-    const cleanName = (name ?? "").trim();
-    if (!cleanName) return { error: "Informe seu nome completo." };
+    const cleanEmail = sanitizeEmail(email);
+    if (!cleanEmail) return { error: "Informe um e-mail válido." };
+    if (typeof password !== "string" || password.length < 6 || password.length > 200)
+      return { error: "A senha deve ter ao menos 6 caracteres." };
+    const cleanName = sanitizeText(name, { maxLength: 80 });
+    if (cleanName.length < 2) return { error: "Informe seu nome completo." };
     const { error } = await supabase.auth.signUp({
-      email: id,
+      email: cleanEmail,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
@@ -191,9 +196,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) {
       if (error.message.toLowerCase().includes("already"))
         return { error: "Já existe uma conta com este e-mail." };
-      return { error: error.message };
+      return { error: "Não foi possível concluir o cadastro." };
     }
-    void triggerWelcomeMail(id, cleanName);
+    void triggerWelcomeMail(cleanEmail, cleanName);
     setJustSignedUp(true);
     return { error: null, justSignedUp: true };
   };
