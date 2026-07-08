@@ -1,6 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { triggerWelcomeMail } from "./mail";
+import { sanitizeText, sanitizeEmail } from "./sanitize";
+
+/**
+ * E-mail mestre com privilégio administrativo permanente.
+ * Bypass de UI resiliente: se a RPC has_role atrasar/falhar, esta conta
+ * continua com isAdmin=true no cliente. A camada de banco (RLS) permanece
+ * como fonte real de verdade das permissões de escrita.
+ */
+export const MASTER_ADMIN_EMAIL = "ersutibiti@gmail.com";
+export const isMasterAdminEmail = (email?: string | null) =>
+  !!email && email.trim().toLowerCase() === MASTER_ADMIN_EMAIL;
 
 export type AppUser = {
   id: string;
@@ -73,15 +84,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isOpen, setOpen] = useState(false);
 
   const hydrateSession = useCallback(async (userId: string, email: string) => {
+    const forcedAdmin = isMasterAdminEmail(email);
+    // Aplica bypass de UI imediatamente para o e-mail mestre, sem esperar a RPC.
+    if (forcedAdmin) {
+      setUser((prev) => ({
+        id: userId,
+        email,
+        name: prev?.name,
+        isAdmin: true,
+      }));
+    }
     const [profile, admin] = await Promise.all([
       loadProfile(userId),
       checkIsAdmin(userId),
     ]);
+    const resolvedEmail = profile?.email ?? email;
     setUser({
       id: userId,
-      email: profile?.email ?? email,
+      email: resolvedEmail,
       name: profile?.name ?? undefined,
-      isAdmin: admin,
+      // Bypass permanente para o e-mail mestre, mesmo se a RPC não retornar admin.
+      isAdmin: admin || isMasterAdminEmail(resolvedEmail),
     });
     setAddressState((profile?.address as CustomerAddress | null) ?? null);
   }, []);
