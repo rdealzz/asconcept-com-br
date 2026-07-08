@@ -99,16 +99,16 @@ function OrdersPage() {
       <main className="mx-auto max-w-6xl px-6 py-12 animate-[fade-in_0.5s_ease-out_both]">
         <div className="flex items-baseline gap-3">
           <h1 className="font-serif text-3xl">
-            {user?.isAdmin ? "Gestão de Pedidos" : "Meus Pedidos"}
+            {isAllowedAdmin ? "Gestão de Pedidos" : "Meus Pedidos"}
           </h1>
-          {user?.isAdmin && (
+          {isAllowedAdmin && (
             <span className="rounded-sm border border-[color:var(--gold)] px-2 py-0.5 text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
               Admin · {user.name ?? user.email}
             </span>
           )}
         </div>
         <p className="mt-1 text-[11px] tracking-luxe uppercase text-muted-foreground">
-          {user?.isAdmin
+          {isAllowedAdmin
             ? "Painel exclusivo do desenvolvedor master"
             : "Histórico de compras da sua conta"}
         </p>
