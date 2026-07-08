@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
   Clock,
@@ -9,9 +9,10 @@ import {
   CheckCircle2,
   Search,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, isMasterAdminEmail } from "@/lib/auth-context";
 import { useOrders } from "@/lib/orders-context";
 import { formatBRL } from "@/lib/cart-context";
+import { supabase } from "@/integrations/supabase/client";
 import type { Order, OrderStatus } from "@/lib/types";
 
 export const Route = createFileRoute("/pedidos/")({
@@ -22,6 +23,14 @@ export const Route = createFileRoute("/pedidos/")({
       { name: "robots", content: "noindex" },
     ],
   }),
+  // Guard client-side: em SSR não há sessão localStorage, então esperamos o
+  // componente. No navegador, exigimos sessão válida — visitantes anônimos
+  // e usuários comuns caem para "/".
+  beforeLoad: async () => {
+    if (typeof window === "undefined") return;
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) throw redirect({ to: "/" });
+  },
   component: OrdersPage,
 });
 
@@ -51,10 +60,26 @@ const STATUS_META: Record<OrderStatus, { label: string; icon: string; className:
 const ALL_STATUSES = Object.keys(STATUS_META) as OrderStatus[];
 
 function OrdersPage() {
-  const { user, openAuth } = useAuth();
+  const { user, loading, openAuth } = useAuth();
   const { orders, byUser } = useOrders();
+  const navigate = useNavigate();
 
-  const visible = user?.isAdmin ? orders : user ? byUser(user.email) : [];
+  // Trava runtime anti-devtools: se, por qualquer razão, um usuário não-mestre
+  // acabar renderizando esta rota, força signOut + redirect. Manipular
+  // `isAdmin` no console não libera nada — o componente sempre revalida.
+  useEffect(() => {
+    if (loading) return;
+    if (!user) return; // estado de "faça login" abaixo cuida disso
+    const allowed = isMasterAdminEmail(user.email);
+    if (!allowed) {
+      void supabase.auth.signOut().finally(() => {
+        navigate({ to: "/", replace: true });
+      });
+    }
+  }, [loading, user, navigate]);
+
+  const isAllowedAdmin = !!user && isMasterAdminEmail(user.email);
+  const visible = isAllowedAdmin ? orders : user ? byUser(user.email) : [];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
