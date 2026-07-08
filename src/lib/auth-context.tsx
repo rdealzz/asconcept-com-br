@@ -1,6 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { triggerWelcomeMail } from "./mail";
+import { sanitizeText, sanitizeEmail } from "./sanitize";
+
+/**
+ * E-mail mestre com privilégio administrativo permanente.
+ * Bypass de UI resiliente: se a RPC has_role atrasar/falhar, esta conta
+ * continua com isAdmin=true no cliente. A camada de banco (RLS) permanece
+ * como fonte real de verdade das permissões de escrita.
+ */
+export const MASTER_ADMIN_EMAIL = "ersutibiti@gmail.com";
+export const isMasterAdminEmail = (email?: string | null) =>
+  !!email && email.trim().toLowerCase() === MASTER_ADMIN_EMAIL;
 
 export type AppUser = {
   id: string;
@@ -73,15 +84,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isOpen, setOpen] = useState(false);
 
   const hydrateSession = useCallback(async (userId: string, email: string) => {
+    const forcedAdmin = isMasterAdminEmail(email);
+    // Aplica bypass de UI imediatamente para o e-mail mestre, sem esperar a RPC.
+    if (forcedAdmin) {
+      setUser((prev) => ({
+        id: userId,
+        email,
+        name: prev?.name,
+        isAdmin: true,
+      }));
+    }
     const [profile, admin] = await Promise.all([
       loadProfile(userId),
       checkIsAdmin(userId),
     ]);
+    const resolvedEmail = profile?.email ?? email;
     setUser({
       id: userId,
-      email: profile?.email ?? email,
+      email: resolvedEmail,
       name: profile?.name ?? undefined,
-      isAdmin: admin,
+      // Bypass permanente para o e-mail mestre, mesmo se a RPC não retornar admin.
+      isAdmin: admin || isMasterAdminEmail(resolvedEmail),
     });
     setAddressState((profile?.address as CustomerAddress | null) ?? null);
   }, []);
@@ -141,8 +164,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.isAdmin, refreshCustomers]);
 
   const signIn: AuthCtx["signIn"] = async (email, password) => {
+    const cleanEmail = sanitizeEmail(email);
+    if (!cleanEmail) return { error: "Informe um e-mail válido." };
+    if (typeof password !== "string" || password.length < 1 || password.length > 200)
+      return { error: "Senha inválida." };
     const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email: cleanEmail,
       password,
     });
     if (error) return { error: "E-mail ou senha inválidos." };
@@ -152,13 +179,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [justSignedUp, setJustSignedUp] = useState(false);
 
   const signUp: AuthCtx["signUp"] = async (email, password, name) => {
-    const id = email.trim();
-    if (!id || !password) return { error: "Preencha e-mail e senha." };
-    if (password.length < 6) return { error: "A senha deve ter ao menos 6 caracteres." };
-    const cleanName = (name ?? "").trim();
-    if (!cleanName) return { error: "Informe seu nome completo." };
+    const cleanEmail = sanitizeEmail(email);
+    if (!cleanEmail) return { error: "Informe um e-mail válido." };
+    if (typeof password !== "string" || password.length < 6 || password.length > 200)
+      return { error: "A senha deve ter ao menos 6 caracteres." };
+    const cleanName = sanitizeText(name, { maxLength: 80 });
+    if (cleanName.length < 2) return { error: "Informe seu nome completo." };
     const { error } = await supabase.auth.signUp({
-      email: id,
+      email: cleanEmail,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
@@ -168,9 +196,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) {
       if (error.message.toLowerCase().includes("already"))
         return { error: "Já existe uma conta com este e-mail." };
-      return { error: error.message };
+      return { error: "Não foi possível concluir o cadastro." };
     }
-    void triggerWelcomeMail(id, cleanName);
+    void triggerWelcomeMail(cleanEmail, cleanName);
     setJustSignedUp(true);
     return { error: null, justSignedUp: true };
   };
@@ -192,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateProfile: AuthCtx["updateProfile"] = async (patch) => {
     if (!user) return;
-    const nextName = patch.name?.trim() || null;
+    const nextName = sanitizeText(patch.name, { maxLength: 80 }) || null;
     const { error } = await supabase
       .from("profiles")
       .update({ name: nextName })

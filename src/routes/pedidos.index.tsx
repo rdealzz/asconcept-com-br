@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
   Clock,
@@ -9,9 +9,10 @@ import {
   CheckCircle2,
   Search,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, isMasterAdminEmail } from "@/lib/auth-context";
 import { useOrders } from "@/lib/orders-context";
 import { formatBRL } from "@/lib/cart-context";
+import { supabase } from "@/integrations/supabase/client";
 import type { Order, OrderStatus } from "@/lib/types";
 
 export const Route = createFileRoute("/pedidos/")({
@@ -22,6 +23,14 @@ export const Route = createFileRoute("/pedidos/")({
       { name: "robots", content: "noindex" },
     ],
   }),
+  // Guard client-side: em SSR não há sessão localStorage, então esperamos o
+  // componente. No navegador, exigimos sessão válida — visitantes anônimos
+  // e usuários comuns caem para "/".
+  beforeLoad: async () => {
+    if (typeof window === "undefined") return;
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) throw redirect({ to: "/" });
+  },
   component: OrdersPage,
 });
 
@@ -51,10 +60,26 @@ const STATUS_META: Record<OrderStatus, { label: string; icon: string; className:
 const ALL_STATUSES = Object.keys(STATUS_META) as OrderStatus[];
 
 function OrdersPage() {
-  const { user, openAuth } = useAuth();
+  const { user, loading, openAuth } = useAuth();
   const { orders, byUser } = useOrders();
+  const navigate = useNavigate();
 
-  const visible = user?.isAdmin ? orders : user ? byUser(user.email) : [];
+  // Trava runtime anti-devtools: se, por qualquer razão, um usuário não-mestre
+  // acabar renderizando esta rota, força signOut + redirect. Manipular
+  // `isAdmin` no console não libera nada — o componente sempre revalida.
+  useEffect(() => {
+    if (loading) return;
+    if (!user) return; // estado de "faça login" abaixo cuida disso
+    const allowed = isMasterAdminEmail(user.email);
+    if (!allowed) {
+      void supabase.auth.signOut().finally(() => {
+        navigate({ to: "/", replace: true });
+      });
+    }
+  }, [loading, user, navigate]);
+
+  const isAllowedAdmin = !!user && isMasterAdminEmail(user.email);
+  const visible = isAllowedAdmin ? orders : user ? byUser(user.email) : [];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -74,16 +99,16 @@ function OrdersPage() {
       <main className="mx-auto max-w-6xl px-6 py-12 animate-[fade-in_0.5s_ease-out_both]">
         <div className="flex items-baseline gap-3">
           <h1 className="font-serif text-3xl">
-            {user?.isAdmin ? "Gestão de Pedidos" : "Meus Pedidos"}
+            {isAllowedAdmin ? "Gestão de Pedidos" : "Meus Pedidos"}
           </h1>
-          {user?.isAdmin && (
+          {isAllowedAdmin && (
             <span className="rounded-sm border border-[color:var(--gold)] px-2 py-0.5 text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
               Admin · {user.name ?? user.email}
             </span>
           )}
         </div>
         <p className="mt-1 text-[11px] tracking-luxe uppercase text-muted-foreground">
-          {user?.isAdmin
+          {isAllowedAdmin
             ? "Painel exclusivo do desenvolvedor master"
             : "Histórico de compras da sua conta"}
         </p>
@@ -103,12 +128,12 @@ function OrdersPage() {
         ) : visible.length === 0 ? (
           <EmptyCard
             title={
-              user.isAdmin
+              isAllowedAdmin
                 ? "Nenhum pedido registrado no momento."
                 : "Nenhum pedido por aqui ainda"
             }
             subtitle={
-              user.isAdmin
+              isAllowedAdmin
                 ? "Quando um cliente concluir uma compra, ela aparecerá listada nesta área."
                 : "Quando você concluir uma compra, ela aparecerá aqui."
             }
@@ -121,7 +146,7 @@ function OrdersPage() {
               </Link>
             }
           />
-        ) : user.isAdmin ? (
+        ) : isAllowedAdmin ? (
           <AdminDashboard orders={visible} />
         ) : (
           <ul className="mt-10 space-y-6">
