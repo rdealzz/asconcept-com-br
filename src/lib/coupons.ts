@@ -8,15 +8,15 @@ export type Coupon = {
   description: string;
 };
 
-export const AVAILABLE_COUPONS: Coupon[] = [
-  {
+export const AVAILABLE_COUPONS: readonly Coupon[] = Object.freeze([
+  Object.freeze({
     code: "10%OFFF",
     discountType: "percent",
     value: 10,
     label: "Boas-vindas · 10% OFF",
     description: "Cupom exclusivo de estreia. Válido uma única vez por cliente.",
-  },
-];
+  }),
+]) as readonly Coupon[];
 
 export function findCoupon(code: string): Coupon | null {
   const norm = code.trim().toUpperCase();
