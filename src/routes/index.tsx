@@ -32,7 +32,7 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
-import { AVAILABLE_COUPONS, findCoupon, calcDiscount, hasUsedCoupon } from "@/lib/coupons";
+import { AVAILABLE_COUPONS, findCoupon, hasUsedCoupon } from "@/lib/coupons";
 
 import hero from "@/assets/hero.jpg";
 import editorial from "@/assets/editorial.jpg";
@@ -2057,13 +2057,22 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
   const [address, setAddress] = useState(() => getAddress() ?? {});
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
 
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (open) {
       setName(user?.name ?? "");
       setAddress(getAddress() ?? {});
       setSavedFlash(null);
+      if (flashTimerRef.current) {
+        clearTimeout(flashTimerRef.current);
+        flashTimerRef.current = null;
+      }
     }
-  }, [open, user, getAddress]);
+    // Only reset when the modal opens or user identity changes — getAddress is
+    // recreated on every AuthProvider render and would clear the flash instantly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, user?.id]);
 
   if (!open || !user) return null;
 
@@ -2071,7 +2080,8 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
     updateProfile({ name });
     saveAddress(address);
     setSavedFlash("Dados salvos com sucesso.");
-    setTimeout(() => setSavedFlash(null), 2400);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => setSavedFlash(null), 2400);
   };
 
   return (
@@ -2459,11 +2469,11 @@ function CouponRow({ subtotal }: { subtotal: number }) {
       setError("Este cupom já foi utilizado por você.");
       return;
     }
-    setCoupon(c.code, calcDiscount(c, subtotal));
+    setCoupon(c);
   };
 
   const clear = () => {
-    setCoupon(null, 0);
+    setCoupon(null);
     setCode("");
     setError(null);
   };

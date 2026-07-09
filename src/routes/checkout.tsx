@@ -54,13 +54,23 @@ async function decrementStockRemote(
 }
 
 function CheckoutPage() {
-  const { user, openAuth } = useAuth();
+  const { user, loading, openAuth } = useAuth();
   const { items, subtotal, count } = useCart();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user) openAuth();
-  }, [user, openAuth]);
+    if (!loading && !user) openAuth();
+  }, [loading, user, openAuth]);
+
+  if (loading) {
+    return (
+      <Shell>
+        <div className="mx-auto max-w-md py-24 text-center text-sm text-muted-foreground">
+          Carregando…
+        </div>
+      </Shell>
+    );
+  }
 
   if (!user) {
     return (
