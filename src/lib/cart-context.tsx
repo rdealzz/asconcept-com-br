@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { calcDiscount, type Coupon } from "./coupons";
 
 export type ProductCategory = "clothes" | "sneakers";
 
@@ -35,20 +36,56 @@ type CartCtx = {
   toggle: () => void;
   count: number;
   subtotal: number;
+  coupon: Coupon | null;
   couponCode: string | null;
   couponDiscount: number;
-  setCoupon: (code: string | null, discount: number) => void;
+  setCoupon: (coupon: Coupon | null) => void;
 };
 
 const Ctx = createContext<CartCtx | null>(null);
 
+const CART_KEY = "as_cart_v1";
+const COUPON_KEY = "as_coupon_v1";
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setOpen] = useState(false);
-  const [couponCode, setCouponCode] = useState<string | null>(null);
-  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [coupon, setCouponState] = useState<Coupon | null>(null);
+  const hydrated = useRef(false);
 
+  // Hydrate from localStorage on client mount to avoid SSR mismatch.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CART_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setItems(parsed);
+      }
+      const c = localStorage.getItem(COUPON_KEY);
+      if (c) {
+        const parsed = JSON.parse(c);
+        if (parsed && typeof parsed === "object" && parsed.code) setCouponState(parsed);
+      }
+    } catch {
+      /* ignore */
+    }
+    hydrated.current = true;
+  }, []);
 
+  useEffect(() => {
+    if (!hydrated.current) return;
+    try {
+      localStorage.setItem(CART_KEY, JSON.stringify(items));
+    } catch { /* ignore */ }
+  }, [items]);
+
+  useEffect(() => {
+    if (!hydrated.current) return;
+    try {
+      if (coupon) localStorage.setItem(COUPON_KEY, JSON.stringify(coupon));
+      else localStorage.removeItem(COUPON_KEY);
+    } catch { /* ignore */ }
+  }, [coupon]);
 
   const add = (p: Product, size: string = "M") => {
     setItems((prev) => {
@@ -78,6 +115,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const count = items.reduce((s, i) => s + i.qty, 0);
   const subtotal = items.reduce((s, i) => s + i.qty * i.price, 0);
+  // Recompute the discount dynamically from the current subtotal so cart edits
+  // never leave a stale (and potentially over-generous) discount attached.
+  const couponDiscount = coupon ? Math.min(subtotal, calcDiscount(coupon, subtotal)) : 0;
 
   return (
     <Ctx.Provider
@@ -89,20 +129,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
         updateQty,
         clear: () => {
           setItems([]);
-          setCouponCode(null);
-          setCouponDiscount(0);
+          setCouponState(null);
         },
         count,
         subtotal,
         open: () => setOpen(true),
         close: () => setOpen(false),
         toggle: () => setOpen((o) => !o),
-        couponCode,
+        coupon,
+        couponCode: coupon?.code ?? null,
         couponDiscount,
-        setCoupon: (code, discount) => {
-          setCouponCode(code);
-          setCouponDiscount(discount);
-        },
+        setCoupon: (c) => setCouponState(c),
       }}
     >
       {children}
