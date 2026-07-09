@@ -39,18 +39,10 @@ export const Route = createFileRoute("/checkout")({
   component: CheckoutPage,
 });
 
-async function decrementStockRemote(
-  items: { id: string; size: string; qty: number }[],
-) {
-  await Promise.all(
-    items.map((i) =>
-      supabase.rpc("decrement_product_stock", {
-        _product_id: i.id,
-        _size: i.size,
-        _qty: i.qty,
-      }),
-    ),
-  );
+async function consumeOrderStockRemote(orderNumber: string) {
+  // Server-side function verifies the order belongs to the caller and only
+  // decrements once, so clients cannot arbitrarily deplete inventory.
+  await supabase.rpc("consume_order_stock", { _order_number: orderNumber });
 }
 
 function CheckoutPage() {
