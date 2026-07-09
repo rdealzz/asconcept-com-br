@@ -259,9 +259,7 @@ function CheckoutForm({
         couponCode: couponCode ?? null,
         discount,
       });
-      await decrementStockRemote(
-        items.map((i) => ({ id: i.id, size: i.size, qty: i.qty })),
-      );
+      await consumeOrderStockRemote(order.id);
       if (couponCode && user) {
         try { await markCouponUsed(user.id, couponCode, order.id); } catch { /* ignore */ }
       }
