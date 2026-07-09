@@ -2057,13 +2057,22 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
   const [address, setAddress] = useState(() => getAddress() ?? {});
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
 
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (open) {
       setName(user?.name ?? "");
       setAddress(getAddress() ?? {});
       setSavedFlash(null);
+      if (flashTimerRef.current) {
+        clearTimeout(flashTimerRef.current);
+        flashTimerRef.current = null;
+      }
     }
-  }, [open, user, getAddress]);
+    // Only reset when the modal opens or user identity changes — getAddress is
+    // recreated on every AuthProvider render and would clear the flash instantly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, user?.id]);
 
   if (!open || !user) return null;
 
@@ -2071,7 +2080,8 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
     updateProfile({ name });
     saveAddress(address);
     setSavedFlash("Dados salvos com sucesso.");
-    setTimeout(() => setSavedFlash(null), 2400);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => setSavedFlash(null), 2400);
   };
 
   return (
