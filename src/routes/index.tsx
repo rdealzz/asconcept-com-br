@@ -32,7 +32,7 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
-import { AVAILABLE_COUPONS, findCoupon, calcDiscount, hasUsedCoupon } from "@/lib/coupons";
+import { AVAILABLE_COUPONS, findCoupon, hasUsedCoupon } from "@/lib/coupons";
 
 import hero from "@/assets/hero.jpg";
 import editorial from "@/assets/editorial.jpg";
