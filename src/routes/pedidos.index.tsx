@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Order, OrderStatus } from "@/lib/types";
 
 export const Route = createFileRoute("/pedidos/")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Meus Pedidos — A&S Concept" },
@@ -23,9 +24,6 @@ export const Route = createFileRoute("/pedidos/")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  // Guard client-side: em SSR não há sessão localStorage, então esperamos o
-  // componente. No navegador, exigimos sessão válida — visitantes anônimos
-  // e usuários comuns caem para "/".
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
     const { data } = await supabase.auth.getUser();
