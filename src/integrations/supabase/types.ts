@@ -70,6 +70,7 @@ export type Database = {
           payment_method: string
           shipping_cost: number
           status: string
+          stock_decremented: boolean
           subtotal: number
           total: number
           tracking_code: string | null
@@ -89,6 +90,7 @@ export type Database = {
           payment_method: string
           shipping_cost?: number
           status?: string
+          stock_decremented?: boolean
           subtotal?: number
           total?: number
           tracking_code?: string | null
@@ -108,6 +110,7 @@ export type Database = {
           payment_method?: string
           shipping_cost?: number
           status?: string
+          stock_decremented?: boolean
           subtotal?: number
           total?: number
           tracking_code?: string | null
@@ -247,16 +250,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      decrement_product_stock: {
-        Args: { _product_id: string; _qty: number; _size: string }
+      consume_order_stock: {
+        Args: { _order_number: string }
         Returns: undefined
-      }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
       }
     }
     Enums: {
