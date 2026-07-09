@@ -6,6 +6,7 @@ import { formatBRL } from "@/lib/cart-context";
 import { StatusBadge, paymentLabel } from "./pedidos.index";
 
 export const Route = createFileRoute("/pedidos/$id")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Detalhes do Pedido — A&S Concept" },
