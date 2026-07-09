@@ -1,9 +1,13 @@
 /**
  * A&S Concept — Motor de e-mails transacionais.
  *
- * Por padrão simula os envios imprimindo o payload no console do desenvolvedor.
- * A estrutura já está pronta para receber chaves reais (Resend/SendGrid) — basta
- * definir as variáveis de ambiente e ligar `MAIL_PROVIDER` para "resend" ou "sendgrid".
+ * Envios reais devem ser feitos por um endpoint server-side (server function
+ * ou edge function) que leia a chave do provedor (Resend/SendGrid) a partir
+ * de um segredo do servidor. Nunca embutir chaves de provedor no bundle do
+ * cliente: qualquer variável com prefixo `VITE_` é publicada no JS público.
+ *
+ * Enquanto o envio server-side não estiver implementado, esta camada apenas
+ * registra o payload no console do navegador (simulação).
  */
 import {
   orderCreatedTemplate,
@@ -12,7 +16,6 @@ import {
 } from "./mailTemplates";
 import type { OrderItem, OrderStatus } from "./types";
 
-type MailProvider = "console" | "resend" | "sendgrid";
 type EnvLike = Record<string, string | undefined>;
 
 const env: EnvLike =
@@ -20,68 +23,18 @@ const env: EnvLike =
     ? ((import.meta as { env?: EnvLike }).env ?? {})
     : {};
 
-const PROVIDER = (env.VITE_MAIL_PROVIDER as MailProvider) || "console";
+// Apenas o "de" pode ser público (aparece no cabeçalho do e-mail). Nunca leia
+// chaves de API neste arquivo — ele executa no navegador.
 const FROM = env.VITE_MAIL_FROM || "A&S Concept <ateliê@asconcept.com.br>";
 
 type MailPayload = { to: string; subject: string; html: string };
 
 async function deliver(payload: MailPayload) {
-  if (PROVIDER === "resend") {
-    const key = env.VITE_RESEND_API_KEY;
-    if (!key) return logSimulated(payload, "resend (chave ausente — simulação)");
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: FROM,
-          to: [payload.to],
-          subject: payload.subject,
-          html: payload.html,
-        }),
-      });
-      if (!res.ok) throw new Error(`Resend HTTP ${res.status}`);
-    } catch (e) {
-      console.warn("[A&S mail] Falha no Resend, caindo para simulação:", e);
-      logSimulated(payload, "resend (fallback)");
-    }
-    return;
-  }
-
-  if (PROVIDER === "sendgrid") {
-    const key = env.VITE_SENDGRID_API_KEY;
-    if (!key) return logSimulated(payload, "sendgrid (chave ausente — simulação)");
-    try {
-      const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          personalizations: [{ to: [{ email: payload.to }] }],
-          from: { email: FROM },
-          subject: payload.subject,
-          content: [{ type: "text/html", value: payload.html }],
-        }),
-      });
-      if (!res.ok) throw new Error(`SendGrid HTTP ${res.status}`);
-    } catch (e) {
-      console.warn("[A&S mail] Falha no SendGrid, caindo para simulação:", e);
-      logSimulated(payload, "sendgrid (fallback)");
-    }
-    return;
-  }
-
   logSimulated(payload, "console");
 }
 
 function logSimulated(payload: MailPayload, tag: string) {
   if (typeof window === "undefined") return;
-  // Log estruturado para o console do desenvolvedor
   // eslint-disable-next-line no-console
   console.groupCollapsed(
     `%c✦ A&S Mail (${tag})%c → ${payload.to} · ${payload.subject}`,
