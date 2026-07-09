@@ -2459,11 +2459,11 @@ function CouponRow({ subtotal }: { subtotal: number }) {
       setError("Este cupom já foi utilizado por você.");
       return;
     }
-    setCoupon(c.code, calcDiscount(c, subtotal));
+    setCoupon(c);
   };
 
   const clear = () => {
-    setCoupon(null, 0);
+    setCoupon(null);
     setCode("");
     setError(null);
   };
