@@ -10,12 +10,14 @@ import {
   Check,
   Download,
 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { useCart, formatBRL } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { useOrders } from "@/lib/orders-context";
 import { triggerOrderCreatedMail } from "@/lib/mail";
 import { supabase } from "@/integrations/supabase/client";
 import { markCouponUsed } from "@/lib/coupons";
+import { placeSecureOrder } from "@/lib/checkout.functions";
 import type { CheckoutAddress, PaymentMethod } from "@/lib/types";
 import {
   formatCep,
