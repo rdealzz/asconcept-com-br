@@ -127,7 +127,8 @@ function CheckoutForm({
 }) {
   const { items, clear, couponCode, couponDiscount } = useCart();
   const { user } = useAuth();
-  const { createOrder } = useOrders();
+  const { refresh: refreshOrders } = useOrders();
+  const placeOrderRemote = useServerFn(placeSecureOrder);
 
   const [step, setStep] = useState<1 | 2>(1);
   const [customerName, setCustomerName] = useState("");
