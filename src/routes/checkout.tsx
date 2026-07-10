@@ -10,12 +10,14 @@ import {
   Check,
   Download,
 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { useCart, formatBRL } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { useOrders } from "@/lib/orders-context";
 import { triggerOrderCreatedMail } from "@/lib/mail";
 import { supabase } from "@/integrations/supabase/client";
 import { markCouponUsed } from "@/lib/coupons";
+import { placeSecureOrder } from "@/lib/checkout.functions";
 import type { CheckoutAddress, PaymentMethod } from "@/lib/types";
 import {
   formatCep,
@@ -125,7 +127,8 @@ function CheckoutForm({
 }) {
   const { items, clear, couponCode, couponDiscount } = useCart();
   const { user } = useAuth();
-  const { createOrder } = useOrders();
+  const { refresh: refreshOrders } = useOrders();
+  const placeOrderRemote = useServerFn(placeSecureOrder);
 
   const [step, setStep] = useState<1 | 2>(1);
   const [customerName, setCustomerName] = useState("");
@@ -247,26 +250,30 @@ function CheckoutForm({
       image: i.image,
     }));
     try {
-      const order = await createOrder({
-        customerEmail: email,
-        customerName: customerName.trim(),
-        items: orderItems,
-        address: { ...address, cep: formatCep(address.cep) },
-        shippingCost,
-        subtotal,
-        total,
-        paymentMethod: payment,
-        couponCode: couponCode ?? null,
-        discount,
+      // Blindagem de preços: o server-side revalida cada item contra
+      // `public.products` e recalcula o total. Qualquer manipulação vinda
+      // do carrinho é descartada silenciosamente pelo backend.
+      const result = await placeOrderRemote({
+        data: {
+          items: items.map((i) => ({ id: i.id, quantity: i.qty, size: i.size })),
+          customerName: customerName.trim(),
+          customerEmail: email,
+          address: { ...address, cep: formatCep(address.cep) },
+          shippingCost,
+          discount,
+          couponCode: couponCode ?? null,
+          paymentMethod: payment,
+        },
       });
-      await consumeOrderStockRemote(order.id);
+      await consumeOrderStockRemote(result.orderNumber);
       if (couponCode && user) {
-        try { await markCouponUsed(user.id, couponCode, order.id); } catch { /* ignore */ }
+        try { await markCouponUsed(user.id, couponCode, result.orderNumber); } catch { /* ignore */ }
       }
-      void triggerOrderCreatedMail(email, order.id, total, orderItems);
+      void triggerOrderCreatedMail(email, result.orderNumber, result.total, orderItems);
+      await refreshOrders();
       clear();
       setPlacing(false);
-      navigate({ to: "/pedidos/$id", params: { id: order.id } });
+      navigate({ to: "/pedidos/$id", params: { id: result.orderNumber } });
     } catch (err) {
       setPlacing(false);
       setFormError(

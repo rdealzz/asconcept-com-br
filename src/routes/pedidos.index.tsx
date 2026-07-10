@@ -179,20 +179,21 @@ function EmptyCard({
 /* ---------- Admin Dashboard (Tabs) ---------- */
 
 function AdminDashboard({ orders }: { orders: Order[] }) {
-  const [tab, setTab] = useState<"pedidos" | "clientes">("pedidos");
+  const [tab, setTab] = useState<"pedidos" | "clientes" | "calculadora">("pedidos");
   return (
     <div className="mt-8">
-      <div className="flex gap-1 border-b border-border">
+      <div className="flex gap-1 border-b border-border overflow-x-auto">
         {(
           [
             { id: "pedidos", label: "Controle de Pedidos" },
-            { id: "clientes", label: "Banco de Clientes" },
+            { id: "clientes", label: "Clientes & Leads" },
+            { id: "calculadora", label: "Calculadora de Markup" },
           ] as const
         ).map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`relative px-5 py-3 text-[11px] tracking-luxe uppercase transition-colors ${
+            className={`relative px-5 py-3 text-[11px] tracking-luxe uppercase transition-colors whitespace-nowrap ${
               tab === t.id
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -205,58 +206,253 @@ function AdminDashboard({ orders }: { orders: Order[] }) {
           </button>
         ))}
       </div>
-      {tab === "pedidos" ? (
-        <AdminOrdersList orders={orders} />
+      {tab === "pedidos" && <AdminOrdersList orders={orders} />}
+      {tab === "clientes" && <AdminClientsPanel />}
+      {tab === "calculadora" && <MarkupCalculator />}
+    </div>
+  );
+}
+
+type NewsletterLead = { id: string; email: string; created_at: string };
+
+function AdminClientsPanel() {
+  const { listCustomers } = useAuth();
+  const customers = listCustomers();
+  const [sub, setSub] = useState<"clientes" | "leads">("clientes");
+  const [leads, setLeads] = useState<NewsletterLead[]>([]);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+
+  useEffect(() => {
+    if (sub !== "leads") return;
+    let cancelled = false;
+    setLoadingLeads(true);
+    void supabase
+      .from("newsletter_subscribers")
+      .select("id, email, created_at")
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        setLoadingLeads(false);
+        if (error) {
+          console.error("[leads] fetch failed", error);
+          return;
+        }
+        setLeads((data ?? []) as NewsletterLead[]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sub]);
+
+  return (
+    <div className="mt-10 animate-[fade-in_0.4s_ease-out] space-y-6">
+      <div className="flex gap-1 border-b border-border">
+        {(
+          [
+            { id: "clientes", label: `Clientes (${customers.length})` },
+            { id: "leads", label: `Newsletter (${leads.length || "—"})` },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setSub(t.id)}
+            className={`relative px-4 py-2 text-[10px] tracking-luxe uppercase transition-colors ${
+              sub === t.id ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.label}
+            {sub === t.id && (
+              <span className="absolute inset-x-2 -bottom-[1px] h-[2px] bg-[color:var(--gold)]" />
+            )}
+          </button>
+        ))}
+      </div>
+
+      {sub === "clientes" ? (
+        <section className="border border-border bg-card">
+          <header className="flex items-baseline justify-between border-b border-border px-5 py-4">
+            <div>
+              <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
+                Cadastros
+              </p>
+              <h3 className="font-serif text-xl">Clientes registrados</h3>
+            </div>
+            <span className="font-serif text-2xl tabular-nums">{customers.length}</span>
+          </header>
+          {customers.length === 0 ? (
+            <p className="px-5 py-10 text-center text-sm text-muted-foreground">
+              Nenhum cliente cadastrado ainda.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {customers.map((c) => (
+                <li key={c.email} className="flex items-center justify-between gap-4 px-5 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-serif text-sm">
+                      {c.name ?? c.email.split("@")[0]}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">{c.email}</p>
+                  </div>
+                  {c.createdAt && (
+                    <span className="shrink-0 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                      {new Date(c.createdAt).toLocaleDateString("pt-BR")}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       ) : (
-        <AdminClientsPanel />
+        <section className="border border-border bg-card">
+          <header className="flex items-baseline justify-between border-b border-border px-5 py-4">
+            <div>
+              <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
+                Leads capturados
+              </p>
+              <h3 className="font-serif text-xl">Assinantes da Newsletter</h3>
+            </div>
+            <span className="font-serif text-2xl tabular-nums">{leads.length}</span>
+          </header>
+          {loadingLeads ? (
+            <p className="px-5 py-10 text-center text-sm text-muted-foreground">
+              Carregando leads…
+            </p>
+          ) : leads.length === 0 ? (
+            <p className="px-5 py-10 text-center text-sm text-muted-foreground">
+              Nenhum e-mail capturado ainda.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {leads.map((l) => (
+                <li key={l.id} className="flex items-center justify-between gap-4 px-5 py-3">
+                  <p className="truncate text-sm text-charcoal">{l.email}</p>
+                  <span className="shrink-0 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    {new Date(l.created_at).toLocaleDateString("pt-BR")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
     </div>
   );
 }
 
-function AdminClientsPanel() {
-  const { listCustomers } = useAuth();
-  const customers = listCustomers();
+/* ---------- Calculadora de Markup Financeiro ---------- */
+
+const STRIPE_BR_RATE = 0.0499; // 4,99%
+const STRIPE_BR_FIXED = 0.5; // R$ 0,50 por transação
+
+function MarkupCalculator() {
+  const [cost, setCost] = useState<string>("");
+  const [margin, setMargin] = useState<string>("60");
+
+  const parsed = useMemo(() => {
+    const c = Number(cost.replace(",", "."));
+    const m = Number(margin.replace(",", "."));
+    if (!isFinite(c) || c <= 0 || !isFinite(m) || m < 0) return null;
+    // Queremos que o valor líquido recebido (após Stripe) cubra o custo mais a margem.
+    // desired = c * (1 + m/100)
+    // net(P) = P - P*rate - fixed = P*(1-rate) - fixed
+    // desired = P*(1-rate) - fixed  =>  P = (desired + fixed) / (1 - rate)
+    const desired = c * (1 + m / 100);
+    const price = (desired + STRIPE_BR_FIXED) / (1 - STRIPE_BR_RATE);
+    const stripeFee = price * STRIPE_BR_RATE + STRIPE_BR_FIXED;
+    const net = price - stripeFee;
+    const profit = net - c;
+    return { desired, price, stripeFee, net, profit, cost: c, margin: m };
+  }, [cost, margin]);
 
   return (
     <div className="mt-10 animate-[fade-in_0.4s_ease-out]">
       <section className="border border-border bg-card">
-        <header className="flex items-baseline justify-between border-b border-border px-5 py-4">
-          <div>
-            <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
-              Cadastros
-            </p>
-            <h3 className="font-serif text-xl">Clientes registrados</h3>
-          </div>
-          <span className="font-serif text-2xl tabular-nums">{customers.length}</span>
-        </header>
-        {customers.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-            Nenhum cliente cadastrado ainda.
+        <header className="border-b border-border px-6 py-4">
+          <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
+            Precificação
           </p>
+          <h3 className="font-serif text-xl">Calculadora de Markup + Taxa Stripe (Brasil)</h3>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Taxa considerada: 4,99% + R$ 0,50 por transação. O preço sugerido garante que a
+            margem líquida desejada seja preservada mesmo após o desconto do gateway.
+          </p>
+        </header>
+
+        <div className="grid gap-6 px-6 py-6 md:grid-cols-2">
+          <label className="block">
+            <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+              Custo bruto de produção (R$)
+            </span>
+            <input
+              value={cost}
+              onChange={(e) => setCost(e.target.value.replace(/[^\d.,]/g, ""))}
+              inputMode="decimal"
+              placeholder="Ex: 180,00"
+              className="mt-2 w-full border border-border bg-background px-3 py-2 text-lg tabular-nums outline-none focus:border-charcoal"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+              Margem de lucro desejada (%)
+            </span>
+            <input
+              value={margin}
+              onChange={(e) => setMargin(e.target.value.replace(/[^\d.,]/g, ""))}
+              inputMode="decimal"
+              placeholder="Ex: 60"
+              className="mt-2 w-full border border-border bg-background px-3 py-2 text-lg tabular-nums outline-none focus:border-charcoal"
+            />
+          </label>
+        </div>
+
+        {parsed ? (
+          <div className="grid gap-px border-t border-border bg-border md:grid-cols-2">
+            <ResultCell
+              label="Preço final sugerido (etiqueta)"
+              value={formatBRL(parsed.price)}
+              accent
+            />
+            <ResultCell
+              label="Taxa Stripe estimada"
+              value={`− ${formatBRL(parsed.stripeFee)}`}
+            />
+            <ResultCell
+              label="Valor líquido recebido"
+              value={formatBRL(parsed.net)}
+            />
+            <ResultCell
+              label={`Lucro real (margem ${parsed.margin.toFixed(0)}%)`}
+              value={formatBRL(parsed.profit)}
+            />
+          </div>
         ) : (
-          <ul className="divide-y divide-border">
-            {customers.map((c) => (
-              <li key={c.email} className="flex items-center justify-between gap-4 px-5 py-3">
-                <div className="min-w-0">
-                  <p className="truncate font-serif text-sm">
-                    {c.name ?? c.email.split("@")[0]}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">{c.email}</p>
-                </div>
-                {c.createdAt && (
-                  <span className="shrink-0 text-[10px] tracking-luxe uppercase text-muted-foreground">
-                    {new Date(c.createdAt).toLocaleDateString("pt-BR")}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
+          <p className="border-t border-border px-6 py-8 text-center text-sm text-muted-foreground">
+            Informe o custo e a margem para calcular.
+          </p>
         )}
-        <p className="border-t border-border px-5 py-3 text-[10px] leading-relaxed text-muted-foreground">
-          Dados carregados diretamente do backend seguro.
+
+        <p className="border-t border-border px-6 py-3 text-[10px] leading-relaxed text-muted-foreground">
+          Fórmula: preço = (custo × (1 + margem%) + R$ 0,50) ÷ (1 − 4,99%). Assim, após a
+          dedução da taxa, o valor líquido corresponde exatamente ao custo mais o percentual
+          de lucro pretendido.
         </p>
       </section>
+    </div>
+  );
+}
+
+function ResultCell({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className={`bg-card px-6 py-5 ${accent ? "bg-[color:var(--ivory)]" : ""}`}>
+      <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">{label}</p>
+      <p
+        className={`mt-1 font-serif tabular-nums ${
+          accent ? "text-[color:var(--gold)] text-3xl" : "text-2xl text-charcoal"
+        }`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
