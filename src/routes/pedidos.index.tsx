@@ -292,6 +292,11 @@ function AdminClientsPanel() {
                       {c.name ?? c.email.split("@")[0]}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">{c.email}</p>
+                    {c.phone && (
+                      <p className="truncate text-[11px] text-[color:var(--gold)]">
+                        📱 {c.phone}
+                      </p>
+                    )}
                   </div>
                   {c.createdAt && (
                     <span className="shrink-0 text-[10px] tracking-luxe uppercase text-muted-foreground">

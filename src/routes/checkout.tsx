@@ -11,7 +11,7 @@ import {
   Download,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { useCart, formatBRL } from "@/lib/cart-context";
+import { useCart, formatBRL, PIX_DISCOUNT_RATE } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { useOrders } from "@/lib/orders-context";
 import { triggerOrderCreatedMail } from "@/lib/mail";
@@ -156,8 +156,13 @@ function CheckoutForm({
     [address.cep, subtotal],
   );
   const shippingCost = quote?.displayCost ?? 0;
-  const discount = Math.min(subtotal, couponDiscount || 0);
+  const couponDiscountApplied = Math.min(subtotal, couponDiscount || 0);
+  const netProducts = Math.max(0, subtotal - couponDiscountApplied);
+  const pixDiscount = payment === "pix" ? +(netProducts * PIX_DISCOUNT_RATE).toFixed(2) : 0;
+  const discount = couponDiscountApplied + pixDiscount;
   const total = Math.max(0, subtotal - discount) + shippingCost;
+
+
 
 
   useEffect(() => {
@@ -343,10 +348,16 @@ function CheckoutForm({
             </ul>
             <div className="mt-6 space-y-2 border-t border-border pt-4 text-sm">
               <Row label="Subtotal" value={formatBRL(subtotal)} />
-              {discount > 0 && (
+              {couponDiscountApplied > 0 && (
                 <Row
                   label={couponCode ? `Cupom ${couponCode}` : "Desconto"}
-                  value={`− ${formatBRL(discount)}`}
+                  value={`− ${formatBRL(couponDiscountApplied)}`}
+                />
+              )}
+              {pixDiscount > 0 && (
+                <Row
+                  label="Desconto Pix (5%)"
+                  value={`− ${formatBRL(pixDiscount)}`}
                 />
               )}
               <Row
@@ -370,6 +381,11 @@ function CheckoutForm({
               {quote?.free && (
                 <p className="text-[11px] text-[color:var(--gold)]">
                   Você ganhou frete grátis ✦
+                </p>
+              )}
+              {payment !== "pix" && (
+                <p className="text-[11px] font-light italic text-[color:var(--gold)]">
+                  Pague no Pix e ganhe 5% de desconto automático.
                 </p>
               )}
             </div>

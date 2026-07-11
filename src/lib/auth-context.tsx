@@ -33,6 +33,7 @@ export type CustomerAddress = {
 export type CustomerRecord = {
   email: string;
   name?: string;
+  phone?: string;
   createdAt?: string;
 };
 
@@ -43,7 +44,12 @@ type AuthCtx = {
   openAuth: () => void;
   closeAuth: () => void;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, name?: string) => Promise<{ error: string | null; justSignedUp?: boolean }>;
+  signUp: (
+    email: string,
+    password: string,
+    name?: string,
+    phone?: string,
+  ) => Promise<{ error: string | null; justSignedUp?: boolean }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   justSignedUp: boolean;
@@ -146,13 +152,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user?.isAdmin) return;
     const { data } = await supabase
       .from("profiles")
-      .select("email, name, created_at")
+      .select("email, name, phone, created_at")
       .order("created_at", { ascending: false });
     if (data) {
       setCustomers(
         data.map((r) => ({
           email: r.email,
           name: r.name ?? undefined,
+          phone: (r as { phone?: string | null }).phone ?? undefined,
           createdAt: r.created_at,
         })),
       );
@@ -178,19 +185,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const [justSignedUp, setJustSignedUp] = useState(false);
 
-  const signUp: AuthCtx["signUp"] = async (email, password, name) => {
+  const signUp: AuthCtx["signUp"] = async (email, password, name, phone) => {
     const cleanEmail = sanitizeEmail(email);
     if (!cleanEmail) return { error: "Informe um e-mail válido." };
     if (typeof password !== "string" || password.length < 6 || password.length > 200)
       return { error: "A senha deve ter ao menos 6 caracteres." };
     const cleanName = sanitizeText(name, { maxLength: 80 });
     if (cleanName.length < 2) return { error: "Informe seu nome completo." };
+    const cleanPhone = sanitizeText(phone, { maxLength: 20 });
+    const digits = cleanPhone.replace(/\D/g, "");
+    if (digits.length < 10 || digits.length > 11)
+      return { error: "Informe um número de celular válido com DDD." };
     const { error } = await supabase.auth.signUp({
       email: cleanEmail,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
-        data: { name: cleanName, full_name: cleanName },
+        data: { name: cleanName, full_name: cleanName, phone: cleanPhone },
       },
     });
     if (error) {

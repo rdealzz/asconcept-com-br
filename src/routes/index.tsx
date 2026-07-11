@@ -25,6 +25,7 @@ import type { OrderStatus } from "@/lib/types";
 import {
   useCart,
   formatBRL,
+  applyPixDiscount,
   type Product,
   type ProductCategory,
 } from "@/lib/cart-context";
@@ -476,7 +477,7 @@ function Nav({
             <button
               aria-label="Painel Admin"
               onClick={onOpenAdmin}
-              title="Painel Admin — rdealzz"
+              title="Painel Admin"
               className="relative hover:text-accent transition-colors"
             >
               <Settings className="h-4 w-4" strokeWidth={1.5} />
@@ -860,7 +861,12 @@ function ProductCard({ product }: { product: Product }) {
             {product.description}
           </p>
         </div>
-        <span className="shrink-0 text-xs md:text-sm tabular-nums">{formatBRL(product.price)}</span>
+        <div className="shrink-0 text-right">
+          <span className="block text-xs md:text-sm tabular-nums">{formatBRL(product.price)}</span>
+          <span className="mt-0.5 block text-[10px] font-light italic tracking-wide text-[color:var(--gold)]/90">
+            ou {formatBRL(applyPixDiscount(product.price))} no Pix
+          </span>
+        </div>
       </div>
       {showLastItem && (
         <p className="mt-2 text-[10px] font-semibold uppercase tracking-luxe text-[color:var(--gold)]">
@@ -956,6 +962,9 @@ function ProductModal() {
               <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Concept</p>
               <h2 className="mt-3 font-serif text-3xl md:text-4xl leading-tight">{active.name}</h2>
               <p className="mt-3 text-lg tabular-nums">{formatBRL(active.price)}</p>
+              <p className="mt-1 text-[11px] font-light italic tracking-wide text-[color:var(--gold)]">
+                ou {formatBRL(applyPixDiscount(active.price))} no Pix (5% de desconto)
+              </p>
               <p className="mt-1 text-[10px] font-light italic tracking-wide text-muted-foreground/80">
                 Novos membros recebem 10% de desconto ao criar uma conta.
               </p>
@@ -1683,6 +1692,9 @@ function CartDrawer() {
               </span>
               <span className="font-serif text-xl tabular-nums">{formatBRL(subtotal)}</span>
             </div>
+            <p className="text-[11px] font-light italic tracking-wide text-[color:var(--gold)]">
+              ou {formatBRL(applyPixDiscount(subtotal))} no Pix (5% de desconto)
+            </p>
             <p className="text-[11px] font-light text-muted-foreground">
               Frete grátis para pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}. Impostos
               calculados no checkout.
@@ -1776,6 +1788,7 @@ function AuthModal() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1808,7 +1821,7 @@ function AuthModal() {
       const { error } = await signIn(email, password);
       if (error) setError(error);
     } else if (mode === "signup") {
-      const { error } = await signUp(email, password, name);
+      const { error } = await signUp(email, password, name, phone);
       if (error) setError(error);
     } else {
       const { error } = await resetPassword(email);
@@ -1854,19 +1867,47 @@ function AuthModal() {
 
           <form onSubmit={onSubmit} className="mt-8 space-y-4">
             {mode === "signup" && (
-              <div>
-                <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                  Nome completo
-                </label>
-                <input
-                  type="text"
-                  required
-                  autoComplete="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    Nome completo
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoComplete="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    Celular (WhatsApp)
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    placeholder="(11) 98765-4321"
+                    value={phone}
+                    onChange={(e) => {
+                      const d = e.target.value.replace(/\D/g, "").slice(0, 11);
+                      let out = d;
+                      if (d.length > 2 && d.length <= 7) out = `(${d.slice(0, 2)}) ${d.slice(2)}`;
+                      else if (d.length > 7)
+                        out = `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+                      else if (d.length > 0) out = `(${d}`;
+                      setPhone(out);
+                    }}
+                    className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
+                  />
+                  <p className="mt-1 text-[10px] font-light text-muted-foreground/70">
+                    Usaremos apenas para contato do atelier sobre seus pedidos.
+                  </p>
+                </div>
+              </>
             )}
             <div>
               <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
@@ -2266,7 +2307,7 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
   );
 }
 
-/* ---------- Admin Panel Modal (rdealzz) ---------- */
+/* ---------- Admin Panel Modal ---------- */
 const ADMIN_STATUSES: OrderStatus[] = [
   "Aguardando Aprovação",
   "Preparando pedido",
@@ -2300,7 +2341,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
           </button>
           <div className="border-b border-border px-8 py-6">
             <p className="flex items-center gap-2 text-[11px] tracking-luxe uppercase text-accent">
-              <Shield className="h-3 w-3" /> Painel Admin · rdealzz
+              <Shield className="h-3 w-3" /> Painel Admin · A&amp;S Conccept
             </p>
             <h2 className="mt-1 font-serif text-3xl">Gestão Interna</h2>
           </div>
