@@ -155,3 +155,8 @@ export function useCart() {
 
 export const formatBRL = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+/** Desconto silencioso aplicado quando o cliente escolhe Pix. */
+export const PIX_DISCOUNT_RATE = 0.05;
+export const applyPixDiscount = (v: number) =>
+  Math.max(0, v * (1 - PIX_DISCOUNT_RATE));
