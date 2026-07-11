@@ -25,6 +25,7 @@ import type { OrderStatus } from "@/lib/types";
 import {
   useCart,
   formatBRL,
+  applyPixDiscount,
   type Product,
   type ProductCategory,
 } from "@/lib/cart-context";
