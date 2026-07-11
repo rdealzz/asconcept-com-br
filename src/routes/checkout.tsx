@@ -348,10 +348,16 @@ function CheckoutForm({
             </ul>
             <div className="mt-6 space-y-2 border-t border-border pt-4 text-sm">
               <Row label="Subtotal" value={formatBRL(subtotal)} />
-              {discount > 0 && (
+              {couponDiscountApplied > 0 && (
                 <Row
                   label={couponCode ? `Cupom ${couponCode}` : "Desconto"}
-                  value={`− ${formatBRL(discount)}`}
+                  value={`− ${formatBRL(couponDiscountApplied)}`}
+                />
+              )}
+              {pixDiscount > 0 && (
+                <Row
+                  label="Desconto Pix (5%)"
+                  value={`− ${formatBRL(pixDiscount)}`}
                 />
               )}
               <Row
@@ -375,6 +381,11 @@ function CheckoutForm({
               {quote?.free && (
                 <p className="text-[11px] text-[color:var(--gold)]">
                   Você ganhou frete grátis ✦
+                </p>
+              )}
+              {payment !== "pix" && (
+                <p className="text-[11px] font-light italic text-[color:var(--gold)]">
+                  Pague no Pix e ganhe 5% de desconto automático.
                 </p>
               )}
             </div>
