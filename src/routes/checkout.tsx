@@ -11,7 +11,7 @@ import {
   Download,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { useCart, formatBRL } from "@/lib/cart-context";
+import { useCart, formatBRL, PIX_DISCOUNT_RATE } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { useOrders } from "@/lib/orders-context";
 import { triggerOrderCreatedMail } from "@/lib/mail";
@@ -156,8 +156,13 @@ function CheckoutForm({
     [address.cep, subtotal],
   );
   const shippingCost = quote?.displayCost ?? 0;
-  const discount = Math.min(subtotal, couponDiscount || 0);
+  const couponDiscountApplied = Math.min(subtotal, couponDiscount || 0);
+  const netProducts = Math.max(0, subtotal - couponDiscountApplied);
+  const pixDiscount = payment === "pix" ? +(netProducts * PIX_DISCOUNT_RATE).toFixed(2) : 0;
+  const discount = couponDiscountApplied + pixDiscount;
   const total = Math.max(0, subtotal - discount) + shippingCost;
+
+
 
 
   useEffect(() => {
