@@ -1821,7 +1821,7 @@ function AuthModal() {
       const { error } = await signIn(email, password);
       if (error) setError(error);
     } else if (mode === "signup") {
-      const { error } = await signUp(email, password, name);
+      const { error } = await signUp(email, password, name, phone);
       if (error) setError(error);
     } else {
       const { error } = await resetPassword(email);
@@ -1867,19 +1867,47 @@ function AuthModal() {
 
           <form onSubmit={onSubmit} className="mt-8 space-y-4">
             {mode === "signup" && (
-              <div>
-                <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                  Nome completo
-                </label>
-                <input
-                  type="text"
-                  required
-                  autoComplete="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    Nome completo
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoComplete="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    Celular (WhatsApp)
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    placeholder="(11) 98765-4321"
+                    value={phone}
+                    onChange={(e) => {
+                      const d = e.target.value.replace(/\D/g, "").slice(0, 11);
+                      let out = d;
+                      if (d.length > 2 && d.length <= 7) out = `(${d.slice(0, 2)}) ${d.slice(2)}`;
+                      else if (d.length > 7)
+                        out = `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+                      else if (d.length > 0) out = `(${d}`;
+                      setPhone(out);
+                    }}
+                    className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
+                  />
+                  <p className="mt-1 text-[10px] font-light text-muted-foreground/70">
+                    Usaremos apenas para contato do atelier sobre seus pedidos.
+                  </p>
+                </div>
+              </>
             )}
             <div>
               <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
