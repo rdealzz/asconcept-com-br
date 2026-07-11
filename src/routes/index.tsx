@@ -34,7 +34,8 @@ import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalcu
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 import { AVAILABLE_COUPONS, findCoupon, hasUsedCoupon } from "@/lib/coupons";
 
-import hero from "@/assets/hero.jpg";
+import heroAsset from "@/assets/hero-amalfi.png.asset.json";
+const hero = heroAsset.url;
 import editorial from "@/assets/editorial.jpg";
 
 export const Route = createFileRoute("/")({

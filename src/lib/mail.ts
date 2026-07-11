@@ -1,5 +1,5 @@
 /**
- * A&S Concept — Motor de e-mails transacionais.
+ * A&S Conccept — Motor de e-mails transacionais.
  *
  * Envios reais devem ser feitos por um endpoint server-side (server function
  * ou edge function) que leia a chave do provedor (Resend/SendGrid) a partir
@@ -25,7 +25,7 @@ const env: EnvLike =
 
 // Apenas o "de" pode ser público (aparece no cabeçalho do e-mail). Nunca leia
 // chaves de API neste arquivo — ele executa no navegador.
-const FROM = env.VITE_MAIL_FROM || "A&S Concept <ateliê@asconcept.com.br>";
+const FROM = env.VITE_MAIL_FROM || "A&S Conccept <ateliê@asconcept.com.br>";
 
 type MailPayload = { to: string; subject: string; html: string };
 
