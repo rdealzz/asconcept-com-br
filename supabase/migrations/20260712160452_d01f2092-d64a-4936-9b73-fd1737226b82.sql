@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Users create own orders" ON public.orders;
