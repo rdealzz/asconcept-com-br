@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { AVAILABLE_COUPONS, calcDiscount } from "@/lib/coupons";
+import { quoteShipping, normalizeCep } from "@/lib/shipping";
 
 type CheckoutItemInput = {
   id: string;
@@ -12,8 +14,6 @@ type CheckoutInput = {
   customerName: string;
   customerEmail: string;
   address: Record<string, unknown>;
-  shippingCost: number;
-  discount: number;
   couponCode: string | null;
   paymentMethod: "pix" | "credit_card" | "boleto";
 };
@@ -24,6 +24,9 @@ type CheckoutResult = {
   subtotal: number;
   status: string;
 };
+
+const PIX_DISCOUNT_RATE = 0.05;
+const INITIAL_STATUS = "Aguardando Aprovação";
 
 function sanitize(v: unknown, max = 200): string {
   const s = typeof v === "string" ? v : "";
@@ -59,8 +62,6 @@ function validateInput(raw: unknown): CheckoutInput {
     customerName: sanitize(d.customerName, 120),
     customerEmail: sanitize(d.customerEmail, 254).toLowerCase(),
     address: (d.address ?? {}) as Record<string, unknown>,
-    shippingCost: Math.max(0, Number(d.shippingCost) || 0),
-    discount: Math.max(0, Number(d.discount) || 0),
     couponCode: d.couponCode ? sanitize(d.couponCode, 40).toUpperCase() : null,
     paymentMethod: method,
   };
@@ -72,8 +73,7 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<CheckoutResult> => {
     const { supabase, userId } = context;
 
-    // Blindagem: buscar preços REAIS do banco — o valor enviado pelo cliente
-    // é descartado para evitar fraude por inspeção de rede/DevTools.
+    // Preços canônicos vindos do banco — o cliente não influencia o valor.
     const ids = Array.from(new Set(data.items.map((i) => i.id)));
     const { data: rows, error: fetchErr } = await supabase
       .from("products")
@@ -87,14 +87,9 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
 
     const priceMap = new Map<string, { name: string; price: number; image: string | null }>();
     for (const r of rows) {
-      priceMap.set(r.id, {
-        name: r.name,
-        price: Number(r.price),
-        image: r.image,
-      });
+      priceMap.set(r.id, { name: r.name, price: Number(r.price), image: r.image });
     }
 
-    // Reconstruir itens do pedido com preços canônicos vindos do banco.
     const orderItems = data.items.map((it) => {
       const p = priceMap.get(it.id)!;
       return {
@@ -108,10 +103,42 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
     });
 
     const subtotal = orderItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
-    const discount = Math.min(data.discount, subtotal); // nunca deixa negativo
-    const total = Math.max(0, subtotal - discount + data.shippingCost);
 
-    // Gera o order_number no servidor.
+    // Frete recomputado a partir do CEP validado — nunca aceita valor do cliente.
+    const rawCep = (data.address as { cep?: unknown }).cep;
+    const cep = typeof rawCep === "string" ? normalizeCep(rawCep) : "";
+    const quote = quoteShipping(cep, subtotal);
+    if (!quote) throw new Error("CEP inválido para cálculo de frete.");
+    const shippingCost = quote.displayCost;
+
+    // Desconto recomputado a partir da lista canônica de cupons + regra PIX.
+    let couponDiscount = 0;
+    let acceptedCoupon: string | null = null;
+    if (data.couponCode) {
+      const coupon = AVAILABLE_COUPONS.find(
+        (c) => c.code.toUpperCase() === data.couponCode,
+      );
+      if (coupon) {
+        const { data: prior } = await supabase
+          .from("coupon_uses")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("code", coupon.code.toUpperCase())
+          .maybeSingle();
+        if (!prior) {
+          couponDiscount = calcDiscount(coupon, subtotal);
+          acceptedCoupon = coupon.code.toUpperCase();
+        }
+      }
+    }
+    const netAfterCoupon = Math.max(0, subtotal - couponDiscount);
+    const pixDiscount =
+      data.paymentMethod === "pix"
+        ? Math.round(netAfterCoupon * PIX_DISCOUNT_RATE * 100) / 100
+        : 0;
+    const discount = Math.min(subtotal, couponDiscount + pixDiscount);
+    const total = Math.max(0, subtotal - discount + shippingCost);
+
     const rand = Math.floor(100000 + Math.random() * 900000);
     const orderNumber = `AS-${rand}`;
 
@@ -122,16 +149,19 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
       customer_name: data.customerName || null,
       items: orderItems,
       address: data.address,
-      shipping_cost: data.shippingCost,
+      shipping_cost: shippingCost,
       subtotal,
       total,
       payment_method: data.paymentMethod,
-      status: "Preparando pedido",
-      coupon_code: data.couponCode,
+      status: INITIAL_STATUS,
+      coupon_code: acceptedCoupon,
       discount,
     };
 
-    const { data: inserted, error: insertErr } = await supabase
+    // Inserção privilegiada: a política RLS de INSERT foi removida em orders,
+    // forçando todo cadastro de pedido a passar por esta função autenticada.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: inserted, error: insertErr } = await supabaseAdmin
       .from("orders")
       .insert(insertPayload as never)
       .select("order_number, total, subtotal, status")
