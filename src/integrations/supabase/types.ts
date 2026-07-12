@@ -38,6 +38,30 @@ export type Database = {
         }
         Relationships: []
       }
+      manual_customers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string | null
+          phone: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name?: string | null
+          phone?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string | null
+          phone?: string | null
+        }
+        Relationships: []
+      }
       newsletter_subscribers: {
         Row: {
           created_at: string

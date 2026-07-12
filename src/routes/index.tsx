@@ -1497,12 +1497,113 @@ function InstagramIcon({ className = "h-5 w-5" }: { className?: string }) {
   );
 }
 
+type InstitutionalKey = "conceito" | "filosofia" | "termos" | "privacidade";
+
+const INSTITUTIONAL_CONTENT: Record<
+  InstitutionalKey,
+  { eyebrow: string; title: string; paragraphs: string[] }
+> = {
+  conceito: {
+    eyebrow: "Manifesto",
+    title: "O Conceito",
+    paragraphs: [
+      "A&S Concept nasce de um desejo antigo: devolver ao guarda-roupa contemporâneo a dignidade da alfaiataria atemporal, distante das oscilações efêmeras das temporadas. Cada peça é pensada como um pequeno patrimônio — algo que atravessa décadas sem ceder ao ruído das tendências.",
+      "Nossa curadoria seleciona ateliês europeus e brasileiros que ainda entendem o valor de uma costura invisível, de um forro talhado à mão e do tempo generoso concedido a cada corte. O luxo, aqui, é silencioso: reside no toque, no caimento, na permanência.",
+      "Cada coleção é apresentada em edições contidas, produzidas sob encomenda ou em séries limitadas — nunca em escala. É a nossa forma de recusar o excesso e preservar o gesto artesanal que define a maison.",
+    ],
+  },
+  filosofia: {
+    eyebrow: "Nossa Visão",
+    title: "A Filosofia",
+    paragraphs: [
+      "Acreditamos que a elegância não se anuncia. Ela se percebe. É por isso que trabalhamos com paletas discretas — marfim, navy, charcoal e ouro velho — e com materiais nobres cuja beleza cresce com o uso: linhos italianos, cashmeres escoceses, couros vegetais curtidos ao tempo.",
+      "Recusamos a lógica descartável do consumo acelerado. Cada cliente da A&S Concept recebe uma peça acompanhada de sua origem, do nome do ateliê e de instruções de cuidado que asseguram sua longevidade. Reparo, ajuste e restauração fazem parte do nosso serviço vitalício.",
+      "Nossa filosofia é, sobretudo, uma escolha ética: menos peças, melhor confecção, respeito ao artesão e ao vestir. É luxo que se afirma pela sobriedade — e permanece.",
+    ],
+  },
+  termos: {
+    eyebrow: "Documento Legal",
+    title: "Termos e Condições",
+    paragraphs: [
+      "Ao utilizar o site A&S Concept, o cliente concorda com as diretrizes de compra, pagamento, envio, troca e cancelamento aqui descritas. Os preços são apresentados em Reais (BRL) e podem sofrer atualizações periódicas conforme a variação cambial dos ateliês parceiros.",
+      "Os pedidos são processados em até 3 dias úteis. Peças sob encomenda podem exigir prazo adicional de produção, informado no ato da compra. O envio é realizado por transportadora rastreada, com seguro integral do valor declarado.",
+      "Trocas por defeito de fabricação ou divergência de tamanho podem ser solicitadas em até 30 dias corridos após a entrega. O produto deve ser devolvido em sua embalagem original, sem sinais de uso. Reservamo-nos o direito de recusar itens fora dessas condições.",
+      "Este documento constitui um contrato eletrônico entre a A&S Concept e o cliente, regido pelas leis brasileiras. Eventuais disputas serão dirimidas no foro da comarca de São Paulo/SP.",
+    ],
+  },
+  privacidade: {
+    eyebrow: "Compromisso",
+    title: "Políticas de Privacidade",
+    paragraphs: [
+      "A A&S Concept trata os dados pessoais de seus clientes com o mesmo rigor com que cuida de suas peças: com discrição, cuidado e propósito. Coletamos apenas as informações necessárias para processar pedidos, oferecer atendimento personalizado e manter comunicação editorial pertinente.",
+      "Nenhum dado é compartilhado com terceiros para fins publicitários. Utilizamos protocolos criptográficos padrão de mercado para armazenar e transmitir informações sensíveis, como e-mail, endereço e telefone.",
+      "O cliente pode, a qualquer momento, solicitar a exclusão, correção ou exportação de seus dados enviando um e-mail ao concierge da maison. Cumprimos integralmente a Lei Geral de Proteção de Dados (LGPD).",
+      "Cookies são utilizados apenas para manter sua sessão ativa e mensurar o desempenho do site — nunca para rastreamento invasivo ou revenda de perfil.",
+    ],
+  },
+};
+
+function InstitutionalModal({
+  which,
+  onClose,
+}: {
+  which: InstitutionalKey | null;
+  onClose: () => void;
+}) {
+  if (!which) return null;
+  const content = INSTITUTIONAL_CONTENT[which];
+  return (
+    <>
+      <div
+        onClick={onClose}
+        className="fixed inset-0 z-[130] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
+      />
+      <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 md:p-8 pointer-events-none">
+        <div className="pointer-events-auto relative w-full max-w-2xl max-h-[88vh] overflow-y-auto bg-[color:var(--ivory)] text-charcoal p-10 md:p-14 shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="absolute right-5 top-5 rounded-full bg-white/70 p-2 backdrop-blur hover:text-[color:var(--gold)] transition-colors"
+          >
+            <X className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <p className="text-[11px] tracking-luxe uppercase text-[color:var(--gold)]">
+            {content.eyebrow}
+          </p>
+          <h2 className="mt-3 font-serif text-3xl md:text-4xl leading-tight">
+            {content.title}
+          </h2>
+          <div className="mt-8 space-y-5 font-serif text-[15px] md:text-base leading-relaxed text-charcoal/85">
+            {content.paragraphs.map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
+          </div>
+          <div className="mt-10 border-t border-charcoal/15 pt-6">
+            <button
+              onClick={onClose}
+              className="w-full bg-charcoal py-3 text-[11px] tracking-luxe uppercase text-ivory hover:bg-navy transition-colors"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function Footer() {
+  const [modal, setModal] = useState<InstitutionalKey | null>(null);
+  const institutional: { id: InstitutionalKey; label: string }[] = [
+    { id: "conceito", label: "O Conceito" },
+    { id: "filosofia", label: "A Filosofia" },
+    { id: "termos", label: "Termos e Condições" },
+    { id: "privacidade", label: "Políticas de Privacidade" },
+  ];
   const cols = [
     { title: "Maison", links: ["Nossa História", "Ateliês", "Craftsmanship", "Sustentabilidade"] },
     { title: "Serviço", links: ["Concierge", "Envio", "Trocas", "Ajustes"] },
     { title: "Descobrir", links: ["O Editorial", "Journal", "Lookbook", "Revendedores"] },
-    { title: "Conectar", links: ["Contato", "Carreiras", "Imprensa"] },
   ];
   return (
     <footer className="border-t border-border bg-charcoal text-ivory">
@@ -1543,12 +1644,28 @@ function Footer() {
               </ul>
             </div>
           ))}
+          <div>
+            <h4 className="mb-5 text-[11px] tracking-luxe uppercase text-accent">Institucional</h4>
+            <ul className="space-y-3">
+              {institutional.map((l) => (
+                <li key={l.id}>
+                  <button
+                    onClick={() => setModal(l.id)}
+                    className="text-left text-xs font-light text-ivory/70 transition-colors hover:text-ivory"
+                  >
+                    {l.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
         <div className="mt-16 flex flex-col justify-between gap-4 border-t border-ivory/10 pt-8 text-[11px] text-ivory/50 md:flex-row">
           <p>© {new Date().getFullYear()} A&amp;S Concept. Todos os direitos reservados.</p>
           <p className="tracking-luxe uppercase">Feito com propósito · Preços em BRL</p>
         </div>
       </div>
+      <InstitutionalModal which={modal} onClose={() => setModal(null)} />
     </footer>
   );
 }
@@ -2315,14 +2432,52 @@ const ADMIN_STATUSES: OrderStatus[] = [
   "Entregue",
 ];
 
+type NewsletterRow = { id: string; email: string; created_at: string };
+type ManualCustomerRow = { id: string; name: string | null; email: string; phone: string | null; created_at: string };
+
 function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, listCustomers } = useAuth();
-  const { orders, updateStatus } = useOrders();
-  const [tab, setTab] = useState<"clientes" | "pedidos">("pedidos");
-  if (!open) return null;
-  if (!user?.isAdmin) return null;
+  const { orders, updateStatus, createOrder } = useOrders();
+  const { products } = useCatalog();
+  const [tab, setTab] = useState<"calc" | "pedidos" | "clientes">("pedidos");
+  const [newsletter, setNewsletter] = useState<NewsletterRow[]>([]);
+  const [manual, setManual] = useState<ManualCustomerRow[]>([]);
+  const [showManualOrder, setShowManualOrder] = useState(false);
+  const [showManualCustomer, setShowManualCustomer] = useState(false);
+
+  const isAdminUser = !!user?.isAdmin;
+
+  const loadNewsletter = useCallback(async () => {
+    const { data } = await supabase
+      .from("newsletter_subscribers")
+      .select("id, email, created_at")
+      .order("created_at", { ascending: false });
+    if (data) setNewsletter(data as NewsletterRow[]);
+  }, []);
+  const loadManual = useCallback(async () => {
+    const { data } = await supabase
+      .from("manual_customers")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (data) setManual(data as ManualCustomerRow[]);
+  }, []);
+
+  useEffect(() => {
+    if (open && isAdminUser) {
+      void loadNewsletter();
+      void loadManual();
+    }
+  }, [open, isAdminUser, loadNewsletter, loadManual]);
+
+  if (!open || !isAdminUser) return null;
 
   const customers = listCustomers();
+
+  const tabs = [
+    { id: "calc" as const, label: "Calculadora" },
+    { id: "pedidos" as const, label: `Pedidos (${orders.length})` },
+    { id: "clientes" as const, label: `Clientes (${customers.length + manual.length})` },
+  ];
 
   return (
     <>
@@ -2345,20 +2500,13 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
             </p>
             <h2 className="mt-1 font-serif text-3xl">Gestão Interna</h2>
           </div>
-          <div className="flex gap-1 border-b border-border px-8">
-            {(
-              [
-                { id: "pedidos" as const, label: `Pedidos (${orders.length})` },
-                { id: "clientes" as const, label: `Clientes (${customers.length})` },
-              ]
-            ).map((t) => (
+          <div className="flex gap-1 border-b border-border px-8 overflow-x-auto">
+            {tabs.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`relative px-5 py-3 text-[11px] tracking-luxe uppercase transition-colors ${
-                  tab === t.id
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
+                className={`relative whitespace-nowrap px-5 py-3 text-[11px] tracking-luxe uppercase transition-colors ${
+                  tab === t.id ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {t.label}
@@ -2368,116 +2516,633 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
               </button>
             ))}
           </div>
+
           <div className="px-8 py-6">
-            {tab === "clientes" ? (
-              customers.length === 0 ? (
-                <p className="border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
-                  Nenhum cliente registrado ainda.
-                </p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left text-[10px] tracking-luxe uppercase text-muted-foreground">
-                      <th className="py-3 pr-4">Nome</th>
-                      <th className="py-3 pr-4">E-mail</th>
-                      <th className="py-3 pr-4 text-right">Cadastrado em</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {customers.map((c) => (
-                      <tr key={c.email} className="border-b border-border/50">
-                        <td className="py-3 pr-4 font-serif">
-                          {c.name ?? c.email.split("@")[0]}
-                        </td>
-                        <td className="py-3 pr-4 text-muted-foreground">{c.email}</td>
-                        <td className="py-3 pr-4 text-right text-[11px] text-muted-foreground">
-                          {c.createdAt
-                            ? new Date(c.createdAt).toLocaleDateString("pt-BR")
-                            : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )
-            ) : orders.length === 0 ? (
-              <p className="border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
-                Nenhum pedido registrado no momento.
-              </p>
-            ) : (
-              <ul className="space-y-4">
-                {orders.map((o) => (
-                  <li
-                    key={o.id}
-                    className="border border-border bg-card p-4 shadow-sm"
+            {tab === "calc" && <MarkupCalculator />}
+
+            {tab === "pedidos" && (
+              <>
+                <div className="mb-5 flex items-center justify-between gap-3">
+                  <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    {orders.length} pedidos registrados
+                  </p>
+                  <button
+                    onClick={() => setShowManualOrder(true)}
+                    className="inline-flex items-center gap-1.5 border border-charcoal bg-charcoal px-3 py-1.5 text-[10px] tracking-luxe uppercase text-ivory hover:bg-navy transition-colors"
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
-                      <div>
-                        <p className="font-mono text-sm">{o.id}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {new Date(o.createdAt).toLocaleString("pt-BR")} ·{" "}
-                          {o.customerName ?? o.customerEmail}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                          Status
-                        </label>
-                        <select
-                          value={o.status}
-                          onChange={(e) =>
-                            updateStatus(o.id, e.target.value as OrderStatus)
-                          }
-                          className="border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-accent"
-                        >
-                          {ADMIN_STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {s === "Preparando pedido"
-                                ? "Preparando"
-                                : s === "Em trânsito"
-                                  ? "Em Trânsito"
-                                  : s}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] items-center">
-                      <ul className="flex flex-wrap gap-3">
-                        {o.items.map((i) => (
-                          <li
-                            key={`${i.id}-${i.size}`}
-                            className="flex items-center gap-2 border border-border/60 bg-background px-2 py-1.5"
-                          >
-                            <img
-                              src={i.image}
-                              alt={i.name}
-                              className="h-10 w-8 flex-none object-cover"
-                            />
-                            <div>
-                              <p className="text-xs font-serif leading-tight">
-                                {i.name}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground">
-                                Tam {i.size} · x{i.quantity}
-                              </p>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                      <div className="text-right sm:min-w-[140px]">
-                        <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                          Total
-                        </p>
-                        <p className="font-serif text-lg tabular-nums">
-                          {formatBRL(o.total)}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                    <Plus className="h-3 w-3" /> Adicionar Novo Pedido Manualmente
+                  </button>
+                </div>
+                {orders.length === 0 ? (
+                  <p className="border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
+                    Nenhum pedido registrado no momento.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-left text-[10px] tracking-luxe uppercase text-muted-foreground">
+                          <th className="py-3 pr-3">Cliente</th>
+                          <th className="py-3 pr-3">E-mail</th>
+                          <th className="py-3 pr-3">Produto</th>
+                          <th className="py-3 pr-3">Tam</th>
+                          <th className="py-3 pr-3 text-right">Qtd</th>
+                          <th className="py-3 pr-3 text-right">Total</th>
+                          <th className="py-3 pr-3">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orders.map((o) =>
+                          o.items.map((i, ix) => (
+                            <tr
+                              key={`${o.id}-${i.id}-${i.size}-${ix}`}
+                              className="border-b border-border/50 align-top"
+                            >
+                              <td className="py-3 pr-3 font-serif">
+                                {o.customerName ?? o.customerEmail.split("@")[0]}
+                              </td>
+                              <td className="py-3 pr-3 text-[11px] text-muted-foreground">
+                                {o.customerEmail}
+                              </td>
+                              <td className="py-3 pr-3">
+                                <div className="flex items-center gap-2">
+                                  {i.image && (
+                                    <img
+                                      src={i.image}
+                                      alt={i.name}
+                                      className="h-12 w-9 flex-none object-cover border border-border/60"
+                                    />
+                                  )}
+                                  <span className="font-serif leading-tight">{i.name}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 pr-3">{i.size}</td>
+                              <td className="py-3 pr-3 text-right tabular-nums">{i.quantity}</td>
+                              <td className="py-3 pr-3 text-right font-serif tabular-nums">
+                                {ix === 0 ? formatBRL(o.total) : ""}
+                              </td>
+                              <td className="py-3 pr-3">
+                                {ix === 0 && (
+                                  <select
+                                    value={o.status}
+                                    onChange={(e) =>
+                                      updateStatus(o.id, e.target.value as OrderStatus)
+                                    }
+                                    className="border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-accent"
+                                  >
+                                    {ADMIN_STATUSES.map((s) => (
+                                      <option key={s} value={s}>
+                                        {s === "Aguardando Aprovação"
+                                          ? "Aprovar"
+                                          : s === "Preparando pedido"
+                                            ? "Preparando Pedido"
+                                            : s === "Em trânsito"
+                                              ? "Em Trânsito"
+                                              : s}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                              </td>
+                            </tr>
+                          )),
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
+
+            {tab === "clientes" && (
+              <div className="space-y-10">
+                <section>
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <h3 className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                      Clientes cadastrados
+                    </h3>
+                    <button
+                      onClick={() => setShowManualCustomer(true)}
+                      className="inline-flex items-center gap-1.5 border border-charcoal bg-charcoal px-3 py-1.5 text-[10px] tracking-luxe uppercase text-ivory hover:bg-navy transition-colors"
+                    >
+                      <Plus className="h-3 w-3" /> Adicionar Cliente Manualmente
+                    </button>
+                  </div>
+                  {customers.length === 0 && manual.length === 0 ? (
+                    <p className="border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
+                      Nenhum cliente registrado ainda.
+                    </p>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-left text-[10px] tracking-luxe uppercase text-muted-foreground">
+                          <th className="py-3 pr-4">Nome</th>
+                          <th className="py-3 pr-4">E-mail</th>
+                          <th className="py-3 pr-4">Celular</th>
+                          <th className="py-3 pr-4 text-right">Cadastrado em</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {customers.map((c) => (
+                          <tr key={`p-${c.email}`} className="border-b border-border/50">
+                            <td className="py-3 pr-4 font-serif">
+                              {c.name ?? c.email.split("@")[0]}
+                            </td>
+                            <td className="py-3 pr-4 text-muted-foreground">{c.email}</td>
+                            <td className="py-3 pr-4 text-muted-foreground">{c.phone ?? "—"}</td>
+                            <td className="py-3 pr-4 text-right text-[11px] text-muted-foreground">
+                              {c.createdAt
+                                ? new Date(c.createdAt).toLocaleDateString("pt-BR")
+                                : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                        {manual.map((m) => (
+                          <tr key={`m-${m.id}`} className="border-b border-border/50">
+                            <td className="py-3 pr-4 font-serif">
+                              {m.name ?? m.email.split("@")[0]}
+                              <span className="ml-2 text-[9px] tracking-luxe uppercase text-accent">
+                                · manual
+                              </span>
+                            </td>
+                            <td className="py-3 pr-4 text-muted-foreground">{m.email}</td>
+                            <td className="py-3 pr-4 text-muted-foreground">{m.phone ?? "—"}</td>
+                            <td className="py-3 pr-4 text-right text-[11px] text-muted-foreground">
+                              {new Date(m.created_at).toLocaleDateString("pt-BR")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </section>
+
+                <section>
+                  <h3 className="mb-4 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    Newsletter · Convites solicitados ({newsletter.length})
+                  </h3>
+                  {newsletter.length === 0 ? (
+                    <p className="border border-dashed border-border px-6 py-8 text-center text-sm text-muted-foreground">
+                      Nenhum e-mail capturado ainda.
+                    </p>
+                  ) : (
+                    <ul className="grid gap-2 sm:grid-cols-2">
+                      {newsletter.map((n) => (
+                        <li
+                          key={n.id}
+                          className="flex items-center justify-between border border-border bg-card px-3 py-2 text-xs"
+                        >
+                          <span className="truncate">{n.email}</span>
+                          <span className="ml-3 flex-none text-[10px] text-muted-foreground">
+                            {new Date(n.created_at).toLocaleDateString("pt-BR")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {showManualOrder && (
+        <ManualOrderModal
+          products={products}
+          customers={customers.map((c) => ({
+            email: c.email,
+            name: c.name ?? c.email.split("@")[0],
+          }))}
+          onClose={() => setShowManualOrder(false)}
+          onSaved={() => setShowManualOrder(false)}
+          createOrder={createOrder}
+        />
+      )}
+      {showManualCustomer && (
+        <ManualCustomerModal
+          onClose={() => setShowManualCustomer(false)}
+          onSaved={async () => {
+            setShowManualCustomer(false);
+            await loadManual();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/* ---------- Markup Calculator ---------- */
+function MarkupCalculator() {
+  const [cost, setCost] = useState<number>(100);
+  const [margin, setMargin] = useState<number>(50);
+
+  // Stripe BR: 4.99% + R$0.50
+  const STRIPE_RATE = 0.0499;
+  const STRIPE_FIXED = 0.5;
+
+  // Desired net = cost + (cost * margin/100)
+  const desiredNet = cost + (cost * margin) / 100;
+  // Sale = (desiredNet + fixed) / (1 - rate)
+  const suggestedPrice = (desiredNet + STRIPE_FIXED) / (1 - STRIPE_RATE);
+  const stripeFee = suggestedPrice * STRIPE_RATE + STRIPE_FIXED;
+  const netReceived = suggestedPrice - stripeFee;
+  const profit = netReceived - cost;
+
+  return (
+    <div className="grid gap-8 md:grid-cols-2">
+      <div className="space-y-5">
+        <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+          Central de Simulação Financeira
+        </p>
+        <h3 className="font-serif text-2xl">Calculadora de Markup</h3>
+        <p className="text-xs font-light text-muted-foreground">
+          Insira o custo bruto e a margem líquida desejada. O preço de etiqueta é calculado para
+          que, após as taxas Stripe Brasil (4,99% + R$ 0,50), você receba exatamente o custo
+          somado à margem líquida.
+        </p>
+        <label className="block">
+          <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+            Custo do Produto (R$)
+          </span>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={cost}
+            onChange={(e) => setCost(Math.max(0, Number(e.target.value) || 0))}
+            className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+          />
+        </label>
+        <label className="block">
+          <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+            Margem de Lucro Desejada (%)
+          </span>
+          <input
+            type="number"
+            min={0}
+            step="0.1"
+            value={margin}
+            onChange={(e) => setMargin(Math.max(0, Number(e.target.value) || 0))}
+            className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+          />
+        </label>
+      </div>
+
+      <div className="border border-border bg-[color:var(--ivory)]/40 p-6 space-y-4">
+        <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">Resultado</p>
+        <ResultRow label="Preço de Venda Sugerido (Etiqueta)" value={formatBRL(suggestedPrice)} highlight />
+        <div className="border-t border-border/60" />
+        <ResultRow label="Taxa Stripe Brasil (4,99% + R$ 0,50)" value={`− ${formatBRL(stripeFee)}`} />
+        <ResultRow label="Você recebe (líquido)" value={formatBRL(netReceived)} />
+        <ResultRow label="Custo do produto" value={`− ${formatBRL(cost)}`} />
+        <div className="border-t border-border/60" />
+        <ResultRow label="Lucro líquido" value={formatBRL(profit)} highlight />
+      </div>
+    </div>
+  );
+}
+
+function ResultRow({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-[11px] tracking-luxe uppercase text-muted-foreground">{label}</span>
+      <span
+        className={`tabular-nums ${
+          highlight ? "font-serif text-xl text-[color:var(--gold)]" : "text-sm"
+        }`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/* ---------- Manual Order Modal ---------- */
+function ManualOrderModal({
+  products,
+  customers,
+  onClose,
+  onSaved,
+  createOrder,
+}: {
+  products: Product[];
+  customers: { email: string; name: string }[];
+  onClose: () => void;
+  onSaved: () => void;
+  createOrder: ReturnType<typeof useOrders>["createOrder"];
+}) {
+  const [customerEmail, setCustomerEmail] = useState(customers[0]?.email ?? "");
+  const [customerName, setCustomerName] = useState(customers[0]?.name ?? "");
+  const [productId, setProductId] = useState(products[0]?.id ?? "");
+  const [size, setSize] = useState<Size>("M");
+  const [qty, setQty] = useState<number>(1);
+  const [total, setTotal] = useState<number>(products[0]?.price ?? 0);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const chosen = products.find((p) => p.id === productId);
+
+  const save = async () => {
+    setErr(null);
+    if (!customerEmail || !chosen) {
+      setErr("Selecione um cliente e um produto.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await createOrder({
+        customerEmail,
+        customerName,
+        items: [
+          {
+            id: chosen.id,
+            name: chosen.name,
+            price: Number(total) / Math.max(1, qty),
+            image: chosen.image,
+            quantity: qty,
+            size,
+          },
+        ],
+        address: {
+          cep: "",
+          logradouro: "",
+          numero: "",
+          bairro: "",
+          cidade: "",
+          uf: "",
+        },
+        shippingCost: 0,
+        subtotal: Number(total),
+        total: Number(total),
+        paymentMethod: "pix",
+        status: "Preparando pedido",
+      });
+      onSaved();
+    } catch (e) {
+      setErr((e as Error).message ?? "Falha ao salvar pedido.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div onClick={onClose} className="fixed inset-0 z-[110] bg-charcoal/70 backdrop-blur-sm" />
+      <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 pointer-events-none">
+        <div className="pointer-events-auto w-full max-w-lg bg-background p-8 shadow-2xl relative">
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="absolute right-4 top-4 hover:text-accent"
+          >
+            <X className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <p className="text-[11px] tracking-luxe uppercase text-accent">Registrar venda</p>
+          <h3 className="mt-1 font-serif text-2xl">Novo Pedido Manual</h3>
+
+          <div className="mt-6 space-y-4">
+            <label className="block">
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Cliente
+              </span>
+              {customers.length > 0 ? (
+                <select
+                  value={customerEmail}
+                  onChange={(e) => {
+                    setCustomerEmail(e.target.value);
+                    const c = customers.find((x) => x.email === e.target.value);
+                    if (c) setCustomerName(c.name);
+                  }}
+                  className="mt-1 w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+                >
+                  {customers.map((c) => (
+                    <option key={c.email} value={c.email}>
+                      {c.name} · {c.email}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="email"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  placeholder="cliente@email.com"
+                  className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+                />
+              )}
+            </label>
+
+            <label className="block">
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Produto
+              </span>
+              <select
+                value={productId}
+                onChange={(e) => {
+                  setProductId(e.target.value);
+                  const p = products.find((x) => x.id === e.target.value);
+                  if (p) setTotal(p.price * qty);
+                }}
+                className="mt-1 w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+              >
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — {formatBRL(p.price)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                  Tamanho
+                </span>
+                <select
+                  value={size}
+                  onChange={(e) => setSize(e.target.value as Size)}
+                  className="mt-1 w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+                >
+                  {SIZES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                  Quantidade
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  value={qty}
+                  onChange={(e) => {
+                    const q = Math.max(1, Math.floor(Number(e.target.value) || 1));
+                    setQty(q);
+                    if (chosen) setTotal(chosen.price * q);
+                  }}
+                  className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+                />
+              </label>
+            </div>
+
+            <label className="block">
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Valor Total Negociado (R$)
+              </span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={total}
+                onChange={(e) => setTotal(Math.max(0, Number(e.target.value) || 0))}
+                className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+            </label>
+
+            {err && <p className="text-xs text-destructive">{err}</p>}
+          </div>
+
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="border border-border px-4 py-2 text-[11px] tracking-luxe uppercase hover:bg-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="bg-charcoal px-5 py-2 text-[11px] tracking-luxe uppercase text-ivory hover:bg-navy disabled:opacity-50"
+            >
+              {saving ? "Salvando..." : "Salvar Pedido"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ---------- Manual Customer Modal ---------- */
+function ManualCustomerModal({
+  onClose,
+  onSaved,
+}: {
+  onClose: () => void;
+  onSaved: () => Promise<void> | void;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const save = async () => {
+    setErr(null);
+    const cleanEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setErr("Informe um e-mail válido.");
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase
+      .from("manual_customers")
+      .insert({
+        name: name.trim() || null,
+        email: cleanEmail,
+        phone: phone.trim() || null,
+      } as never);
+    setSaving(false);
+    if (error) {
+      setErr("Não foi possível salvar o cliente.");
+      return;
+    }
+    await onSaved();
+  };
+
+  return (
+    <>
+      <div onClick={onClose} className="fixed inset-0 z-[110] bg-charcoal/70 backdrop-blur-sm" />
+      <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 pointer-events-none">
+        <div className="pointer-events-auto w-full max-w-md bg-background p-8 shadow-2xl relative">
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="absolute right-4 top-4 hover:text-accent"
+          >
+            <X className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <p className="text-[11px] tracking-luxe uppercase text-accent">Cadastro rápido</p>
+          <h3 className="mt-1 font-serif text-2xl">Novo Cliente</h3>
+
+          <div className="mt-6 space-y-4">
+            <label className="block">
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">Nome</span>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">E-mail</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Celular (WhatsApp)
+              </span>
+              <input
+                type="tel"
+                inputMode="numeric"
+                placeholder="(11) 98765-4321"
+                value={phone}
+                onChange={(e) => {
+                  const d = e.target.value.replace(/\D/g, "").slice(0, 11);
+                  let out = d;
+                  if (d.length > 2 && d.length <= 7) out = `(${d.slice(0, 2)}) ${d.slice(2)}`;
+                  else if (d.length > 7)
+                    out = `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+                  else if (d.length > 0) out = `(${d}`;
+                  setPhone(out);
+                }}
+                className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+            </label>
+            {err && <p className="text-xs text-destructive">{err}</p>}
+          </div>
+
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="border border-border px-4 py-2 text-[11px] tracking-luxe uppercase hover:bg-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="bg-charcoal px-5 py-2 text-[11px] tracking-luxe uppercase text-ivory hover:bg-navy disabled:opacity-50"
+            >
+              {saving ? "Salvando..." : "Salvar Cliente"}
+            </button>
           </div>
         </div>
       </div>
