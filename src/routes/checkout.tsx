@@ -264,8 +264,6 @@ function CheckoutForm({
           customerName: customerName.trim(),
           customerEmail: email,
           address: { ...address, cep: formatCep(address.cep) },
-          shippingCost,
-          discount,
           couponCode: couponCode ?? null,
           paymentMethod: payment,
         },
