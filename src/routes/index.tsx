@@ -1497,12 +1497,113 @@ function InstagramIcon({ className = "h-5 w-5" }: { className?: string }) {
   );
 }
 
+type InstitutionalKey = "conceito" | "filosofia" | "termos" | "privacidade";
+
+const INSTITUTIONAL_CONTENT: Record<
+  InstitutionalKey,
+  { eyebrow: string; title: string; paragraphs: string[] }
+> = {
+  conceito: {
+    eyebrow: "Manifesto",
+    title: "O Conceito",
+    paragraphs: [
+      "A&S Concept nasce de um desejo antigo: devolver ao guarda-roupa contemporâneo a dignidade da alfaiataria atemporal, distante das oscilações efêmeras das temporadas. Cada peça é pensada como um pequeno patrimônio — algo que atravessa décadas sem ceder ao ruído das tendências.",
+      "Nossa curadoria seleciona ateliês europeus e brasileiros que ainda entendem o valor de uma costura invisível, de um forro talhado à mão e do tempo generoso concedido a cada corte. O luxo, aqui, é silencioso: reside no toque, no caimento, na permanência.",
+      "Cada coleção é apresentada em edições contidas, produzidas sob encomenda ou em séries limitadas — nunca em escala. É a nossa forma de recusar o excesso e preservar o gesto artesanal que define a maison.",
+    ],
+  },
+  filosofia: {
+    eyebrow: "Nossa Visão",
+    title: "A Filosofia",
+    paragraphs: [
+      "Acreditamos que a elegância não se anuncia. Ela se percebe. É por isso que trabalhamos com paletas discretas — marfim, navy, charcoal e ouro velho — e com materiais nobres cuja beleza cresce com o uso: linhos italianos, cashmeres escoceses, couros vegetais curtidos ao tempo.",
+      "Recusamos a lógica descartável do consumo acelerado. Cada cliente da A&S Concept recebe uma peça acompanhada de sua origem, do nome do ateliê e de instruções de cuidado que asseguram sua longevidade. Reparo, ajuste e restauração fazem parte do nosso serviço vitalício.",
+      "Nossa filosofia é, sobretudo, uma escolha ética: menos peças, melhor confecção, respeito ao artesão e ao vestir. É luxo que se afirma pela sobriedade — e permanece.",
+    ],
+  },
+  termos: {
+    eyebrow: "Documento Legal",
+    title: "Termos e Condições",
+    paragraphs: [
+      "Ao utilizar o site A&S Concept, o cliente concorda com as diretrizes de compra, pagamento, envio, troca e cancelamento aqui descritas. Os preços são apresentados em Reais (BRL) e podem sofrer atualizações periódicas conforme a variação cambial dos ateliês parceiros.",
+      "Os pedidos são processados em até 3 dias úteis. Peças sob encomenda podem exigir prazo adicional de produção, informado no ato da compra. O envio é realizado por transportadora rastreada, com seguro integral do valor declarado.",
+      "Trocas por defeito de fabricação ou divergência de tamanho podem ser solicitadas em até 30 dias corridos após a entrega. O produto deve ser devolvido em sua embalagem original, sem sinais de uso. Reservamo-nos o direito de recusar itens fora dessas condições.",
+      "Este documento constitui um contrato eletrônico entre a A&S Concept e o cliente, regido pelas leis brasileiras. Eventuais disputas serão dirimidas no foro da comarca de São Paulo/SP.",
+    ],
+  },
+  privacidade: {
+    eyebrow: "Compromisso",
+    title: "Políticas de Privacidade",
+    paragraphs: [
+      "A A&S Concept trata os dados pessoais de seus clientes com o mesmo rigor com que cuida de suas peças: com discrição, cuidado e propósito. Coletamos apenas as informações necessárias para processar pedidos, oferecer atendimento personalizado e manter comunicação editorial pertinente.",
+      "Nenhum dado é compartilhado com terceiros para fins publicitários. Utilizamos protocolos criptográficos padrão de mercado para armazenar e transmitir informações sensíveis, como e-mail, endereço e telefone.",
+      "O cliente pode, a qualquer momento, solicitar a exclusão, correção ou exportação de seus dados enviando um e-mail ao concierge da maison. Cumprimos integralmente a Lei Geral de Proteção de Dados (LGPD).",
+      "Cookies são utilizados apenas para manter sua sessão ativa e mensurar o desempenho do site — nunca para rastreamento invasivo ou revenda de perfil.",
+    ],
+  },
+};
+
+function InstitutionalModal({
+  which,
+  onClose,
+}: {
+  which: InstitutionalKey | null;
+  onClose: () => void;
+}) {
+  if (!which) return null;
+  const content = INSTITUTIONAL_CONTENT[which];
+  return (
+    <>
+      <div
+        onClick={onClose}
+        className="fixed inset-0 z-[130] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
+      />
+      <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 md:p-8 pointer-events-none">
+        <div className="pointer-events-auto relative w-full max-w-2xl max-h-[88vh] overflow-y-auto bg-[color:var(--ivory)] text-charcoal p-10 md:p-14 shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="absolute right-5 top-5 rounded-full bg-white/70 p-2 backdrop-blur hover:text-[color:var(--gold)] transition-colors"
+          >
+            <X className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <p className="text-[11px] tracking-luxe uppercase text-[color:var(--gold)]">
+            {content.eyebrow}
+          </p>
+          <h2 className="mt-3 font-serif text-3xl md:text-4xl leading-tight">
+            {content.title}
+          </h2>
+          <div className="mt-8 space-y-5 font-serif text-[15px] md:text-base leading-relaxed text-charcoal/85">
+            {content.paragraphs.map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
+          </div>
+          <div className="mt-10 border-t border-charcoal/15 pt-6">
+            <button
+              onClick={onClose}
+              className="w-full bg-charcoal py-3 text-[11px] tracking-luxe uppercase text-ivory hover:bg-navy transition-colors"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function Footer() {
+  const [modal, setModal] = useState<InstitutionalKey | null>(null);
+  const institutional: { id: InstitutionalKey; label: string }[] = [
+    { id: "conceito", label: "O Conceito" },
+    { id: "filosofia", label: "A Filosofia" },
+    { id: "termos", label: "Termos e Condições" },
+    { id: "privacidade", label: "Políticas de Privacidade" },
+  ];
   const cols = [
     { title: "Maison", links: ["Nossa História", "Ateliês", "Craftsmanship", "Sustentabilidade"] },
     { title: "Serviço", links: ["Concierge", "Envio", "Trocas", "Ajustes"] },
     { title: "Descobrir", links: ["O Editorial", "Journal", "Lookbook", "Revendedores"] },
-    { title: "Conectar", links: ["Contato", "Carreiras", "Imprensa"] },
   ];
   return (
     <footer className="border-t border-border bg-charcoal text-ivory">
@@ -1543,12 +1644,28 @@ function Footer() {
               </ul>
             </div>
           ))}
+          <div>
+            <h4 className="mb-5 text-[11px] tracking-luxe uppercase text-accent">Institucional</h4>
+            <ul className="space-y-3">
+              {institutional.map((l) => (
+                <li key={l.id}>
+                  <button
+                    onClick={() => setModal(l.id)}
+                    className="text-left text-xs font-light text-ivory/70 transition-colors hover:text-ivory"
+                  >
+                    {l.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
         <div className="mt-16 flex flex-col justify-between gap-4 border-t border-ivory/10 pt-8 text-[11px] text-ivory/50 md:flex-row">
           <p>© {new Date().getFullYear()} A&amp;S Concept. Todos os direitos reservados.</p>
           <p className="tracking-luxe uppercase">Feito com propósito · Preços em BRL</p>
         </div>
       </div>
+      <InstitutionalModal which={modal} onClose={() => setModal(null)} />
     </footer>
   );
 }
