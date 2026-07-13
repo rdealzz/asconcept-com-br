@@ -2518,7 +2518,12 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
           </div>
 
           <div className="px-8 py-6">
-            {tab === "calc" && <MarkupCalculator />}
+            {tab === "calc" && (
+              <div className="space-y-10">
+                <MarkupCalculator />
+                <FinancialOverview />
+              </div>
+            )}
 
             {tab === "pedidos" && (
               <>
