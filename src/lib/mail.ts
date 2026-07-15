@@ -8,7 +8,12 @@
 import { sendTransactionalMail } from "./mail.functions";
 import type { OrderItem, OrderStatus } from "./types";
 
-async function safeSend(payload: Parameters<typeof sendTransactionalMail>[0]["data"]) {
+type MailPayload =
+  | { kind: "welcome"; to: string; name?: string }
+  | { kind: "order_created"; to: string; orderId: string; total: number; items: OrderItem[] }
+  | { kind: "status_update"; to: string; orderId: string; status: OrderStatus; trackingCode?: string };
+
+async function safeSend(payload: MailPayload) {
   try {
     await sendTransactionalMail({ data: payload });
   } catch (err) {
