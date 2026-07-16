@@ -2719,7 +2719,20 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                                   </select>
                                 )}
                               </td>
+                              <td className="py-3 pr-3 text-right">
+                                {ix === 0 && (
+                                  <button
+                                    onClick={() => setConfirmOrder(o.id)}
+                                    aria-label={`Excluir pedido ${o.id}`}
+                                    title="Excluir pedido"
+                                    className="inline-flex items-center justify-center border border-border p-1.5 text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive hover:text-ivory"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                                  </button>
+                                )}
+                              </td>
                             </tr>
+
                           )),
                         )}
                       </tbody>
