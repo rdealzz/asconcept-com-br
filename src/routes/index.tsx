@@ -476,16 +476,27 @@ function Nav({
             )}
           </button>
           {isDevMaster && (
-            <button
-              aria-label="Painel Admin"
-              onClick={onOpenAdmin}
-              title="Painel Admin"
-              className="relative hover:text-accent transition-colors"
-            >
-              <Settings className="h-4 w-4" strokeWidth={1.5} />
-              <span className="absolute -right-2 -top-2 h-1.5 w-1.5 rounded-full bg-accent" />
-            </button>
+            <>
+              <Link
+                to="/pedidos"
+                aria-label="Controle de Pedidos"
+                title="Controle de Pedidos"
+                className="hover:text-accent transition-colors"
+              >
+                <Package className="h-4 w-4" strokeWidth={1.5} />
+              </Link>
+              <button
+                aria-label="Painel Admin"
+                onClick={onOpenAdmin}
+                title="Painel Admin"
+                className="relative hover:text-accent transition-colors"
+              >
+                <Settings className="h-4 w-4" strokeWidth={1.5} />
+                <span className="absolute -right-2 -top-2 h-1.5 w-1.5 rounded-full bg-accent" />
+              </button>
+            </>
           )}
+
         </div>
       </div>
     </header>
