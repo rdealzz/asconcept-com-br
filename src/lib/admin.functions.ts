@@ -46,11 +46,14 @@ export const adminDeleteCustomer = createServerFn({ method: "POST" })
     return { email: input.email.trim().toLowerCase(), kind: input.kind ?? "auth" };
   })
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    } as never);
-    if (!isAdmin) throw new Error("Acesso negado.");
+    const { data: roleRow } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!roleRow) throw new Error("Acesso negado.");
+
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
