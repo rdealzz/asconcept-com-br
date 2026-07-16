@@ -2768,6 +2768,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                           <th className="py-3 pr-4">E-mail</th>
                           <th className="py-3 pr-4">Celular</th>
                           <th className="py-3 pr-4 text-right">Cadastrado em</th>
+                          <th className="py-3 pr-4 text-right">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2782,6 +2783,22 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                               {c.createdAt
                                 ? new Date(c.createdAt).toLocaleDateString("pt-BR")
                                 : "—"}
+                            </td>
+                            <td className="py-3 pr-4 text-right">
+                              <button
+                                onClick={() =>
+                                  setConfirmCustomer({
+                                    email: c.email,
+                                    kind: "auth",
+                                    name: c.name ?? c.email,
+                                  })
+                                }
+                                aria-label={`Excluir cliente ${c.email}`}
+                                title="Excluir cliente"
+                                className="inline-flex items-center justify-center border border-border p-1.5 text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive hover:text-ivory"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -2798,10 +2815,27 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                             <td className="py-3 pr-4 text-right text-[11px] text-muted-foreground">
                               {new Date(m.created_at).toLocaleDateString("pt-BR")}
                             </td>
+                            <td className="py-3 pr-4 text-right">
+                              <button
+                                onClick={() =>
+                                  setConfirmCustomer({
+                                    email: m.email,
+                                    kind: "manual",
+                                    name: m.name ?? m.email,
+                                  })
+                                }
+                                aria-label={`Excluir cliente ${m.email}`}
+                                title="Excluir cliente"
+                                className="inline-flex items-center justify-center border border-border p-1.5 text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive hover:text-ivory"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+
                   )}
                 </section>
 
