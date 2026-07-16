@@ -35,9 +35,11 @@ import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalcu
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 import { AVAILABLE_COUPONS, findCoupon, hasUsedCoupon } from "@/lib/coupons";
 
-import heroAsset from "@/assets/hero-amalfi.png.asset.json";
+import heroAsset from "@/assets/hero-amalfi-men.jpg.asset.json";
 const hero = heroAsset.url;
-import editorial from "@/assets/editorial.jpg";
+import editorialAsset from "@/assets/editorial-linen.jpg.asset.json";
+const editorial = editorialAsset.url;
+
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -474,16 +476,27 @@ function Nav({
             )}
           </button>
           {isDevMaster && (
-            <button
-              aria-label="Painel Admin"
-              onClick={onOpenAdmin}
-              title="Painel Admin"
-              className="relative hover:text-accent transition-colors"
-            >
-              <Settings className="h-4 w-4" strokeWidth={1.5} />
-              <span className="absolute -right-2 -top-2 h-1.5 w-1.5 rounded-full bg-accent" />
-            </button>
+            <>
+              <Link
+                to="/pedidos"
+                aria-label="Controle de Pedidos"
+                title="Controle de Pedidos"
+                className="hover:text-accent transition-colors"
+              >
+                <Package className="h-4 w-4" strokeWidth={1.5} />
+              </Link>
+              <button
+                aria-label="Painel Admin"
+                onClick={onOpenAdmin}
+                title="Painel Admin"
+                className="relative hover:text-accent transition-colors"
+              >
+                <Settings className="h-4 w-4" strokeWidth={1.5} />
+                <span className="absolute -right-2 -top-2 h-1.5 w-1.5 rounded-full bg-accent" />
+              </button>
+            </>
           )}
+
         </div>
       </div>
     </header>
@@ -2425,6 +2438,56 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
 }
 
 /* ---------- Admin Panel Modal ---------- */
+import { useServerFn } from "@tanstack/react-start";
+import { adminDeleteOrder, adminDeleteCustomer } from "@/lib/admin.functions";
+
+function ConfirmDialog({
+  open,
+  title,
+  message,
+  onConfirm,
+  onCancel,
+  busy,
+}: {
+  open: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  busy?: boolean;
+}) {
+  if (!open) return null;
+  return (
+    <>
+      <div onClick={onCancel} className="fixed inset-0 z-[110] bg-charcoal/70 backdrop-blur-sm" />
+      <div className="fixed inset-0 z-[115] flex items-center justify-center p-4">
+        <div className="pointer-events-auto w-full max-w-md bg-background p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Concept · Confirmação</p>
+          <h3 className="mt-2 font-serif text-2xl">{title}</h3>
+          <p className="mt-4 text-sm text-muted-foreground">{message}</p>
+          <div className="mt-8 flex justify-end gap-3">
+            <button
+              onClick={onCancel}
+              disabled={busy}
+              className="border border-border px-5 py-2 text-[11px] tracking-luxe uppercase hover:bg-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={busy}
+              className="border border-destructive bg-destructive px-5 py-2 text-[11px] tracking-luxe uppercase text-ivory hover:opacity-90 disabled:opacity-60"
+            >
+              {busy ? "Excluindo..." : "Excluir definitivamente"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+
 const ADMIN_STATUSES: OrderStatus[] = [
   "Aguardando Aprovação",
   "Preparando pedido",
@@ -2436,16 +2499,61 @@ type NewsletterRow = { id: string; email: string; created_at: string };
 type ManualCustomerRow = { id: string; name: string | null; email: string; phone: string | null; created_at: string };
 
 function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, listCustomers } = useAuth();
-  const { orders, updateStatus, createOrder } = useOrders();
+  const { user, listCustomers, refreshCustomers } = useAuth();
+  const { orders, updateStatus, createOrder, refresh: refreshOrders } = useOrders();
   const { products } = useCatalog();
   const [tab, setTab] = useState<"calc" | "pedidos" | "clientes">("pedidos");
   const [newsletter, setNewsletter] = useState<NewsletterRow[]>([]);
   const [manual, setManual] = useState<ManualCustomerRow[]>([]);
   const [showManualOrder, setShowManualOrder] = useState(false);
   const [showManualCustomer, setShowManualCustomer] = useState(false);
+  const [confirmOrder, setConfirmOrder] = useState<string | null>(null);
+  const [confirmCustomer, setConfirmCustomer] = useState<
+    { email: string; kind: "auth" | "manual"; name: string } | null
+  >(null);
+  const [deleting, setDeleting] = useState(false);
+  const deleteOrderFn = useServerFn(adminDeleteOrder);
+  const deleteCustomerFn = useServerFn(adminDeleteCustomer);
 
   const isAdminUser = !!user?.isAdmin;
+
+  const handleDeleteOrder = async () => {
+    if (!confirmOrder || !isAdminUser) return;
+    setDeleting(true);
+    try {
+      await deleteOrderFn({ data: { orderNumber: confirmOrder } });
+      await refreshOrders();
+      setConfirmOrder(null);
+    } catch (e) {
+      console.error("[admin] delete order failed", e);
+      alert("Não foi possível excluir o pedido.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!confirmCustomer || !isAdminUser) return;
+    setDeleting(true);
+    try {
+      await deleteCustomerFn({
+        data: { email: confirmCustomer.email, kind: confirmCustomer.kind },
+      });
+      if (confirmCustomer.kind === "manual") {
+        await loadManual();
+      } else {
+        await refreshCustomers();
+      }
+      setConfirmCustomer(null);
+    } catch (e) {
+      console.error("[admin] delete customer failed", e);
+      alert("Não foi possível excluir o cliente.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+
 
   const loadNewsletter = useCallback(async () => {
     const { data } = await supabase
@@ -2554,7 +2662,9 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                           <th className="py-3 pr-3 text-right">Qtd</th>
                           <th className="py-3 pr-3 text-right">Total</th>
                           <th className="py-3 pr-3">Status</th>
+                          <th className="py-3 pr-3 text-right">Ações</th>
                         </tr>
+
                       </thead>
                       <tbody>
                         {orders.map((o) =>
@@ -2609,7 +2719,20 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                                   </select>
                                 )}
                               </td>
+                              <td className="py-3 pr-3 text-right">
+                                {ix === 0 && (
+                                  <button
+                                    onClick={() => setConfirmOrder(o.id)}
+                                    aria-label={`Excluir pedido ${o.id}`}
+                                    title="Excluir pedido"
+                                    className="inline-flex items-center justify-center border border-border p-1.5 text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive hover:text-ivory"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                                  </button>
+                                )}
+                              </td>
                             </tr>
+
                           )),
                         )}
                       </tbody>
@@ -2645,6 +2768,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                           <th className="py-3 pr-4">E-mail</th>
                           <th className="py-3 pr-4">Celular</th>
                           <th className="py-3 pr-4 text-right">Cadastrado em</th>
+                          <th className="py-3 pr-4 text-right">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2659,6 +2783,22 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                               {c.createdAt
                                 ? new Date(c.createdAt).toLocaleDateString("pt-BR")
                                 : "—"}
+                            </td>
+                            <td className="py-3 pr-4 text-right">
+                              <button
+                                onClick={() =>
+                                  setConfirmCustomer({
+                                    email: c.email,
+                                    kind: "auth",
+                                    name: c.name ?? c.email,
+                                  })
+                                }
+                                aria-label={`Excluir cliente ${c.email}`}
+                                title="Excluir cliente"
+                                className="inline-flex items-center justify-center border border-border p-1.5 text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive hover:text-ivory"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -2675,10 +2815,27 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                             <td className="py-3 pr-4 text-right text-[11px] text-muted-foreground">
                               {new Date(m.created_at).toLocaleDateString("pt-BR")}
                             </td>
+                            <td className="py-3 pr-4 text-right">
+                              <button
+                                onClick={() =>
+                                  setConfirmCustomer({
+                                    email: m.email,
+                                    kind: "manual",
+                                    name: m.name ?? m.email,
+                                  })
+                                }
+                                aria-label={`Excluir cliente ${m.email}`}
+                                title="Excluir cliente"
+                                className="inline-flex items-center justify-center border border-border p-1.5 text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive hover:text-ivory"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+
                   )}
                 </section>
 
@@ -2733,7 +2890,24 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
           }}
         />
       )}
+      <ConfirmDialog
+        open={!!confirmOrder}
+        title="Excluir pedido"
+        message={`Tem certeza que deseja remover o pedido ${confirmOrder ?? ""} permanentemente? Esta ação não pode ser desfeita.`}
+        onConfirm={handleDeleteOrder}
+        onCancel={() => !deleting && setConfirmOrder(null)}
+        busy={deleting}
+      />
+      <ConfirmDialog
+        open={!!confirmCustomer}
+        title="Excluir cliente"
+        message={`Esta ação excluirá o cadastro de ${confirmCustomer?.name ?? ""} e todos os dados associados. Deseja prosseguir?`}
+        onConfirm={handleDeleteCustomer}
+        onCancel={() => !deleting && setConfirmCustomer(null)}
+        busy={deleting}
+      />
     </>
+
   );
 }
 
