@@ -2890,7 +2890,24 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
           }}
         />
       )}
+      <ConfirmDialog
+        open={!!confirmOrder}
+        title="Excluir pedido"
+        message={`Tem certeza que deseja remover o pedido ${confirmOrder ?? ""} permanentemente? Esta ação não pode ser desfeita.`}
+        onConfirm={handleDeleteOrder}
+        onCancel={() => !deleting && setConfirmOrder(null)}
+        busy={deleting}
+      />
+      <ConfirmDialog
+        open={!!confirmCustomer}
+        title="Excluir cliente"
+        message={`Esta ação excluirá o cadastro de ${confirmCustomer?.name ?? ""} e todos os dados associados. Deseja prosseguir?`}
+        onConfirm={handleDeleteCustomer}
+        onCancel={() => !deleting && setConfirmCustomer(null)}
+        busy={deleting}
+      />
     </>
+
   );
 }
 
