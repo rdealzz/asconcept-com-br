@@ -2662,7 +2662,9 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                           <th className="py-3 pr-3 text-right">Qtd</th>
                           <th className="py-3 pr-3 text-right">Total</th>
                           <th className="py-3 pr-3">Status</th>
+                          <th className="py-3 pr-3 text-right">Ações</th>
                         </tr>
+
                       </thead>
                       <tbody>
                         {orders.map((o) =>
