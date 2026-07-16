@@ -2438,6 +2438,56 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
 }
 
 /* ---------- Admin Panel Modal ---------- */
+import { useServerFn } from "@tanstack/react-start";
+import { adminDeleteOrder, adminDeleteCustomer } from "@/lib/admin.functions";
+
+function ConfirmDialog({
+  open,
+  title,
+  message,
+  onConfirm,
+  onCancel,
+  busy,
+}: {
+  open: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  busy?: boolean;
+}) {
+  if (!open) return null;
+  return (
+    <>
+      <div onClick={onCancel} className="fixed inset-0 z-[110] bg-charcoal/70 backdrop-blur-sm" />
+      <div className="fixed inset-0 z-[115] flex items-center justify-center p-4">
+        <div className="pointer-events-auto w-full max-w-md bg-background p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Concept · Confirmação</p>
+          <h3 className="mt-2 font-serif text-2xl">{title}</h3>
+          <p className="mt-4 text-sm text-muted-foreground">{message}</p>
+          <div className="mt-8 flex justify-end gap-3">
+            <button
+              onClick={onCancel}
+              disabled={busy}
+              className="border border-border px-5 py-2 text-[11px] tracking-luxe uppercase hover:bg-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={busy}
+              className="border border-destructive bg-destructive px-5 py-2 text-[11px] tracking-luxe uppercase text-ivory hover:opacity-90 disabled:opacity-60"
+            >
+              {busy ? "Excluindo..." : "Excluir definitivamente"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+
 const ADMIN_STATUSES: OrderStatus[] = [
   "Aguardando Aprovação",
   "Preparando pedido",
