@@ -2499,16 +2499,61 @@ type NewsletterRow = { id: string; email: string; created_at: string };
 type ManualCustomerRow = { id: string; name: string | null; email: string; phone: string | null; created_at: string };
 
 function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, listCustomers } = useAuth();
-  const { orders, updateStatus, createOrder } = useOrders();
+  const { user, listCustomers, refreshCustomers } = useAuth();
+  const { orders, updateStatus, createOrder, refresh: refreshOrders } = useOrders();
   const { products } = useCatalog();
   const [tab, setTab] = useState<"calc" | "pedidos" | "clientes">("pedidos");
   const [newsletter, setNewsletter] = useState<NewsletterRow[]>([]);
   const [manual, setManual] = useState<ManualCustomerRow[]>([]);
   const [showManualOrder, setShowManualOrder] = useState(false);
   const [showManualCustomer, setShowManualCustomer] = useState(false);
+  const [confirmOrder, setConfirmOrder] = useState<string | null>(null);
+  const [confirmCustomer, setConfirmCustomer] = useState<
+    { email: string; kind: "auth" | "manual"; name: string } | null
+  >(null);
+  const [deleting, setDeleting] = useState(false);
+  const deleteOrderFn = useServerFn(adminDeleteOrder);
+  const deleteCustomerFn = useServerFn(adminDeleteCustomer);
 
   const isAdminUser = !!user?.isAdmin;
+
+  const handleDeleteOrder = async () => {
+    if (!confirmOrder || !isAdminUser) return;
+    setDeleting(true);
+    try {
+      await deleteOrderFn({ data: { orderNumber: confirmOrder } });
+      await refreshOrders();
+      setConfirmOrder(null);
+    } catch (e) {
+      console.error("[admin] delete order failed", e);
+      alert("Não foi possível excluir o pedido.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!confirmCustomer || !isAdminUser) return;
+    setDeleting(true);
+    try {
+      await deleteCustomerFn({
+        data: { email: confirmCustomer.email, kind: confirmCustomer.kind },
+      });
+      if (confirmCustomer.kind === "manual") {
+        await loadManual();
+      } else {
+        await refreshCustomers();
+      }
+      setConfirmCustomer(null);
+    } catch (e) {
+      console.error("[admin] delete customer failed", e);
+      alert("Não foi possível excluir o cliente.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+
 
   const loadNewsletter = useCallback(async () => {
     const { data } = await supabase
