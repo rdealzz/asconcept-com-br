@@ -113,7 +113,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: admin || isMasterAdminEmail(resolvedEmail),
     });
     setAddressState((profile?.address as CustomerAddress | null) ?? null);
+
+    // Boas-vindas: dispara apenas quando a sessão está estabelecida
+    // (garantindo bearer token) e uma única vez por conta.
+    if (typeof window !== "undefined") {
+      try {
+        const pending = window.localStorage.getItem(PENDING_WELCOME_KEY);
+        if (pending && pending.toLowerCase() === resolvedEmail.toLowerCase()) {
+          window.localStorage.removeItem(PENDING_WELCOME_KEY);
+          void triggerWelcomeMail(resolvedEmail, profile?.name ?? undefined);
+        }
+      } catch {
+        /* localStorage indisponível — ignora silenciosamente */
+      }
+    }
   }, []);
+
 
   useEffect(() => {
     let mounted = true;
