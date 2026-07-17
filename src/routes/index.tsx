@@ -1076,16 +1076,16 @@ function ProductModal() {
         onClick={close}
         className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
       />
-      <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 md:p-8 pointer-events-none">
-        <div className="pointer-events-auto relative w-full max-w-5xl max-h-[92vh] overflow-y-auto bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+      <div className="fixed inset-0 z-[90] flex items-stretch justify-center pointer-events-none md:items-center md:p-8">
+        <div className="pointer-events-auto relative flex h-[100svh] w-full max-w-5xl flex-col overflow-hidden bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-500 md:h-auto md:max-h-[92vh]">
           <button
             onClick={close}
             aria-label="Fechar"
-            className="absolute right-4 top-4 z-10 rounded-full bg-background/80 p-2 backdrop-blur hover:text-accent"
+            className="absolute right-4 top-4 z-20 rounded-full bg-background/80 p-2 backdrop-blur hover:text-accent"
           >
-            <X className="h-4 w-4" strokeWidth={1.5} />
+            <X className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.5} />
           </button>
-          <div className="grid grid-cols-1 md:grid-cols-2">
+          <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-2 md:overflow-visible md:pb-0">
             <div className="bg-secondary">
               <div className="aspect-[3/4] w-full overflow-hidden">
                 <img
@@ -1095,12 +1095,12 @@ function ProductModal() {
                 />
               </div>
               {gallery.length > 1 && (
-                <div className="flex gap-2 p-3">
+                <div className="flex gap-2 overflow-x-auto p-3">
                   {gallery.map((g, i) => (
                     <button
                       key={i}
                       onClick={() => setActiveImg(i)}
-                      className={`h-20 w-16 overflow-hidden border transition-all ${
+                      className={`h-20 w-16 shrink-0 overflow-hidden border transition-all ${
                         activeImg === i ? "border-accent" : "border-transparent opacity-70"
                       }`}
                     >
@@ -1111,9 +1111,9 @@ function ProductModal() {
               )}
             </div>
 
-            <div className="flex flex-col p-8 md:p-12">
+            <div className="flex flex-col p-6 md:p-12">
               <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Concept</p>
-              <h2 className="mt-3 font-serif text-3xl md:text-4xl leading-tight">{active.name}</h2>
+              <h2 className="mt-3 font-serif text-2xl leading-tight md:text-4xl">{active.name}</h2>
               <p className="mt-3 text-lg tabular-nums">{formatBRL(active.price)}</p>
               <p className="mt-1 text-[11px] font-light italic tracking-wide text-[color:var(--gold)]">
                 ou {formatBRL(applyPixDiscount(active.price))} no Pix (5% de desconto)
@@ -1137,7 +1137,7 @@ function ProductModal() {
                 <p className="mb-3 text-[11px] tracking-luxe uppercase text-muted-foreground">
                   Tamanho
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {SIZES.map((s) => {
                     const q = sizeStock?.[s] ?? 0;
                     const isOut = q === 0;
@@ -1147,7 +1147,7 @@ function ProductModal() {
                         onClick={() => !isOut && setSize(s)}
                         disabled={isOut}
                         title={isOut ? "Tamanho esgotado" : `${q} em estoque`}
-                        className={`relative h-11 w-14 border text-sm transition-all ${
+                        className={`relative h-12 w-16 border text-sm transition-all md:h-11 md:w-14 ${
                           size === s
                             ? "border-foreground bg-foreground text-ivory"
                             : "border-border hover:border-foreground"
@@ -1174,6 +1174,7 @@ function ProductModal() {
                 </p>
               </div>
 
+              {/* Desktop CTA */}
               <button
                 onClick={() => {
                   if (soldOut || sizeSoldOut) return;
@@ -1182,7 +1183,7 @@ function ProductModal() {
                   close();
                 }}
                 disabled={soldOut || sizeSoldOut}
-                className="mt-10 bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                className="mt-10 hidden bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground md:block"
               >
                 {soldOut
                   ? "Produto Esgotado"
@@ -1200,6 +1201,26 @@ function ProductModal() {
                 <p>Trocas e ajustes cortesia em até 30 dias.</p>
               </div>
             </div>
+          </div>
+
+          {/* Mobile sticky CTA */}
+          <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-10 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:hidden">
+            <button
+              onClick={() => {
+                if (soldOut || sizeSoldOut) return;
+                add(active, size);
+                decrementStock(active.id, size, 1);
+                close();
+              }}
+              disabled={soldOut || sizeSoldOut}
+              className="w-full bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+            >
+              {soldOut
+                ? "Produto Esgotado"
+                : sizeSoldOut
+                  ? `Tamanho ${size} esgotado`
+                  : `Adicionar — ${formatBRL(active.price)}`}
+            </button>
           </div>
         </div>
       </div>
