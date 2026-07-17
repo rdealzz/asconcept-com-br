@@ -3187,18 +3187,9 @@ function FinancialOverview() {
       });
     }
 
-    const totalReal = weeks.reduce((s, w) => s + w.gross, 0);
-    if (totalReal < 500) {
-      const base = [8400, 11200, 14650, 18900];
-      base.forEach((g, idx) => {
-        weeks[idx] = {
-          label: weeks[idx].label,
-          gross: g,
-          grossProfit: g * 0.58,
-          netProfit: g * 0.42,
-        };
-      });
-    }
+    // Nunca substituímos os dados reais por valores fictícios: o painel
+    // sempre reflete o faturamento efetivo, mesmo que seja próximo de zero.
+
 
     return {
       kpis: { gross, grossProfit, netProfit, netMarginPct },
