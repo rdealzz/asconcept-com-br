@@ -301,6 +301,7 @@ function Index() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   return (
     <CatalogProvider>
       <SearchProvider>
@@ -310,6 +311,7 @@ function Index() {
               onOpenFilter={() => setFilterOpen(true)}
               onOpenAccount={() => setAccountOpen(true)}
               onOpenAdmin={() => setAdminOpen(true)}
+              onOpenMobileMenu={() => setMobileMenuOpen(true)}
             />
             <Hero />
             <CategoryTabs />
@@ -327,6 +329,18 @@ function Index() {
             <FilterSidebar open={filterOpen} onClose={() => setFilterOpen(false)} />
             <MinhaContaModal open={accountOpen} onClose={() => setAccountOpen(false)} />
             <AdminPanelModal open={adminOpen} onClose={() => setAdminOpen(false)} />
+            <MobileMenu
+              open={mobileMenuOpen}
+              onClose={() => setMobileMenuOpen(false)}
+              onOpenAccount={() => {
+                setMobileMenuOpen(false);
+                setAccountOpen(true);
+              }}
+              onOpenFilter={() => {
+                setMobileMenuOpen(false);
+                setFilterOpen(true);
+              }}
+            />
           </div>
         </ProductProvider>
       </SearchProvider>
