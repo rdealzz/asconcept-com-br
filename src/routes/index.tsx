@@ -2137,8 +2137,8 @@ function AuthModal() {
         onClick={closeAuth}
         className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
       />
-      <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 pointer-events-none">
-        <div className="pointer-events-auto relative w-full max-w-md bg-background p-8 md:p-10 shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+      <div className="fixed inset-0 z-[90] flex items-end justify-center pointer-events-none sm:items-center sm:p-4">
+        <div className="pointer-events-auto relative max-h-[95svh] w-full max-w-md overflow-y-auto bg-background p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-500 sm:p-8 md:p-10">
           <button
             onClick={closeAuth}
             aria-label="Fechar"
