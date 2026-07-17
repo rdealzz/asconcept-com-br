@@ -301,6 +301,7 @@ function Index() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   return (
     <CatalogProvider>
       <SearchProvider>
@@ -310,6 +311,7 @@ function Index() {
               onOpenFilter={() => setFilterOpen(true)}
               onOpenAccount={() => setAccountOpen(true)}
               onOpenAdmin={() => setAdminOpen(true)}
+              onOpenMobileMenu={() => setMobileMenuOpen(true)}
             />
             <Hero />
             <CategoryTabs />
@@ -327,6 +329,18 @@ function Index() {
             <FilterSidebar open={filterOpen} onClose={() => setFilterOpen(false)} />
             <MinhaContaModal open={accountOpen} onClose={() => setAccountOpen(false)} />
             <AdminPanelModal open={adminOpen} onClose={() => setAdminOpen(false)} />
+            <MobileMenu
+              open={mobileMenuOpen}
+              onClose={() => setMobileMenuOpen(false)}
+              onOpenAccount={() => {
+                setMobileMenuOpen(false);
+                setAccountOpen(true);
+              }}
+              onOpenFilter={() => {
+                setMobileMenuOpen(false);
+                setFilterOpen(true);
+              }}
+            />
           </div>
         </ProductProvider>
       </SearchProvider>
@@ -387,10 +401,12 @@ function Nav({
   onOpenFilter,
   onOpenAccount,
   onOpenAdmin,
+  onOpenMobileMenu,
 }: {
   onOpenFilter: () => void;
   onOpenAccount: () => void;
   onOpenAdmin: () => void;
+  onOpenMobileMenu: () => void;
 }) {
   const { open, count } = useCart();
   const { user, openAuth } = useAuth();
@@ -411,16 +427,25 @@ function Nav({
         scrolled ? "bg-background/90 backdrop-blur border-b border-border" : "bg-transparent"
       }`}
     >
-      <div className="mx-auto grid max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center px-6 py-5 md:px-12">
+      <div className="mx-auto grid max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center px-4 py-4 md:px-12 md:py-5">
         <div
           className={`flex items-center gap-5 ${
             scrolled ? "text-foreground" : "text-ivory"
           }`}
         >
+          {/* Mobile hamburger */}
+          <button
+            aria-label="Abrir menu"
+            onClick={onOpenMobileMenu}
+            className="hover:text-accent transition-colors md:hidden"
+          >
+            <Menu className="h-5 w-5" strokeWidth={1.25} />
+          </button>
+          {/* Desktop filter */}
           <button
             aria-label="Filtrar categoria"
             onClick={onOpenFilter}
-            className="hover:text-accent transition-colors"
+            className="hidden hover:text-accent transition-colors md:inline-flex"
           >
             <Menu className="h-4 w-4" strokeWidth={1.5} />
           </button>
@@ -432,7 +457,7 @@ function Nav({
         </div>
         <a
           href="#"
-          className={`font-serif text-xl md:text-2xl tracking-wider text-center whitespace-nowrap ${
+          className={`font-serif text-lg md:text-2xl tracking-wider text-center whitespace-nowrap ${
             scrolled ? "text-foreground" : "text-ivory"
           }`}
         >
@@ -444,14 +469,14 @@ function Nav({
           )}
         </a>
         <div
-          className={`flex items-center justify-end gap-5 ${
+          className={`flex items-center justify-end gap-4 md:gap-5 ${
             scrolled ? "text-foreground" : "text-ivory"
           }`}
         >
           <button
             aria-label="Buscar"
             onClick={openSearch}
-            className="hover:text-accent transition-colors"
+            className="hidden hover:text-accent transition-colors md:inline-flex"
           >
             <Search className="h-4 w-4" strokeWidth={1.5} />
           </button>
@@ -459,7 +484,7 @@ function Nav({
             onClick={() => (user ? onOpenAccount() : openAuth())}
             aria-label={user ? "Minha Conta" : "Entrar"}
             title={user ? `${user.email}` : "Entrar"}
-            className="hover:text-accent transition-colors"
+            className="hidden hover:text-accent transition-colors md:inline-flex"
           >
             <UserIcon className="h-4 w-4" strokeWidth={1.5} />
           </button>
@@ -468,7 +493,7 @@ function Nav({
             onClick={open}
             className="relative hover:text-accent transition-colors"
           >
-            <ShoppingBag className="h-4 w-4" strokeWidth={1.5} />
+            <ShoppingBag className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.5} />
             {count > 0 && (
               <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-medium text-charcoal">
                 {count}
@@ -481,7 +506,7 @@ function Nav({
                 to="/pedidos"
                 aria-label="Controle de Pedidos"
                 title="Controle de Pedidos"
-                className="hover:text-accent transition-colors"
+                className="hidden hover:text-accent transition-colors md:inline-flex"
               >
                 <Package className="h-4 w-4" strokeWidth={1.5} />
               </Link>
@@ -489,7 +514,7 @@ function Nav({
                 aria-label="Painel Admin"
                 onClick={onOpenAdmin}
                 title="Painel Admin"
-                className="relative hover:text-accent transition-colors"
+                className="relative hidden hover:text-accent transition-colors md:inline-flex"
               >
                 <Settings className="h-4 w-4" strokeWidth={1.5} />
                 <span className="absolute -right-2 -top-2 h-1.5 w-1.5 rounded-full bg-accent" />
@@ -503,6 +528,121 @@ function Nav({
   );
 }
 
+/* ---------- Mobile Menu Drawer ---------- */
+function MobileMenu({
+  open,
+  onClose,
+  onOpenAccount,
+  onOpenFilter,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onOpenAccount: () => void;
+  onOpenFilter: () => void;
+}) {
+  const { user, openAuth } = useAuth();
+  const { setTab } = useSearch();
+  const goTo = (id: string) => {
+    onClose();
+    setTimeout(
+      () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }),
+      180,
+    );
+  };
+  return (
+    <>
+      <div
+        onClick={onClose}
+        className={`fixed inset-0 z-[85] bg-charcoal/60 backdrop-blur-sm transition-opacity duration-400 md:hidden ${
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      />
+      <aside
+        className={`fixed inset-y-0 left-0 z-[90] flex w-[88%] max-w-sm flex-col bg-[color:var(--ivory)] text-foreground shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:hidden ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-border px-6 py-5">
+          <span className="font-serif text-lg tracking-wider">
+            A<span className="text-accent">&amp;</span>S Concept
+          </span>
+          <button onClick={onClose} aria-label="Fechar menu" className="hover:text-accent">
+            <X className="h-5 w-5" strokeWidth={1.25} />
+          </button>
+        </div>
+
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-6 py-8">
+          <p className="mb-3 text-[10px] tracking-luxe uppercase text-muted-foreground">
+            Coleção
+          </p>
+          <button
+            onClick={() => {
+              setTab("clothes");
+              goTo("collections");
+            }}
+            className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
+          >
+            Roupas
+          </button>
+          <button
+            onClick={() => {
+              setTab("sneakers");
+              goTo("collections");
+            }}
+            className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
+          >
+            Sneakers
+          </button>
+          <button
+            onClick={() => {
+              onClose();
+              onOpenFilter();
+            }}
+            className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
+          >
+            Filtrar
+          </button>
+
+          <p className="mb-3 mt-8 text-[10px] tracking-luxe uppercase text-muted-foreground">
+            Editorial
+          </p>
+          <button
+            onClick={() => goTo("edit")}
+            className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
+          >
+            O Editorial
+          </button>
+          <button
+            onClick={() => goTo("about")}
+            className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
+          >
+            Sobre a Marca
+          </button>
+
+          <p className="mb-3 mt-8 text-[10px] tracking-luxe uppercase text-muted-foreground">
+            Conta
+          </p>
+          <button
+            onClick={() => {
+              onClose();
+              if (user) onOpenAccount();
+              else openAuth();
+            }}
+            className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
+          >
+            {user ? "Minha Conta" : "Entrar / Criar Conta"}
+          </button>
+        </nav>
+
+        <div className="border-t border-border px-6 py-5 text-[10px] tracking-luxe uppercase text-muted-foreground">
+          A&amp;S Concept — Herança Curada
+        </div>
+      </aside>
+    </>
+  );
+}
+
+
 /* ---------- Hero ---------- */
 function Hero() {
   return (
@@ -512,27 +652,27 @@ function Hero() {
         alt="Editorial A&S Concept"
         width={1920}
         height={1280}
-        className="absolute inset-0 h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full object-cover object-[65%_center] md:object-center"
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-charcoal/40 via-charcoal/20 to-charcoal/70" />
-      <div className="relative z-10 flex h-full items-end pb-20 md:items-center md:pb-0">
-        <div className="mx-auto max-w-[1600px] w-full px-6 md:px-12">
+      <div className="absolute inset-0 bg-gradient-to-b from-charcoal/50 via-charcoal/25 to-charcoal/80" />
+      <div className="relative z-10 flex h-full items-end pb-16 md:items-center md:pb-0">
+        <div className="mx-auto w-full max-w-[1600px] px-5 md:px-12">
           <div className="max-w-2xl animate-fade-up text-ivory">
-            <p className="mb-6 text-[11px] tracking-luxe uppercase text-accent">
+            <p className="mb-4 text-[10px] tracking-luxe uppercase text-accent md:mb-6 md:text-[11px]">
               — Coleção Outono / Inverno
             </p>
-            <h1 className="font-serif text-5xl leading-[1.02] md:text-7xl lg:text-[6rem]">
+            <h1 className="font-serif text-[2.5rem] leading-[1.05] sm:text-5xl md:text-7xl lg:text-[6rem]">
               A Nova Era<br />da Herança.
             </h1>
-            <p className="mt-8 max-w-md text-base md:text-lg font-light text-ivory/85">
+            <p className="mt-6 max-w-md text-sm font-light text-ivory/85 md:mt-8 md:text-lg">
               Luxo curado para a próxima geração.
             </p>
             <a
               href="#collections"
-              className="group mt-12 inline-flex items-center gap-4 border border-ivory/70 px-10 py-4 text-[11px] tracking-luxe uppercase text-ivory transition-all duration-500 hover:border-accent hover:text-accent"
+              className="group mt-8 inline-flex items-center gap-4 border border-ivory/70 px-8 py-3.5 text-[11px] tracking-luxe uppercase text-ivory transition-all duration-500 hover:border-accent hover:text-accent md:mt-12 md:px-10 md:py-4"
             >
               Explorar a Coleção
-              <span className="inline-block h-px w-8 bg-current transition-all duration-500 group-hover:w-12" />
+              <span className="inline-block h-px w-6 bg-current transition-all duration-500 group-hover:w-10 md:w-8" />
             </a>
           </div>
         </div>
@@ -936,16 +1076,16 @@ function ProductModal() {
         onClick={close}
         className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
       />
-      <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 md:p-8 pointer-events-none">
-        <div className="pointer-events-auto relative w-full max-w-5xl max-h-[92vh] overflow-y-auto bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+      <div className="fixed inset-0 z-[90] flex items-stretch justify-center pointer-events-none md:items-center md:p-8">
+        <div className="pointer-events-auto relative flex h-[100svh] w-full max-w-5xl flex-col overflow-hidden bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-500 md:h-auto md:max-h-[92vh]">
           <button
             onClick={close}
             aria-label="Fechar"
-            className="absolute right-4 top-4 z-10 rounded-full bg-background/80 p-2 backdrop-blur hover:text-accent"
+            className="absolute right-4 top-4 z-20 rounded-full bg-background/80 p-2 backdrop-blur hover:text-accent"
           >
-            <X className="h-4 w-4" strokeWidth={1.5} />
+            <X className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.5} />
           </button>
-          <div className="grid grid-cols-1 md:grid-cols-2">
+          <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-2 md:overflow-visible md:pb-0">
             <div className="bg-secondary">
               <div className="aspect-[3/4] w-full overflow-hidden">
                 <img
@@ -955,12 +1095,12 @@ function ProductModal() {
                 />
               </div>
               {gallery.length > 1 && (
-                <div className="flex gap-2 p-3">
+                <div className="flex gap-2 overflow-x-auto p-3">
                   {gallery.map((g, i) => (
                     <button
                       key={i}
                       onClick={() => setActiveImg(i)}
-                      className={`h-20 w-16 overflow-hidden border transition-all ${
+                      className={`h-20 w-16 shrink-0 overflow-hidden border transition-all ${
                         activeImg === i ? "border-accent" : "border-transparent opacity-70"
                       }`}
                     >
@@ -971,9 +1111,9 @@ function ProductModal() {
               )}
             </div>
 
-            <div className="flex flex-col p-8 md:p-12">
+            <div className="flex flex-col p-6 md:p-12">
               <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Concept</p>
-              <h2 className="mt-3 font-serif text-3xl md:text-4xl leading-tight">{active.name}</h2>
+              <h2 className="mt-3 font-serif text-2xl leading-tight md:text-4xl">{active.name}</h2>
               <p className="mt-3 text-lg tabular-nums">{formatBRL(active.price)}</p>
               <p className="mt-1 text-[11px] font-light italic tracking-wide text-[color:var(--gold)]">
                 ou {formatBRL(applyPixDiscount(active.price))} no Pix (5% de desconto)
@@ -997,7 +1137,7 @@ function ProductModal() {
                 <p className="mb-3 text-[11px] tracking-luxe uppercase text-muted-foreground">
                   Tamanho
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {SIZES.map((s) => {
                     const q = sizeStock?.[s] ?? 0;
                     const isOut = q === 0;
@@ -1007,7 +1147,7 @@ function ProductModal() {
                         onClick={() => !isOut && setSize(s)}
                         disabled={isOut}
                         title={isOut ? "Tamanho esgotado" : `${q} em estoque`}
-                        className={`relative h-11 w-14 border text-sm transition-all ${
+                        className={`relative h-12 w-16 border text-sm transition-all md:h-11 md:w-14 ${
                           size === s
                             ? "border-foreground bg-foreground text-ivory"
                             : "border-border hover:border-foreground"
@@ -1034,6 +1174,7 @@ function ProductModal() {
                 </p>
               </div>
 
+              {/* Desktop CTA */}
               <button
                 onClick={() => {
                   if (soldOut || sizeSoldOut) return;
@@ -1042,7 +1183,7 @@ function ProductModal() {
                   close();
                 }}
                 disabled={soldOut || sizeSoldOut}
-                className="mt-10 bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                className="mt-10 hidden bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground md:block"
               >
                 {soldOut
                   ? "Produto Esgotado"
@@ -1060,6 +1201,26 @@ function ProductModal() {
                 <p>Trocas e ajustes cortesia em até 30 dias.</p>
               </div>
             </div>
+          </div>
+
+          {/* Mobile sticky CTA */}
+          <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-10 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:hidden">
+            <button
+              onClick={() => {
+                if (soldOut || sizeSoldOut) return;
+                add(active, size);
+                decrementStock(active.id, size, 1);
+                close();
+              }}
+              disabled={soldOut || sizeSoldOut}
+              className="w-full bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+            >
+              {soldOut
+                ? "Produto Esgotado"
+                : sizeSoldOut
+                  ? `Tamanho ${size} esgotado`
+                  : `Adicionar — ${formatBRL(active.price)}`}
+            </button>
           </div>
         </div>
       </div>
@@ -1976,8 +2137,8 @@ function AuthModal() {
         onClick={closeAuth}
         className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
       />
-      <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 pointer-events-none">
-        <div className="pointer-events-auto relative w-full max-w-md bg-background p-8 md:p-10 shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+      <div className="fixed inset-0 z-[90] flex items-end justify-center pointer-events-none sm:items-center sm:p-4">
+        <div className="pointer-events-auto relative max-h-[95svh] w-full max-w-md overflow-y-auto bg-background p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-500 sm:p-8 md:p-10">
           <button
             onClick={closeAuth}
             aria-label="Fechar"
