@@ -13,14 +13,16 @@ type MailKind =
       kind: "order_created";
       to: string;
       orderId: string;
-      total: number;
-      items: OrderItem[];
+      // Ignored server-side; values are re-derived from the database.
+      total?: number;
+      items?: OrderItem[];
     }
   | {
       kind: "status_update";
       to: string;
       orderId: string;
-      status: OrderStatus;
+      // Ignored server-side; values are re-derived from the database.
+      status?: OrderStatus;
       trackingCode?: string;
     };
 
@@ -39,26 +41,77 @@ function validate(input: unknown): MailKind {
   return d;
 }
 
-function render(input: MailKind): { subject: string; html: string } {
-  if (input.kind === "welcome") return welcomeTemplate(input.to, input.name);
-  if (input.kind === "order_created")
-    return orderCreatedTemplate(input.to, input.orderId, input.total, input.items);
-  return statusUpdateTemplate(input.to, input.orderId, input.status, input.trackingCode);
-}
-
 export const sendTransactionalMail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
       console.error("[mail] RESEND_API_KEY ausente — envio ignorado.");
       throw new Error("Serviço de e-mail não configurado.");
     }
-    const from =
-      process.env.MAIL_FROM || "A&S Concept <onboarding@resend.dev>";
+    const from = process.env.MAIL_FROM || "A&S Concept <onboarding@resend.dev>";
 
-    const { subject, html } = render(data);
+    // Resolve caller identity server-side. Never trust client-supplied `to`
+    // as authorization; it is only used for cross-check with the caller.
+    const callerEmail = (context.claims?.email as string | undefined)?.toLowerCase();
+    const requestedTo = data.to.trim().toLowerCase();
+
+    const { data: isAdminRow } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    const isAdmin = !!isAdminRow;
+
+    let rendered: { subject: string; html: string };
+    let recipient: string;
+
+    if (data.kind === "welcome") {
+      // Welcome mail may only go to the authenticated user's own address.
+      if (!callerEmail || callerEmail !== requestedTo) {
+        throw new Error("Não autorizado a enviar para este destinatário.");
+      }
+      recipient = callerEmail;
+      rendered = welcomeTemplate(recipient, data.name);
+    } else if (data.kind === "order_created") {
+      // Load the order under the caller's RLS. Non-admins only see their own.
+      const query = context.supabase
+        .from("orders")
+        .select("customer_email, total, items, order_number")
+        .eq("order_number", data.orderId)
+        .maybeSingle();
+      const { data: order } = await query;
+      if (!order) throw new Error("Pedido não encontrado ou acesso negado.");
+      if (!isAdmin && callerEmail && order.customer_email.toLowerCase() !== callerEmail) {
+        throw new Error("Não autorizado a enviar para este destinatário.");
+      }
+      recipient = order.customer_email;
+      rendered = orderCreatedTemplate(
+        recipient,
+        order.order_number,
+        Number(order.total ?? 0),
+        (order.items as OrderItem[]) ?? [],
+      );
+    } else {
+      // Status updates are an administrative action.
+      if (!isAdmin) throw new Error("Apenas administradores podem enviar atualizações de status.");
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: order } = await supabaseAdmin
+        .from("orders")
+        .select("customer_email, order_number, status, tracking_code")
+        .eq("order_number", data.orderId)
+        .maybeSingle();
+      if (!order) throw new Error("Pedido não encontrado.");
+      recipient = order.customer_email;
+      rendered = statusUpdateTemplate(
+        recipient,
+        order.order_number,
+        (order.status as OrderStatus) ?? "processing",
+        order.tracking_code ?? undefined,
+      );
+    }
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -68,9 +121,9 @@ export const sendTransactionalMail = createServerFn({ method: "POST" })
       },
       body: JSON.stringify({
         from,
-        to: [data.to],
-        subject,
-        html,
+        to: [recipient],
+        subject: rendered.subject,
+        html: rendered.html,
       }),
     });
 
