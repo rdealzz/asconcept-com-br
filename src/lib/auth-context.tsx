@@ -10,6 +10,8 @@ import { sanitizeText, sanitizeEmail } from "./sanitize";
  * como fonte real de verdade das permissões de escrita.
  */
 export const MASTER_ADMIN_EMAIL = "ersutibiti@gmail.com";
+const PENDING_WELCOME_KEY = "asconcept.pendingWelcome";
+
 export const isMasterAdminEmail = (email?: string | null) =>
   !!email && email.trim().toLowerCase() === MASTER_ADMIN_EMAIL;
 
