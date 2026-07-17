@@ -2604,7 +2604,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
           </button>
           <div className="border-b border-border px-8 py-6">
             <p className="flex items-center gap-2 text-[11px] tracking-luxe uppercase text-accent">
-              <Shield className="h-3 w-3" /> Painel Admin · A&amp;S Conccept
+              <Shield className="h-3 w-3" /> Painel Admin · A&amp;S Concept
             </p>
             <h2 className="mt-1 font-serif text-3xl">Gestão Interna</h2>
           </div>

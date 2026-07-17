@@ -29,11 +29,11 @@ import {
 export const Route = createFileRoute("/checkout")({
   head: () => ({
     meta: [
-      { title: "Finalizar Compra — A&S Conccept" },
+      { title: "Finalizar Compra — A&S Concept" },
       {
         name: "description",
         content:
-          "Complete seu pedido A&S Conccept com envio nacional e pagamento seguro.",
+          "Complete seu pedido A&S Concept com envio nacional e pagamento seguro.",
       },
       { name: "robots", content: "noindex" },
     ],
@@ -740,7 +740,7 @@ function CreditCardForm({
               </span>
             </div>
             <p className="mt-auto text-[9px] tracking-luxe uppercase opacity-60">
-              A&S Conccept · Cartão simulado para demonstração
+              A&S Concept · Cartão simulado para demonstração
             </p>
           </div>
         </div>
@@ -936,7 +936,7 @@ function BoletoPanel({ total }: { total: number }) {
         <div className="flex items-start justify-between border-b border-dashed border-border pb-4">
           <div>
             <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
-              A&S Conccept
+              A&S Concept
             </p>
             <p className="mt-1 font-serif text-xl">Boleto Heritage</p>
           </div>
@@ -952,7 +952,7 @@ function BoletoPanel({ total }: { total: number }) {
             <dt className="text-[10px] tracking-luxe uppercase text-muted-foreground">
               Beneficiário
             </dt>
-            <dd className="mt-1 text-charcoal">A&S Conccept Ltda.</dd>
+            <dd className="mt-1 text-charcoal">A&S Concept Ltda.</dd>
           </div>
           <div>
             <dt className="text-[10px] tracking-luxe uppercase text-muted-foreground">
@@ -1020,7 +1020,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <ChevronLeft className="h-4 w-4" /> Continuar comprando
           </Link>
           <Link to="/" className="font-serif text-xl tracking-widest">
-            A&S Conccept
+            A&S Concept
           </Link>
           <Link
             to="/pedidos"

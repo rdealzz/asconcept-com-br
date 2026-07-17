@@ -9,7 +9,7 @@ export const Route = createFileRoute("/pedidos/$id")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Detalhes do Pedido — A&S Conccept" },
+      { title: "Detalhes do Pedido — A&S Concept" },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -134,7 +134,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           <Link to="/pedidos" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
             <ChevronLeft className="h-4 w-4" /> Meus pedidos
           </Link>
-          <Link to="/" className="font-serif text-xl tracking-widest">A&S Conccept</Link>
+          <Link to="/" className="font-serif text-xl tracking-widest">A&S Concept</Link>
           <span className="w-24" />
         </div>
       </header>
