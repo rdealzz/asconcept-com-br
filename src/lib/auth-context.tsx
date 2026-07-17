@@ -226,10 +226,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: "Já existe uma conta com este e-mail." };
       return { error: "Não foi possível concluir o cadastro." };
     }
-    void triggerWelcomeMail(cleanEmail, cleanName);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(PENDING_WELCOME_KEY, cleanEmail);
+      } catch {
+        /* localStorage indisponível — envio será tentado no próximo login */
+      }
+    }
     setJustSignedUp(true);
     return { error: null, justSignedUp: true };
   };
+
 
   const signOut = async () => {
     await supabase.auth.signOut();
