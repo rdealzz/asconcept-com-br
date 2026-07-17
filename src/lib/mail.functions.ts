@@ -92,7 +92,7 @@ export const sendTransactionalMail = createServerFn({ method: "POST" })
         recipient,
         order.order_number,
         Number(order.total ?? 0),
-        (order.items as OrderItem[]) ?? [],
+        (order.items as unknown as OrderItem[]) ?? [],
       );
     } else {
       // Status updates are an administrative action.
