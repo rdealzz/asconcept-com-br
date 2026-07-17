@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
     meta: [
-      { title: "Nova senha — A&S Conccept" },
+      { title: "Nova senha — A&S Concept" },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -51,7 +51,7 @@ function ResetPasswordPage() {
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
             ← Voltar
           </Link>
-          <span className="font-serif text-xl tracking-widest">A&amp;S Conccept</span>
+          <span className="font-serif text-xl tracking-widest">A&amp;S Concept</span>
           <span className="w-16" />
         </div>
       </header>

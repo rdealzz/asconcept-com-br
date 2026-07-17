@@ -118,19 +118,26 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
       const coupon = AVAILABLE_COUPONS.find(
         (c) => c.code.toUpperCase() === data.couponCode,
       );
-      if (coupon) {
-        const { data: prior } = await supabase
-          .from("coupon_uses")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("code", coupon.code.toUpperCase())
-          .maybeSingle();
-        if (!prior) {
-          couponDiscount = calcDiscount(coupon, subtotal);
-          acceptedCoupon = coupon.code.toUpperCase();
-        }
+      if (!coupon) {
+        throw new Error(
+          "Cupom inválido. Remova o cupom aplicado e refaça o cálculo do pedido.",
+        );
       }
+      const { data: prior } = await supabase
+        .from("coupon_uses")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("code", coupon.code.toUpperCase())
+        .maybeSingle();
+      if (prior) {
+        throw new Error(
+          "Este cupom já foi utilizado. Remova o cupom aplicado para prosseguir com o pedido.",
+        );
+      }
+      couponDiscount = calcDiscount(coupon, subtotal);
+      acceptedCoupon = coupon.code.toUpperCase();
     }
+
     const netAfterCoupon = Math.max(0, subtotal - couponDiscount);
     const pixDiscount =
       data.paymentMethod === "pix"

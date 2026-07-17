@@ -10,6 +10,8 @@ import { sanitizeText, sanitizeEmail } from "./sanitize";
  * como fonte real de verdade das permissões de escrita.
  */
 export const MASTER_ADMIN_EMAIL = "ersutibiti@gmail.com";
+const PENDING_WELCOME_KEY = "asconcept.pendingWelcome";
+
 export const isMasterAdminEmail = (email?: string | null) =>
   !!email && email.trim().toLowerCase() === MASTER_ADMIN_EMAIL;
 
@@ -113,7 +115,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: admin || isMasterAdminEmail(resolvedEmail),
     });
     setAddressState((profile?.address as CustomerAddress | null) ?? null);
+
+    // Boas-vindas: dispara apenas quando a sessão está estabelecida
+    // (garantindo bearer token) e uma única vez por conta.
+    if (typeof window !== "undefined") {
+      try {
+        const pending = window.localStorage.getItem(PENDING_WELCOME_KEY);
+        if (pending && pending.toLowerCase() === resolvedEmail.toLowerCase()) {
+          window.localStorage.removeItem(PENDING_WELCOME_KEY);
+          void triggerWelcomeMail(resolvedEmail, profile?.name ?? undefined);
+        }
+      } catch {
+        /* localStorage indisponível — ignora silenciosamente */
+      }
+    }
   }, []);
+
 
   useEffect(() => {
     let mounted = true;
@@ -209,10 +226,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: "Já existe uma conta com este e-mail." };
       return { error: "Não foi possível concluir o cadastro." };
     }
-    void triggerWelcomeMail(cleanEmail, cleanName);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(PENDING_WELCOME_KEY, cleanEmail);
+      } catch {
+        /* localStorage indisponível — envio será tentado no próximo login */
+      }
+    }
     setJustSignedUp(true);
     return { error: null, justSignedUp: true };
   };
+
 
   const signOut = async () => {
     await supabase.auth.signOut();

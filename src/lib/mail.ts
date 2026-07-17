@@ -1,5 +1,5 @@
 /**
- * A&S Conccept — Disparo real de e-mails transacionais.
+ * A&S Concept — Disparo real de e-mails transacionais.
  *
  * O envio ocorre no servidor via `sendTransactionalMail` (server function
  * TanStack) que se conecta à API da Resend usando `RESEND_API_KEY`. Falhas
