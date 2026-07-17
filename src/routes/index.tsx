@@ -652,27 +652,27 @@ function Hero() {
         alt="Editorial A&S Concept"
         width={1920}
         height={1280}
-        className="absolute inset-0 h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full object-cover object-[65%_center] md:object-center"
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-charcoal/40 via-charcoal/20 to-charcoal/70" />
-      <div className="relative z-10 flex h-full items-end pb-20 md:items-center md:pb-0">
-        <div className="mx-auto max-w-[1600px] w-full px-6 md:px-12">
+      <div className="absolute inset-0 bg-gradient-to-b from-charcoal/50 via-charcoal/25 to-charcoal/80" />
+      <div className="relative z-10 flex h-full items-end pb-16 md:items-center md:pb-0">
+        <div className="mx-auto w-full max-w-[1600px] px-5 md:px-12">
           <div className="max-w-2xl animate-fade-up text-ivory">
-            <p className="mb-6 text-[11px] tracking-luxe uppercase text-accent">
+            <p className="mb-4 text-[10px] tracking-luxe uppercase text-accent md:mb-6 md:text-[11px]">
               — Coleção Outono / Inverno
             </p>
-            <h1 className="font-serif text-5xl leading-[1.02] md:text-7xl lg:text-[6rem]">
+            <h1 className="font-serif text-[2.5rem] leading-[1.05] sm:text-5xl md:text-7xl lg:text-[6rem]">
               A Nova Era<br />da Herança.
             </h1>
-            <p className="mt-8 max-w-md text-base md:text-lg font-light text-ivory/85">
+            <p className="mt-6 max-w-md text-sm font-light text-ivory/85 md:mt-8 md:text-lg">
               Luxo curado para a próxima geração.
             </p>
             <a
               href="#collections"
-              className="group mt-12 inline-flex items-center gap-4 border border-ivory/70 px-10 py-4 text-[11px] tracking-luxe uppercase text-ivory transition-all duration-500 hover:border-accent hover:text-accent"
+              className="group mt-8 inline-flex items-center gap-4 border border-ivory/70 px-8 py-3.5 text-[11px] tracking-luxe uppercase text-ivory transition-all duration-500 hover:border-accent hover:text-accent md:mt-12 md:px-10 md:py-4"
             >
               Explorar a Coleção
-              <span className="inline-block h-px w-8 bg-current transition-all duration-500 group-hover:w-12" />
+              <span className="inline-block h-px w-6 bg-current transition-all duration-500 group-hover:w-10 md:w-8" />
             </a>
           </div>
         </div>
