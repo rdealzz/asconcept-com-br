@@ -401,10 +401,12 @@ function Nav({
   onOpenFilter,
   onOpenAccount,
   onOpenAdmin,
+  onOpenMobileMenu,
 }: {
   onOpenFilter: () => void;
   onOpenAccount: () => void;
   onOpenAdmin: () => void;
+  onOpenMobileMenu: () => void;
 }) {
   const { open, count } = useCart();
   const { user, openAuth } = useAuth();
@@ -425,16 +427,25 @@ function Nav({
         scrolled ? "bg-background/90 backdrop-blur border-b border-border" : "bg-transparent"
       }`}
     >
-      <div className="mx-auto grid max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center px-6 py-5 md:px-12">
+      <div className="mx-auto grid max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center px-4 py-4 md:px-12 md:py-5">
         <div
           className={`flex items-center gap-5 ${
             scrolled ? "text-foreground" : "text-ivory"
           }`}
         >
+          {/* Mobile hamburger */}
+          <button
+            aria-label="Abrir menu"
+            onClick={onOpenMobileMenu}
+            className="hover:text-accent transition-colors md:hidden"
+          >
+            <Menu className="h-5 w-5" strokeWidth={1.25} />
+          </button>
+          {/* Desktop filter */}
           <button
             aria-label="Filtrar categoria"
             onClick={onOpenFilter}
-            className="hover:text-accent transition-colors"
+            className="hidden hover:text-accent transition-colors md:inline-flex"
           >
             <Menu className="h-4 w-4" strokeWidth={1.5} />
           </button>
@@ -446,7 +457,7 @@ function Nav({
         </div>
         <a
           href="#"
-          className={`font-serif text-xl md:text-2xl tracking-wider text-center whitespace-nowrap ${
+          className={`font-serif text-lg md:text-2xl tracking-wider text-center whitespace-nowrap ${
             scrolled ? "text-foreground" : "text-ivory"
           }`}
         >
@@ -458,14 +469,14 @@ function Nav({
           )}
         </a>
         <div
-          className={`flex items-center justify-end gap-5 ${
+          className={`flex items-center justify-end gap-4 md:gap-5 ${
             scrolled ? "text-foreground" : "text-ivory"
           }`}
         >
           <button
             aria-label="Buscar"
             onClick={openSearch}
-            className="hover:text-accent transition-colors"
+            className="hidden hover:text-accent transition-colors md:inline-flex"
           >
             <Search className="h-4 w-4" strokeWidth={1.5} />
           </button>
@@ -473,7 +484,7 @@ function Nav({
             onClick={() => (user ? onOpenAccount() : openAuth())}
             aria-label={user ? "Minha Conta" : "Entrar"}
             title={user ? `${user.email}` : "Entrar"}
-            className="hover:text-accent transition-colors"
+            className="hidden hover:text-accent transition-colors md:inline-flex"
           >
             <UserIcon className="h-4 w-4" strokeWidth={1.5} />
           </button>
@@ -482,7 +493,7 @@ function Nav({
             onClick={open}
             className="relative hover:text-accent transition-colors"
           >
-            <ShoppingBag className="h-4 w-4" strokeWidth={1.5} />
+            <ShoppingBag className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.5} />
             {count > 0 && (
               <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-medium text-charcoal">
                 {count}
@@ -495,7 +506,7 @@ function Nav({
                 to="/pedidos"
                 aria-label="Controle de Pedidos"
                 title="Controle de Pedidos"
-                className="hover:text-accent transition-colors"
+                className="hidden hover:text-accent transition-colors md:inline-flex"
               >
                 <Package className="h-4 w-4" strokeWidth={1.5} />
               </Link>
@@ -503,7 +514,7 @@ function Nav({
                 aria-label="Painel Admin"
                 onClick={onOpenAdmin}
                 title="Painel Admin"
-                className="relative hover:text-accent transition-colors"
+                className="relative hidden hover:text-accent transition-colors md:inline-flex"
               >
                 <Settings className="h-4 w-4" strokeWidth={1.5} />
                 <span className="absolute -right-2 -top-2 h-1.5 w-1.5 rounded-full bg-accent" />
@@ -516,6 +527,121 @@ function Nav({
     </header>
   );
 }
+
+/* ---------- Mobile Menu Drawer ---------- */
+function MobileMenu({
+  open,
+  onClose,
+  onOpenAccount,
+  onOpenFilter,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onOpenAccount: () => void;
+  onOpenFilter: () => void;
+}) {
+  const { user, openAuth } = useAuth();
+  const { setTab } = useSearch();
+  const goTo = (id: string) => {
+    onClose();
+    setTimeout(
+      () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }),
+      180,
+    );
+  };
+  return (
+    <>
+      <div
+        onClick={onClose}
+        className={`fixed inset-0 z-[85] bg-charcoal/60 backdrop-blur-sm transition-opacity duration-400 md:hidden ${
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      />
+      <aside
+        className={`fixed inset-y-0 left-0 z-[90] flex w-[88%] max-w-sm flex-col bg-[color:var(--ivory)] text-foreground shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:hidden ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-border px-6 py-5">
+          <span className="font-serif text-lg tracking-wider">
+            A<span className="text-accent">&amp;</span>S Concept
+          </span>
+          <button onClick={onClose} aria-label="Fechar menu" className="hover:text-accent">
+            <X className="h-5 w-5" strokeWidth={1.25} />
+          </button>
+        </div>
+
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-6 py-8">
+          <p className="mb-3 text-[10px] tracking-luxe uppercase text-muted-foreground">
+            Coleção
+          </p>
+          <button
+            onClick={() => {
+              setTab("clothes");
+              goTo("collections");
+            }}
+            className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
+          >
+            Roupas
+          </button>
+          <button
+            onClick={() => {
+              setTab("sneakers");
+              goTo("collections");
+            }}
+            className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
+          >
+            Sneakers
+          </button>
+          <button
+            onClick={() => {
+              onClose();
+              onOpenFilter();
+            }}
+            className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
+          >
+            Filtrar
+          </button>
+
+          <p className="mb-3 mt-8 text-[10px] tracking-luxe uppercase text-muted-foreground">
+            Editorial
+          </p>
+          <button
+            onClick={() => goTo("edit")}
+            className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
+          >
+            O Editorial
+          </button>
+          <button
+            onClick={() => goTo("about")}
+            className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
+          >
+            Sobre a Marca
+          </button>
+
+          <p className="mb-3 mt-8 text-[10px] tracking-luxe uppercase text-muted-foreground">
+            Conta
+          </p>
+          <button
+            onClick={() => {
+              onClose();
+              if (user) onOpenAccount();
+              else openAuth();
+            }}
+            className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
+          >
+            {user ? "Minha Conta" : "Entrar / Criar Conta"}
+          </button>
+        </nav>
+
+        <div className="border-t border-border px-6 py-5 text-[10px] tracking-luxe uppercase text-muted-foreground">
+          A&amp;S Concept — Herança Curada
+        </div>
+      </aside>
+    </>
+  );
+}
+
 
 /* ---------- Hero ---------- */
 function Hero() {
