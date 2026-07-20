@@ -25,7 +25,7 @@ const shell = (title: string, preheader: string, inner: string) => `
           <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #E9E4D6;">
             <tr>
               <td style="padding:32px 40px;border-bottom:1px solid #E9E4D6;text-align:center;">
-                <div style="font-family:'Playfair Display',Georgia,serif;font-size:22px;letter-spacing:0.35em;color:${BRAND.charcoal};">A&amp;S CONCEPT</div>
+                <div style="font-family:'Playfair Display',Georgia,serif;font-size:22px;letter-spacing:0.35em;color:${BRAND.charcoal};">A&amp;S CONCCEPT</div>
                 <div style="margin-top:6px;font-size:10px;letter-spacing:0.32em;color:${BRAND.gold};text-transform:uppercase;">The New Era of Heritage</div>
               </td>
             </tr>
@@ -34,7 +34,7 @@ const shell = (title: string, preheader: string, inner: string) => `
             </tr>
             <tr>
               <td style="padding:24px 40px;border-top:1px solid #E9E4D6;text-align:center;font-size:11px;color:#7A7568;letter-spacing:0.14em;">
-                A&amp;S Concept · Curitiba/PR · Brasil<br />
+                A&amp;S Conccept · Curitiba/PR · Brasil<br />
                 <span style="color:${BRAND.gold};">✦</span> Este e-mail foi enviado porque você realizou uma ação em nossa boutique digital.
               </td>
             </tr>
@@ -67,7 +67,7 @@ export function welcomeTemplate(email: string, name?: string) {
       Prezado(a) <strong>${escapeHtml(display)}</strong>,
     </p>
     <p style="font-size:14px;line-height:1.7;color:${BRAND.charcoal};margin:0 0 20px;">
-      É com imenso prazer que damos boas-vindas à A&amp;S Concept — uma casa dedicada à alfaiataria contemporânea
+      É com imenso prazer que damos boas-vindas à A&amp;S Conccept — uma casa dedicada à alfaiataria contemporânea
       e à herança do bom gosto. Sua conta está ativa e pronta para acompanhar as edições limitadas da temporada.
     </p>
     <div style="margin:28px 0;padding:20px;border:1px solid ${BRAND.gold};background:${BRAND.ivory};">
@@ -81,8 +81,8 @@ export function welcomeTemplate(email: string, name?: string) {
       <em style="font-family:'Playfair Display',Georgia,serif;color:${BRAND.navy};">Ateliê A&amp;S</em>
     </p>`;
   return {
-    subject: "Bem-vindo(a) à A&S Concept",
-    html: shell("Bem-vindo à A&S Concept", `Olá ${display}, sua conta A&S está ativa.`, inner),
+    subject: "Bem-vindo(a) à A&S Conccept",
+    html: shell("Bem-vindo à A&S Conccept", `Olá ${display}, sua conta A&S está ativa.`, inner),
   };
 }
 
@@ -128,9 +128,9 @@ export function orderCreatedTemplate(
       Você receberá novas notificações a cada avanço do pedido — do preparo à entrega.
     </p>`;
   return {
-    subject: `Pedido ${orderId} confirmado — A&S Concept`,
+    subject: `Pedido ${orderId} confirmado — A&S Conccept`,
     html: shell(
-      "Confirmação de pedido — A&S Concept",
+      "Confirmação de pedido — A&S Conccept",
       `Pedido ${orderId} confirmado · ${brl(total)}`,
       inner,
     ),

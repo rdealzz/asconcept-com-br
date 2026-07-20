@@ -19,8 +19,8 @@ export const Route = createFileRoute("/pedidos/")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Meus Pedidos — A&S Concept" },
-      { name: "description", content: "Acompanhe o status dos seus pedidos A&S Concept." },
+      { title: "Meus Pedidos — A&S Conccept" },
+      { name: "description", content: "Acompanhe o status dos seus pedidos A&S Conccept." },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -89,7 +89,7 @@ function OrdersPage() {
           >
             <ChevronLeft className="h-4 w-4" /> Voltar à loja
           </Link>
-          <span className="font-serif text-xl tracking-widest">A&S Concept</span>
+          <span className="font-serif text-xl tracking-widest">A&S Conccept</span>
           <span className="w-24" />
         </div>
       </header>
