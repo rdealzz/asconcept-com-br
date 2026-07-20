@@ -635,7 +635,7 @@ function MobileMenu({
         </nav>
 
         <div className="border-t border-border px-6 py-5 text-[10px] tracking-luxe uppercase text-muted-foreground">
-          A&amp;S Concept — Herança Curada
+          A&amp;S Conccept — Herança Curada
         </div>
       </aside>
     </>
@@ -649,7 +649,7 @@ function Hero() {
     <section className="relative h-[100svh] w-full overflow-hidden">
       <img
         src={hero}
-        alt="Editorial A&S Concept"
+        alt="Editorial A&S Conccept"
         width={1920}
         height={1280}
         className="absolute inset-0 h-full w-full object-cover object-[65%_center] md:object-center"
@@ -1112,7 +1112,7 @@ function ProductModal() {
             </div>
 
             <div className="flex flex-col p-6 md:p-12">
-              <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Concept</p>
+              <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Conccept</p>
               <h2 className="mt-3 font-serif text-2xl leading-tight md:text-4xl">{active.name}</h2>
               <p className="mt-3 text-lg tabular-nums">{formatBRL(active.price)}</p>
               <p className="mt-1 text-[11px] font-light italic tracking-wide text-[color:var(--gold)]">
@@ -1561,7 +1561,7 @@ function Concept() {
         <div className="relative overflow-hidden">
           <img
             src={editorial}
-            alt="Editorial A&S Concept"
+            alt="Editorial A&S Conccept"
             loading="lazy"
             width={1200}
             height={1500}
@@ -1581,7 +1581,7 @@ function Concept() {
               Uma elegância silenciosa, herdada e reinterpretada.
             </h2>
             <p className="mt-8 text-sm md:text-base leading-relaxed text-ivory/75 font-light">
-              A&amp;S Concept é um estudo de contenção — um guarda-roupa moderno traçado a partir
+              A&amp;S Conccept é um estudo de contenção — um guarda-roupa moderno traçado a partir
               dos códigos do old money, feito para uma geração que valoriza a discrição acima da
               ostentação.
             </p>
@@ -1681,7 +1681,7 @@ const INSTITUTIONAL_CONTENT: Record<
     eyebrow: "Manifesto",
     title: "O Conceito",
     paragraphs: [
-      "A&S Concept nasce de um desejo antigo: devolver ao guarda-roupa contemporâneo a dignidade da alfaiataria atemporal, distante das oscilações efêmeras das temporadas. Cada peça é pensada como um pequeno patrimônio — algo que atravessa décadas sem ceder ao ruído das tendências.",
+      "A&S Conccept nasce de um desejo antigo: devolver ao guarda-roupa contemporâneo a dignidade da alfaiataria atemporal, distante das oscilações efêmeras das temporadas. Cada peça é pensada como um pequeno patrimônio — algo que atravessa décadas sem ceder ao ruído das tendências.",
       "Nossa curadoria seleciona ateliês europeus e brasileiros que ainda entendem o valor de uma costura invisível, de um forro talhado à mão e do tempo generoso concedido a cada corte. O luxo, aqui, é silencioso: reside no toque, no caimento, na permanência.",
       "Cada coleção é apresentada em edições contidas, produzidas sob encomenda ou em séries limitadas — nunca em escala. É a nossa forma de recusar o excesso e preservar o gesto artesanal que define a maison.",
     ],
@@ -1691,7 +1691,7 @@ const INSTITUTIONAL_CONTENT: Record<
     title: "A Filosofia",
     paragraphs: [
       "Acreditamos que a elegância não se anuncia. Ela se percebe. É por isso que trabalhamos com paletas discretas — marfim, navy, charcoal e ouro velho — e com materiais nobres cuja beleza cresce com o uso: linhos italianos, cashmeres escoceses, couros vegetais curtidos ao tempo.",
-      "Recusamos a lógica descartável do consumo acelerado. Cada cliente da A&S Concept recebe uma peça acompanhada de sua origem, do nome do ateliê e de instruções de cuidado que asseguram sua longevidade. Reparo, ajuste e restauração fazem parte do nosso serviço vitalício.",
+      "Recusamos a lógica descartável do consumo acelerado. Cada cliente da A&S Conccept recebe uma peça acompanhada de sua origem, do nome do ateliê e de instruções de cuidado que asseguram sua longevidade. Reparo, ajuste e restauração fazem parte do nosso serviço vitalício.",
       "Nossa filosofia é, sobretudo, uma escolha ética: menos peças, melhor confecção, respeito ao artesão e ao vestir. É luxo que se afirma pela sobriedade — e permanece.",
     ],
   },
@@ -1699,17 +1699,17 @@ const INSTITUTIONAL_CONTENT: Record<
     eyebrow: "Documento Legal",
     title: "Termos e Condições",
     paragraphs: [
-      "Ao utilizar o site A&S Concept, o cliente concorda com as diretrizes de compra, pagamento, envio, troca e cancelamento aqui descritas. Os preços são apresentados em Reais (BRL) e podem sofrer atualizações periódicas conforme a variação cambial dos ateliês parceiros.",
+      "Ao utilizar o site A&S Conccept, o cliente concorda com as diretrizes de compra, pagamento, envio, troca e cancelamento aqui descritas. Os preços são apresentados em Reais (BRL) e podem sofrer atualizações periódicas conforme a variação cambial dos ateliês parceiros.",
       "Os pedidos são processados em até 3 dias úteis. Peças sob encomenda podem exigir prazo adicional de produção, informado no ato da compra. O envio é realizado por transportadora rastreada, com seguro integral do valor declarado.",
       "Trocas por defeito de fabricação ou divergência de tamanho podem ser solicitadas em até 30 dias corridos após a entrega. O produto deve ser devolvido em sua embalagem original, sem sinais de uso. Reservamo-nos o direito de recusar itens fora dessas condições.",
-      "Este documento constitui um contrato eletrônico entre a A&S Concept e o cliente, regido pelas leis brasileiras. Eventuais disputas serão dirimidas no foro da comarca de São Paulo/SP.",
+      "Este documento constitui um contrato eletrônico entre a A&S Conccept e o cliente, regido pelas leis brasileiras. Eventuais disputas serão dirimidas no foro da comarca de São Paulo/SP.",
     ],
   },
   privacidade: {
     eyebrow: "Compromisso",
     title: "Políticas de Privacidade",
     paragraphs: [
-      "A A&S Concept trata os dados pessoais de seus clientes com o mesmo rigor com que cuida de suas peças: com discrição, cuidado e propósito. Coletamos apenas as informações necessárias para processar pedidos, oferecer atendimento personalizado e manter comunicação editorial pertinente.",
+      "A A&S Conccept trata os dados pessoais de seus clientes com o mesmo rigor com que cuida de suas peças: com discrição, cuidado e propósito. Coletamos apenas as informações necessárias para processar pedidos, oferecer atendimento personalizado e manter comunicação editorial pertinente.",
       "Nenhum dado é compartilhado com terceiros para fins publicitários. Utilizamos protocolos criptográficos padrão de mercado para armazenar e transmitir informações sensíveis, como e-mail, endereço e telefone.",
       "O cliente pode, a qualquer momento, solicitar a exclusão, correção ou exportação de seus dados enviando um e-mail ao concierge da maison. Cumprimos integralmente a Lei Geral de Proteção de Dados (LGPD).",
       "Cookies são utilizados apenas para manter sua sessão ativa e mensurar o desempenho do site — nunca para rastreamento invasivo ou revenda de perfil.",
@@ -1835,7 +1835,7 @@ function Footer() {
           </div>
         </div>
         <div className="mt-16 flex flex-col justify-between gap-4 border-t border-ivory/10 pt-8 text-[11px] text-ivory/50 md:flex-row">
-          <p>© {new Date().getFullYear()} A&amp;S Concept. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} A&amp;S Conccept. Todos os direitos reservados.</p>
           <p className="tracking-luxe uppercase">Feito com propósito · Preços em BRL</p>
         </div>
       </div>
@@ -2623,7 +2623,7 @@ function ConfirmDialog({
       <div onClick={onCancel} className="fixed inset-0 z-[110] bg-charcoal/70 backdrop-blur-sm" />
       <div className="fixed inset-0 z-[115] flex items-center justify-center p-4">
         <div className="pointer-events-auto w-full max-w-md bg-background p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-          <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Concept · Confirmação</p>
+          <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Conccept · Confirmação</p>
           <h3 className="mt-2 font-serif text-2xl">{title}</h3>
           <p className="mt-4 text-sm text-muted-foreground">{message}</p>
           <div className="mt-8 flex justify-end gap-3">
@@ -2765,7 +2765,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
           </button>
           <div className="border-b border-border px-8 py-6">
             <p className="flex items-center gap-2 text-[11px] tracking-luxe uppercase text-accent">
-              <Shield className="h-3 w-3" /> Painel Admin · A&amp;S Concept
+              <Shield className="h-3 w-3" /> Painel Admin · A&amp;S Conccept
             </p>
             <h2 className="mt-1 font-serif text-3xl">Gestão Interna</h2>
           </div>
@@ -3983,7 +3983,7 @@ function WelcomeCouponPopup() {
             Um presente<br />de estreia ✦
           </h2>
           <p className="mt-4 text-sm font-light text-charcoal/80">
-            Sua adesão à A&amp;S Concept desbloqueia 10% de desconto na primeira compra.
+            Sua adesão à A&amp;S Conccept desbloqueia 10% de desconto na primeira compra.
           </p>
           <div className="mt-6 border border-dashed border-[color:var(--gold)] bg-white p-4 text-center">
             <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">Cupom exclusivo</p>
