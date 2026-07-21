@@ -409,6 +409,14 @@ function CheckoutForm({
           </aside>
         </div>
       </div>
+      <StripeCheckoutModal
+        open={stripeOpen}
+        onClose={() => setStripeOpen(false)}
+        input={stripeInput}
+        onOrderCreated={() => {
+          /* pedido criado no servidor; confirmação acontece em /checkout/return */
+        }}
+      />
     </Shell>
   );
 }
