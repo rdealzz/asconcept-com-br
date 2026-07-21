@@ -95,6 +95,7 @@ export type Database = {
           shipping_cost: number
           status: string
           stock_decremented: boolean
+          stripe_session_id: string | null
           subtotal: number
           total: number
           tracking_code: string | null
@@ -115,6 +116,7 @@ export type Database = {
           shipping_cost?: number
           status?: string
           stock_decremented?: boolean
+          stripe_session_id?: string | null
           subtotal?: number
           total?: number
           tracking_code?: string | null
@@ -135,6 +137,7 @@ export type Database = {
           shipping_cost?: number
           status?: string
           stock_decremented?: boolean
+          stripe_session_id?: string | null
           subtotal?: number
           total?: number
           tracking_code?: string | null

@@ -18,6 +18,8 @@ import { triggerOrderCreatedMail } from "@/lib/mail";
 import { supabase } from "@/integrations/supabase/client";
 import { markCouponUsed } from "@/lib/coupons";
 import { placeSecureOrder } from "@/lib/checkout.functions";
+import { StripeCheckoutModal } from "@/components/StripeCheckoutModal";
+import { isPaymentsConfigured } from "@/lib/stripe";
 import type { CheckoutAddress, PaymentMethod } from "@/lib/types";
 import {
   formatCep,
@@ -146,6 +148,17 @@ function CheckoutForm({
   const [payment, setPayment] = useState<PaymentMethod>("pix");
   const [placing, setPlacing] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [stripeOpen, setStripeOpen] = useState(false);
+  const [stripeInput, setStripeInput] = useState<
+    | {
+        items: { id: string; quantity: number; size: "P" | "M" | "G" | "GG" }[];
+        customerName: string;
+        customerEmail: string;
+        address: Record<string, unknown>;
+        couponCode: string | null;
+      }
+    | null
+  >(null);
 
   // Estado do cartão de crédito (só para animação — não persiste, não envia a lugar nenhum)
   const [card, setCard] = useState({ number: "", name: "", expiry: "", cvv: "" });
@@ -226,26 +239,24 @@ function CheckoutForm({
   const placeOrder = async () => {
     setFormError(null);
     if (payment === "credit_card") {
-      const digits = card.number.replace(/\D/g, "");
-      if (digits.length < 13) {
-        setFormError("Número do cartão inválido.");
+      if (!isPaymentsConfigured()) {
+        setFormError(
+          "Pagamento com cartão indisponível: complete a configuração de pagamentos.",
+        );
         return;
       }
-      if (!card.name.trim()) {
-        setFormError("Informe o nome impresso no cartão.");
-        return;
-      }
-      if (!/^\d{2}\/\d{2}$/.test(card.expiry)) {
-        setFormError("Validade no formato MM/AA.");
-        return;
-      }
-      if (card.cvv.length < 3) {
-        setFormError("CVV inválido.");
-        return;
-      }
+      setStripeInput({
+        items: items.map((i) => ({ id: i.id, quantity: i.qty, size: i.size as "P" | "M" | "G" | "GG" })),
+        customerName: customerName.trim(),
+        customerEmail: email,
+        address: { ...address, cep: formatCep(address.cep) },
+        couponCode: couponCode ?? null,
+      });
+      setStripeOpen(true);
+      return;
     }
     setPlacing(true);
-    await new Promise((r) => setTimeout(r, 900));
+    await new Promise((r) => setTimeout(r, 400));
     const orderItems = items.map((i) => ({
       id: i.id,
       name: i.name,
@@ -398,6 +409,14 @@ function CheckoutForm({
           </aside>
         </div>
       </div>
+      <StripeCheckoutModal
+        open={stripeOpen}
+        onClose={() => setStripeOpen(false)}
+        input={stripeInput}
+        onOrderCreated={() => {
+          /* pedido criado no servidor; confirmação acontece em /checkout/return */
+        }}
+      />
     </Shell>
   );
 }
