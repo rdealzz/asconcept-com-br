@@ -136,6 +136,7 @@ function RootComponent() {
       <AuthProvider>
         <CartProvider>
           <OrdersProvider>
+            <PaymentTestModeBanner />
             {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
             <Outlet />
           </OrdersProvider>
