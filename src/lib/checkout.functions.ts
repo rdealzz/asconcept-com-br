@@ -307,17 +307,17 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
         },
       }));
 
-      const shippingOptions: import("stripe").Stripe.Checkout.SessionCreateParams.ShippingOption[] =
+      const shippingOptions =
         subtotal >= FREE_SHIPPING_MIN
           ? [
               {
                 shipping_rate_data: {
-                  type: "fixed_amount",
+                  type: "fixed_amount" as const,
                   display_name: "Frete grátis — envio nacional",
                   fixed_amount: { amount: 0, currency: "brl" },
                   delivery_estimate: {
-                    minimum: { unit: "business_day", value: 3 },
-                    maximum: { unit: "business_day", value: 9 },
+                    minimum: { unit: "business_day" as const, value: 3 },
+                    maximum: { unit: "business_day" as const, value: 9 },
                   },
                 },
               },
@@ -325,16 +325,17 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
           : [
               {
                 shipping_rate_data: {
-                  type: "fixed_amount",
+                  type: "fixed_amount" as const,
                   display_name: "Envio nacional",
                   fixed_amount: { amount: FLAT_SHIPPING_CENTS, currency: "brl" },
                   delivery_estimate: {
-                    minimum: { unit: "business_day", value: 3 },
-                    maximum: { unit: "business_day", value: 9 },
+                    minimum: { unit: "business_day" as const, value: 3 },
+                    maximum: { unit: "business_day" as const, value: 9 },
                   },
                 },
               },
             ];
+
 
       const sessionParams: import("stripe").Stripe.Checkout.SessionCreateParams = {
         mode: "payment",
