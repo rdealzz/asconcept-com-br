@@ -337,7 +337,7 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
             ];
 
 
-      const sessionParams: import("stripe").Stripe.Checkout.SessionCreateParams = {
+      const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {
         mode: "payment",
         payment_method_types: ["card", "pix"],
         currency: "brl",
@@ -356,6 +356,7 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
           metadata: { orderNumber, userId },
         },
       };
+
 
       if (discount > 0) {
         const coupon = await stripe.coupons.create({
