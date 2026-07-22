@@ -54,8 +54,8 @@ function SucessoPage() {
         });
         if (cancelled) return;
         if (res.paid) {
-          if (coupon) markCouponUsed(coupon.code);
           clear();
+
           setState({ kind: "paid", orderNumber: res.orderNumber });
         } else {
           setState({ kind: "pending", orderNumber: res.orderNumber });
