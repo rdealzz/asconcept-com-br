@@ -67,13 +67,13 @@ function validateInput(raw: unknown): CheckoutInput {
   };
 }
 
+// Fluxo legado (Pix/Boleto manual e cadastros administrativos).
 export const placeSecureOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateInput)
   .handler(async ({ data, context }): Promise<CheckoutResult> => {
     const { supabase, userId } = context;
 
-    // Preços canônicos vindos do banco — o cliente não influencia o valor.
     const ids = Array.from(new Set(data.items.map((i) => i.id)));
     const { data: rows, error: fetchErr } = await supabase
       .from("products")
@@ -104,36 +104,26 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
 
     const subtotal = orderItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
 
-    // Frete recomputado a partir do CEP validado — nunca aceita valor do cliente.
     const rawCep = (data.address as { cep?: unknown }).cep;
     const cep = typeof rawCep === "string" ? normalizeCep(rawCep) : "";
     const quote = quoteShipping(cep, subtotal);
     if (!quote) throw new Error("CEP inválido para cálculo de frete.");
     const shippingCost = quote.displayCost;
 
-    // Desconto recomputado a partir da lista canônica de cupons + regra PIX.
     let couponDiscount = 0;
     let acceptedCoupon: string | null = null;
     if (data.couponCode) {
       const coupon = AVAILABLE_COUPONS.find(
         (c) => c.code.toUpperCase() === data.couponCode,
       );
-      if (!coupon) {
-        throw new Error(
-          "Cupom inválido. Remova o cupom aplicado e refaça o cálculo do pedido.",
-        );
-      }
+      if (!coupon) throw new Error("Cupom inválido.");
       const { data: prior } = await supabase
         .from("coupon_uses")
         .select("id")
         .eq("user_id", userId)
         .eq("code", coupon.code.toUpperCase())
         .maybeSingle();
-      if (prior) {
-        throw new Error(
-          "Este cupom já foi utilizado. Remova o cupom aplicado para prosseguir com o pedido.",
-        );
-      }
+      if (prior) throw new Error("Este cupom já foi utilizado.");
       couponDiscount = calcDiscount(coupon, subtotal);
       acceptedCoupon = coupon.code.toUpperCase();
     }
@@ -165,8 +155,6 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
       discount,
     };
 
-    // Inserção privilegiada: a política RLS de INSERT foi removida em orders,
-    // forçando todo cadastro de pedido a passar por esta função autenticada.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: inserted, error: insertErr } = await supabaseAdmin
       .from("orders")
@@ -187,25 +175,23 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
   });
 
 // ============================================================================
-// Stripe Embedded Checkout — pagamento com cartão
+// Stripe Hosted Checkout — redireciona direto para a página segura do Stripe.
 // ============================================================================
 
-type StripeCheckoutInput = {
+type HostedCheckoutInput = {
   items: CheckoutItemInput[];
-  customerName: string;
-  customerEmail: string;
-  address: Record<string, unknown>;
   couponCode: string | null;
   environment: "sandbox" | "live";
-  returnUrl: string;
+  successUrl: string;
+  cancelUrl: string;
 };
 
-type StripeCheckoutResult =
-  | { clientSecret: string; orderNumber: string; total: number }
+type HostedCheckoutResult =
+  | { url: string; orderNumber: string }
   | { error: string };
 
-function validateStripeInput(raw: unknown): StripeCheckoutInput {
-  const d = raw as Partial<StripeCheckoutInput>;
+function validateHostedInput(raw: unknown): HostedCheckoutInput {
+  const d = raw as Partial<HostedCheckoutInput>;
   if (!d || typeof d !== "object") throw new Error("Payload inválido.");
   if (!Array.isArray(d.items) || d.items.length === 0) throw new Error("Sua sacola está vazia.");
   const items: CheckoutItemInput[] = d.items.map((it) => {
@@ -220,24 +206,29 @@ function validateStripeInput(raw: unknown): StripeCheckoutInput {
   if (d.environment !== "sandbox" && d.environment !== "live") {
     throw new Error("Ambiente de pagamento inválido.");
   }
-  const returnUrl = typeof d.returnUrl === "string" ? d.returnUrl : "";
-  if (!returnUrl.startsWith("http")) throw new Error("URL de retorno inválida.");
+  const successUrl = typeof d.successUrl === "string" ? d.successUrl : "";
+  const cancelUrl = typeof d.cancelUrl === "string" ? d.cancelUrl : "";
+  if (!successUrl.startsWith("http") || !cancelUrl.startsWith("http")) {
+    throw new Error("URLs de retorno inválidas.");
+  }
   return {
     items,
-    customerName: sanitize(d.customerName, 120),
-    customerEmail: sanitize(d.customerEmail, 254).toLowerCase(),
-    address: (d.address ?? {}) as Record<string, unknown>,
     couponCode: d.couponCode ? sanitize(d.couponCode, 40).toUpperCase() : null,
     environment: d.environment,
-    returnUrl,
+    successUrl,
+    cancelUrl,
   };
 }
 
-export const createStripeCheckoutSession = createServerFn({ method: "POST" })
+const FLAT_SHIPPING_CENTS = 3990; // R$ 39,90 quando abaixo do frete grátis.
+const FREE_SHIPPING_MIN = 249.99;
+
+export const createStripeHostedSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(validateStripeInput)
-  .handler(async ({ data, context }): Promise<StripeCheckoutResult> => {
-    const { supabase, userId } = context;
+  .inputValidator(validateHostedInput)
+  .handler(async ({ data, context }): Promise<HostedCheckoutResult> => {
+    const { supabase, userId, claims } = context;
+    const customerEmail = (claims?.email as string | undefined)?.toLowerCase() ?? "";
 
     const ids = Array.from(new Set(data.items.map((i) => i.id)));
     const { data: rows, error: fetchErr } = await supabase
@@ -257,31 +248,25 @@ export const createStripeCheckoutSession = createServerFn({ method: "POST" })
 
     const subtotal = orderItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
 
-    const rawCep = (data.address as { cep?: unknown }).cep;
-    const cep = typeof rawCep === "string" ? normalizeCep(rawCep) : "";
-    const quote = quoteShipping(cep, subtotal);
-    if (!quote) throw new Error("CEP inválido para cálculo de frete.");
-    const shippingCost = quote.displayCost;
-
     let couponDiscount = 0;
     let acceptedCoupon: string | null = null;
     if (data.couponCode) {
       const coupon = AVAILABLE_COUPONS.find((c) => c.code.toUpperCase() === data.couponCode);
-      if (!coupon) throw new Error("Cupom inválido. Remova o cupom para continuar.");
+      if (!coupon) return { error: "Cupom inválido. Remova o cupom para continuar." };
       const { data: prior } = await supabase
         .from("coupon_uses")
         .select("id")
         .eq("user_id", userId)
         .eq("code", coupon.code.toUpperCase())
         .maybeSingle();
-      if (prior) throw new Error("Este cupom já foi utilizado. Remova o cupom para continuar.");
+      if (prior) return { error: "Este cupom já foi utilizado. Remova o cupom para continuar." };
       couponDiscount = calcDiscount(coupon, subtotal);
       acceptedCoupon = coupon.code.toUpperCase();
     }
 
     const discount = Math.min(subtotal, couponDiscount);
-    const total = Math.max(0, subtotal - discount + shippingCost);
-    if (total < 1) throw new Error("Valor do pedido é inválido.");
+    const netProducts = Math.max(0, subtotal - discount);
+    if (netProducts < 1) return { error: "Valor do pedido é inválido." };
 
     const rand = Math.floor(100000 + Math.random() * 900000);
     const orderNumber = `AS-${rand}`;
@@ -292,62 +277,107 @@ export const createStripeCheckoutSession = createServerFn({ method: "POST" })
       .insert({
         order_number: orderNumber,
         user_id: userId,
-        customer_email: data.customerEmail,
-        customer_name: data.customerName || null,
+        customer_email: customerEmail,
+        customer_name: null,
         items: orderItems,
-        address: data.address,
-        shipping_cost: shippingCost,
+        address: {},
+        shipping_cost: 0,
         subtotal,
-        total,
-        payment_method: "credit_card",
+        total: netProducts,
+        payment_method: "stripe",
         status: "Aguardando Pagamento",
         coupon_code: acceptedCoupon,
         discount,
       } as never);
-    if (insertErr) throw new Error(insertErr.message);
+    if (insertErr) return { error: insertErr.message };
 
     try {
       const { createStripeClient, getStripeErrorMessage } = await import("@/lib/stripe.server");
       const stripe = createStripeClient(data.environment);
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        ui_mode: "embedded_page",
-        return_url: data.returnUrl,
-        customer_email: data.customerEmail,
-        line_items: [
-          {
-            quantity: 1,
-            price_data: {
-              currency: "brl",
-              unit_amount: Math.round(total * 100),
-              product_data: {
-                name: `Pedido ${orderNumber} — A&S Conccept`,
-                description: orderItems
-                  .map((i) => `${i.quantity}× ${i.name} (${i.size})`)
-                  .join(" · ")
-                  .slice(0, 500),
-              },
-            },
+
+      const lineItems = orderItems.map((i) => ({
+        quantity: i.quantity,
+        price_data: {
+          currency: "brl",
+          unit_amount: Math.round(i.price * 100),
+          product_data: {
+            name: `${i.name} — Tam. ${i.size}`,
+            images: i.image ? [i.image] : undefined,
           },
-        ],
+        },
+      }));
+
+      const shippingOptions =
+        subtotal >= FREE_SHIPPING_MIN
+          ? [
+              {
+                shipping_rate_data: {
+                  type: "fixed_amount" as const,
+                  display_name: "Frete grátis — envio nacional",
+                  fixed_amount: { amount: 0, currency: "brl" },
+                  delivery_estimate: {
+                    minimum: { unit: "business_day" as const, value: 3 },
+                    maximum: { unit: "business_day" as const, value: 9 },
+                  },
+                },
+              },
+            ]
+          : [
+              {
+                shipping_rate_data: {
+                  type: "fixed_amount" as const,
+                  display_name: "Envio nacional",
+                  fixed_amount: { amount: FLAT_SHIPPING_CENTS, currency: "brl" },
+                  delivery_estimate: {
+                    minimum: { unit: "business_day" as const, value: 3 },
+                    maximum: { unit: "business_day" as const, value: 9 },
+                  },
+                },
+              },
+            ];
+
+
+      const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {
+        mode: "payment",
+        payment_method_types: ["card", "pix"],
+        currency: "brl",
+        locale: "pt-BR",
+        customer_email: customerEmail || undefined,
+        line_items: lineItems,
+        billing_address_collection: "required",
+        shipping_address_collection: { allowed_countries: ["BR"] },
+        shipping_options: shippingOptions,
+        phone_number_collection: { enabled: true },
+        success_url: `${data.successUrl}?order=${orderNumber}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: data.cancelUrl,
+        metadata: { orderNumber, userId },
         payment_intent_data: {
           description: `A&S Conccept · Pedido ${orderNumber}`,
+          metadata: { orderNumber, userId },
         },
-        metadata: { orderNumber, userId: userId },
-      });
+      };
+
+
+      if (discount > 0) {
+        const coupon = await stripe.coupons.create({
+          amount_off: Math.round(discount * 100),
+          currency: "brl",
+          duration: "once",
+          name: acceptedCoupon ? `Cupom ${acceptedCoupon}` : "Desconto",
+        });
+        sessionParams.discounts = [{ coupon: coupon.id }];
+      }
+
+      const session = await stripe.checkout.sessions.create(sessionParams);
 
       await supabaseAdmin
         .from("orders")
         .update({ stripe_session_id: session.id } as never)
         .eq("order_number", orderNumber);
 
-      return {
-        clientSecret: session.client_secret ?? "",
-        orderNumber,
-        total,
-      };
+      if (!session.url) return { error: "Stripe não retornou URL de checkout." };
+      return { url: session.url, orderNumber };
     } catch (error) {
-      // Se o Stripe falhar, marca o pedido como cancelado para não bloquear cupom/estoque.
       await supabaseAdmin
         .from("orders")
         .update({ status: "Falha no pagamento" } as never)
@@ -382,14 +412,31 @@ export const confirmStripePayment = createServerFn({ method: "POST" })
 
     const { createStripeClient } = await import("@/lib/stripe.server");
     const stripe = createStripeClient(data.environment);
-    const session = await stripe.checkout.sessions.retrieve(data.sessionId);
+    const session = await stripe.checkout.sessions.retrieve(data.sessionId, {
+      expand: ["customer_details", "shipping_details", "total_details"],
+    });
     const paid = session.payment_status === "paid" || session.status === "complete";
     if (!paid) return { orderNumber: order.order_number, status: order.status, paid: false };
+
+    const shipping = (session as unknown as { shipping_details?: { name?: string; address?: Record<string, unknown> } })
+      .shipping_details;
+    const customer = session.customer_details;
+    const addressPayload = shipping?.address ?? customer?.address ?? {};
+    const namePayload = shipping?.name ?? customer?.name ?? null;
+    const shippingCost = ((session.total_details?.amount_shipping ?? 0) as number) / 100;
+    const totalPaid = ((session.amount_total ?? 0) as number) / 100;
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
       .from("orders")
-      .update({ status: "Preparando pedido", updated_at: new Date().toISOString() } as never)
+      .update({
+        status: "Preparando pedido",
+        address: addressPayload as never,
+        customer_name: namePayload,
+        shipping_cost: shippingCost,
+        total: totalPaid,
+        updated_at: new Date().toISOString(),
+      } as never)
       .eq("order_number", order.order_number);
     if (!order.stock_decremented) {
       try {
