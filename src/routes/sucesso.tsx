@@ -7,7 +7,7 @@ import { Check, Loader2 } from "lucide-react";
 import { confirmStripePayment } from "@/lib/checkout.functions";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { useCart } from "@/lib/cart-context";
-import { markCouponUsed } from "@/lib/coupons";
+
 
 export const Route = createFileRoute("/sucesso")({
   ssr: false,
