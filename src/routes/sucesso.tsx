@@ -29,7 +29,7 @@ function SucessoPage() {
   const { session_id: sessionId, order } = Route.useSearch();
   const confirm = useServerFn(confirmStripePayment);
   const navigate = useNavigate();
-  const { clear, coupon } = useCart();
+  const { clear } = useCart();
   const [state, setState] = useState<
     | { kind: "loading" }
     | { kind: "paid"; orderNumber: string }
