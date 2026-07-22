@@ -71,7 +71,7 @@ function SucessoPage() {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, order, confirm, clear, coupon]);
+  }, [sessionId, order, confirm, clear]);
 
   return (
     <main className="min-h-screen bg-background px-6 py-24">
