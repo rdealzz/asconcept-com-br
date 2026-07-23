@@ -100,7 +100,7 @@ function OrderDetail() {
         <section className="mt-8 grid gap-6 sm:grid-cols-2">
           <div className="border border-border p-6">
             <h3 className="text-[11px] tracking-luxe uppercase text-muted-foreground">Endereço</h3>
-            <AddressBlock address={order.address} />
+            <AddressBlock address={order.address as unknown as Record<string, string | undefined>} />
           </div>
           <div className="border border-border p-6">
             <h3 className="text-[11px] tracking-luxe uppercase text-muted-foreground">Pagamento</h3>
