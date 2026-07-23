@@ -100,24 +100,19 @@ function OrderDetail() {
         <section className="mt-8 grid gap-6 sm:grid-cols-2">
           <div className="border border-border p-6">
             <h3 className="text-[11px] tracking-luxe uppercase text-muted-foreground">Endereço</h3>
-            <p className="mt-3 text-sm leading-relaxed">
-              {order.address.logradouro}, {order.address.numero}
-              {order.address.complemento ? ` — ${order.address.complemento}` : ""}
-              <br />
-              {order.address.bairro} — {order.address.cidade}/{order.address.uf}
-              <br />
-              CEP {order.address.cep}
-            </p>
+            <AddressBlock address={order.address as unknown as Record<string, string | undefined>} />
           </div>
           <div className="border border-border p-6">
             <h3 className="text-[11px] tracking-luxe uppercase text-muted-foreground">Pagamento</h3>
             <p className="mt-3 text-sm">{paymentLabel(order.paymentMethod)}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">
               {order.paymentMethod === "pix"
-                ? "QR Code enviado por e-mail (simulado)."
+                ? "QR Code enviado por e-mail."
                 : order.paymentMethod === "boleto"
-                  ? "Boleto disponível em até 1h (simulado)."
-                  : "Cobrança realizada no cartão informado (simulado)."}
+                  ? "Boleto disponível em até 1h."
+                  : order.paymentMethod === "stripe"
+                    ? "Pagamento confirmado pelo Stripe."
+                    : "Cobrança realizada no cartão informado."}
             </p>
           </div>
         </section>
@@ -142,3 +137,29 @@ function Shell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+function AddressBlock({ address }: { address: Record<string, string | undefined> }) {
+  const hasAny = Boolean(
+    address?.logradouro || address?.cidade || address?.cep || address?.uf,
+  );
+  if (!hasAny) {
+    return (
+      <p className="mt-3 text-sm text-muted-foreground italic">
+        Endereço será atualizado assim que o pagamento for confirmado.
+      </p>
+    );
+  }
+  const line1 = [address.logradouro, address.numero].filter(Boolean).join(", ");
+  const withComp = address.complemento ? `${line1} — ${address.complemento}` : line1;
+  const cityLine = [address.bairro, [address.cidade, address.uf].filter(Boolean).join("/")]
+    .filter(Boolean)
+    .join(" — ");
+  return (
+    <p className="mt-3 text-sm leading-relaxed">
+      {withComp}
+      {cityLine && (<><br />{cityLine}</>)}
+      {address.cep && (<><br />CEP {address.cep}</>)}
+    </p>
+  );
+}
+

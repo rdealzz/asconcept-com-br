@@ -418,13 +418,28 @@ export const confirmStripePayment = createServerFn({ method: "POST" })
     const paid = session.payment_status === "paid" || session.status === "complete";
     if (!paid) return { orderNumber: order.order_number, status: order.status, paid: false };
 
-    const shipping = (session as unknown as { shipping_details?: { name?: string; address?: Record<string, unknown> } })
+    const shipping = (session as unknown as { shipping_details?: { name?: string; address?: Record<string, string | null> } })
       .shipping_details;
     const customer = session.customer_details;
-    const addressPayload = shipping?.address ?? customer?.address ?? {};
+    const stripeAddr = (shipping?.address ?? customer?.address ?? {}) as Record<string, string | null>;
     const namePayload = shipping?.name ?? customer?.name ?? null;
     const shippingCost = ((session.total_details?.amount_shipping ?? 0) as number) / 100;
     const totalPaid = ((session.amount_total ?? 0) as number) / 100;
+
+    // Normaliza endereço do Stripe para o shape ViaCEP usado na UI.
+    const line1 = (stripeAddr.line1 ?? "").trim();
+    const numMatch = line1.match(/,\s*(\d[\w-]*)\s*$/);
+    const logradouro = numMatch ? line1.slice(0, numMatch.index).trim() : line1;
+    const numero = numMatch ? numMatch[1] : "";
+    const addressPayload = {
+      cep: (stripeAddr.postal_code ?? "").toString(),
+      logradouro,
+      numero,
+      complemento: (stripeAddr.line2 ?? "").toString(),
+      bairro: "",
+      cidade: (stripeAddr.city ?? "").toString(),
+      uf: (stripeAddr.state ?? "").toString(),
+    };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
@@ -438,6 +453,7 @@ export const confirmStripePayment = createServerFn({ method: "POST" })
         updated_at: new Date().toISOString(),
       } as never)
       .eq("order_number", order.order_number);
+
     if (!order.stock_decremented) {
       try {
         await (supabaseAdmin.rpc as unknown as (name: string, args: Record<string, unknown>) => Promise<unknown>)(

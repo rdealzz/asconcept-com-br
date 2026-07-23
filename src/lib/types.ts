@@ -17,7 +17,7 @@ export interface OrderItem {
   image: string;
 }
 
-export type PaymentMethod = "credit_card" | "pix" | "boleto";
+export type PaymentMethod = "credit_card" | "pix" | "boleto" | "stripe";
 
 export type OrderStatus =
   | "Aguardando Aprovação"
