@@ -809,5 +809,8 @@ function StatusIcon({ status }: { status: OrderStatus }) {
 }
 
 export function paymentLabel(m: Order["paymentMethod"]) {
-  return m === "pix" ? "PIX" : m === "credit_card" ? "Cartão de Crédito" : "Boleto";
+  if (m === "pix") return "PIX";
+  if (m === "credit_card") return "Cartão de Crédito";
+  if (m === "stripe") return "Stripe (Cartão / PIX)";
+  return "Boleto";
 }

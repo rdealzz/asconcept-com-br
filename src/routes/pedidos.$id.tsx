@@ -100,24 +100,19 @@ function OrderDetail() {
         <section className="mt-8 grid gap-6 sm:grid-cols-2">
           <div className="border border-border p-6">
             <h3 className="text-[11px] tracking-luxe uppercase text-muted-foreground">Endereço</h3>
-            <p className="mt-3 text-sm leading-relaxed">
-              {order.address.logradouro}, {order.address.numero}
-              {order.address.complemento ? ` — ${order.address.complemento}` : ""}
-              <br />
-              {order.address.bairro} — {order.address.cidade}/{order.address.uf}
-              <br />
-              CEP {order.address.cep}
-            </p>
+            <AddressBlock address={order.address} />
           </div>
           <div className="border border-border p-6">
             <h3 className="text-[11px] tracking-luxe uppercase text-muted-foreground">Pagamento</h3>
             <p className="mt-3 text-sm">{paymentLabel(order.paymentMethod)}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">
               {order.paymentMethod === "pix"
-                ? "QR Code enviado por e-mail (simulado)."
+                ? "QR Code enviado por e-mail."
                 : order.paymentMethod === "boleto"
-                  ? "Boleto disponível em até 1h (simulado)."
-                  : "Cobrança realizada no cartão informado (simulado)."}
+                  ? "Boleto disponível em até 1h."
+                  : order.paymentMethod === "stripe"
+                    ? "Pagamento confirmado pelo Stripe."
+                    : "Cobrança realizada no cartão informado."}
             </p>
           </div>
         </section>
