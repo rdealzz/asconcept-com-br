@@ -14,7 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "../lib/auth-context";
 import { CartProvider } from "../lib/cart-context";
 import { OrdersProvider } from "../lib/orders-context";
-import { PaymentTestModeBanner } from "../components/PaymentTestModeBanner";
+
 
 function NotFoundComponent() {
   return (
@@ -137,7 +137,7 @@ function RootComponent() {
       <AuthProvider>
         <CartProvider>
           <OrdersProvider>
-            <PaymentTestModeBanner />
+            
             {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
             <Outlet />
           </OrdersProvider>
