@@ -137,3 +137,29 @@ function Shell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+function AddressBlock({ address }: { address: Record<string, string | undefined> }) {
+  const hasAny = Boolean(
+    address?.logradouro || address?.cidade || address?.cep || address?.uf,
+  );
+  if (!hasAny) {
+    return (
+      <p className="mt-3 text-sm text-muted-foreground italic">
+        Endereço será atualizado assim que o pagamento for confirmado.
+      </p>
+    );
+  }
+  const line1 = [address.logradouro, address.numero].filter(Boolean).join(", ");
+  const withComp = address.complemento ? `${line1} — ${address.complemento}` : line1;
+  const cityLine = [address.bairro, [address.cidade, address.uf].filter(Boolean).join("/")]
+    .filter(Boolean)
+    .join(" — ");
+  return (
+    <p className="mt-3 text-sm leading-relaxed">
+      {withComp}
+      {cityLine && (<><br />{cityLine}</>)}
+      {address.cep && (<><br />CEP {address.cep}</>)}
+    </p>
+  );
+}
+
