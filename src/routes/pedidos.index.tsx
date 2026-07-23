@@ -600,14 +600,23 @@ function AdminOrderCard({ order }: { order: Order }) {
             <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]/80">
               Endereço
             </p>
-            <p className="text-charcoal">
-              {order.address.logradouro}, {order.address.numero}
-              {order.address.complemento ? ` — ${order.address.complemento}` : ""}
-            </p>
-            <p className="text-charcoal">
-              {order.address.bairro} · {order.address.cidade}/{order.address.uf}
-            </p>
-            <p>CEP {order.address.cep}</p>
+            {order.address?.logradouro || order.address?.cidade || order.address?.cep ? (
+              <>
+                <p className="text-charcoal">
+                  {order.address.logradouro}
+                  {order.address.numero ? `, ${order.address.numero}` : ""}
+                  {order.address.complemento ? ` — ${order.address.complemento}` : ""}
+                </p>
+                <p className="text-charcoal">
+                  {[order.address.bairro, [order.address.cidade, order.address.uf].filter(Boolean).join("/")]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                {order.address.cep && <p>CEP {order.address.cep}</p>}
+              </>
+            ) : (
+              <p className="italic">Endereço não informado.</p>
+            )}
           </div>
         </section>
 
