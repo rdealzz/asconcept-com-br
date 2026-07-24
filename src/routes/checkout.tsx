@@ -93,7 +93,7 @@ function CheckoutPage() {
       ...f,
       name: f.name || user.name || "",
       email: f.email || user.email || "",
-      phone: f.phone || (user.phone ? formatPhoneBR(user.phone) : ""),
+      phone: f.phone,
     }));
   }, [user]);
 
