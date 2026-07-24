@@ -178,17 +178,63 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
 // Stripe Hosted Checkout — redireciona direto para a página segura do Stripe.
 // ============================================================================
 
+type CustomerPayload = {
+  name: string;
+  email: string;
+  phone: string;
+  cep: string;
+  logradouro: string;
+  numero: string;
+  complemento?: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+};
+
 type HostedCheckoutInput = {
   items: CheckoutItemInput[];
   couponCode: string | null;
   environment: "sandbox" | "live";
   successUrl: string;
   cancelUrl: string;
+  origin: string;
+  customer: CustomerPayload;
 };
 
 type HostedCheckoutResult =
   | { url: string; orderNumber: string }
   | { error: string };
+
+const UF_SET = new Set([
+  "AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT",
+  "PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO",
+]);
+
+function validateCustomer(raw: unknown): CustomerPayload {
+  const c = (raw ?? {}) as Partial<CustomerPayload>;
+  const name = sanitize(c.name, 120);
+  const email = sanitize(c.email, 254).toLowerCase();
+  const phone = sanitize(c.phone, 20).replace(/\D/g, "");
+  const cep = sanitize(c.cep, 9).replace(/\D/g, "");
+  const logradouro = sanitize(c.logradouro, 160);
+  const numero = sanitize(c.numero, 20);
+  const complemento = sanitize(c.complemento ?? "", 80);
+  const bairro = sanitize(c.bairro, 120);
+  const cidade = sanitize(c.cidade, 120);
+  const uf = sanitize(c.uf, 2).toUpperCase();
+
+  if (name.length < 3) throw new Error("Nome completo é obrigatório.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("E-mail inválido.");
+  if (phone.length < 10 || phone.length > 11) throw new Error("Telefone inválido.");
+  if (cep.length !== 8) throw new Error("CEP inválido.");
+  if (!logradouro) throw new Error("Endereço é obrigatório.");
+  if (!numero) throw new Error("Número é obrigatório.");
+  if (!bairro) throw new Error("Bairro é obrigatório.");
+  if (!cidade) throw new Error("Cidade é obrigatória.");
+  if (!UF_SET.has(uf)) throw new Error("UF inválida.");
+
+  return { name, email, phone, cep, logradouro, numero, complemento, bairro, cidade, uf };
+}
 
 function validateHostedInput(raw: unknown): HostedCheckoutInput {
   const d = raw as Partial<HostedCheckoutInput>;
@@ -206,9 +252,10 @@ function validateHostedInput(raw: unknown): HostedCheckoutInput {
   if (d.environment !== "sandbox" && d.environment !== "live") {
     throw new Error("Ambiente de pagamento inválido.");
   }
+  const origin = typeof d.origin === "string" ? d.origin : "";
   const successUrl = typeof d.successUrl === "string" ? d.successUrl : "";
   const cancelUrl = typeof d.cancelUrl === "string" ? d.cancelUrl : "";
-  if (!successUrl.startsWith("http") || !cancelUrl.startsWith("http")) {
+  if (!/^https?:\/\//.test(successUrl) || !/^https?:\/\//.test(cancelUrl)) {
     throw new Error("URLs de retorno inválidas.");
   }
   return {
@@ -217,18 +264,27 @@ function validateHostedInput(raw: unknown): HostedCheckoutInput {
     environment: d.environment,
     successUrl,
     cancelUrl,
+    origin: /^https?:\/\//.test(origin) ? origin.replace(/\/$/, "") : "",
+    customer: validateCustomer(d.customer),
   };
 }
 
-const FLAT_SHIPPING_CENTS = 3990; // R$ 39,90 quando abaixo do frete grátis.
-const FREE_SHIPPING_MIN = 249.99;
+// Converte URL de imagem em URL pública absoluta; descarta se não for válida.
+function toPublicImageUrl(image: string | null | undefined, origin: string): string | null {
+  if (!image) return null;
+  const s = image.trim();
+  if (!s || s.startsWith("data:")) return null;
+  if (/^https:\/\//i.test(s)) return s;
+  if (/^http:\/\//i.test(s)) return null; // Stripe exige HTTPS.
+  if (s.startsWith("/") && origin) return `${origin}${s}`;
+  return null;
+}
 
 export const createStripeHostedSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validateHostedInput)
   .handler(async ({ data, context }): Promise<HostedCheckoutResult> => {
-    const { supabase, userId, claims } = context;
-    const customerEmail = (claims?.email as string | undefined)?.toLowerCase() ?? "";
+    const { supabase, userId } = context;
 
     const ids = Array.from(new Set(data.items.map((i) => i.id)));
     const { data: rows, error: fetchErr } = await supabase
@@ -246,7 +302,28 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
       return { id: it.id, name: p.name, price: p.price, image: p.image ?? "", quantity: it.quantity, size: it.size };
     });
 
+    // Validação estrita antes de chamar Stripe (evita erro genérico do provedor).
+    for (const i of orderItems) {
+      if (!i.name || typeof i.name !== "string") {
+        console.error("[checkout] item sem nome:", i);
+        return { error: `Produto "${i.id}" está sem nome. Contate o suporte.` };
+      }
+      if (!Number.isFinite(i.price) || i.price <= 0) {
+        console.error("[checkout] preço inválido:", i);
+        return { error: `Preço inválido para "${i.name}".` };
+      }
+      if (!Number.isInteger(i.quantity) || i.quantity < 1) {
+        console.error("[checkout] quantidade inválida:", i);
+        return { error: `Quantidade inválida para "${i.name}".` };
+      }
+    }
+
     const subtotal = orderItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
+
+    // Frete calculado a partir do CEP informado na Etapa 1.
+    const quote = quoteShipping(data.customer.cep, subtotal);
+    if (!quote) return { error: "CEP inválido para cálculo de frete." };
+    const shippingCost = quote.displayCost;
 
     let couponDiscount = 0;
     let acceptedCoupon: string | null = null;
@@ -271,92 +348,104 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
     const rand = Math.floor(100000 + Math.random() * 900000);
     const orderNumber = `AS-${rand}`;
 
+    const addressPayload = {
+      cep: data.customer.cep,
+      logradouro: data.customer.logradouro,
+      numero: data.customer.numero,
+      complemento: data.customer.complemento ?? "",
+      bairro: data.customer.bairro,
+      cidade: data.customer.cidade,
+      uf: data.customer.uf,
+    };
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const baseInsert = {
+      order_number: orderNumber,
+      user_id: userId,
+      customer_email: data.customer.email,
+      customer_name: data.customer.name,
+      items: orderItems,
+      address: addressPayload,
+      shipping_cost: shippingCost,
+      subtotal,
+      total: netProducts + shippingCost,
+      payment_method: "stripe",
+      status: "Aguardando Pagamento",
+      coupon_code: acceptedCoupon,
+      discount,
+    };
     const { error: insertErr } = await supabaseAdmin
       .from("orders")
-      .insert({
-        order_number: orderNumber,
-        user_id: userId,
-        customer_email: customerEmail,
-        customer_name: null,
-        items: orderItems,
-        address: {},
-        shipping_cost: 0,
-        subtotal,
-        total: netProducts,
-        payment_method: "stripe",
-        status: "Aguardando Pagamento",
-        coupon_code: acceptedCoupon,
-        discount,
-      } as never);
-    if (insertErr) return { error: insertErr.message };
+      .insert({ ...baseInsert, customer_phone: data.customer.phone } as never);
+    if (insertErr) {
+      // Fallback caso a coluna customer_phone ainda não exista no schema.
+      const { error: retryErr } = await supabaseAdmin
+        .from("orders")
+        .insert(baseInsert as never);
+      if (retryErr) {
+        console.error("[checkout] insert order failed:", insertErr, retryErr);
+        return { error: retryErr.message };
+      }
+    }
 
     try {
       const { createStripeClient, getStripeErrorMessage } = await import("@/lib/stripe.server");
       const stripe = createStripeClient(data.environment);
 
-      const lineItems = orderItems.map((i) => ({
-        quantity: i.quantity,
-        price_data: {
-          currency: "brl",
-          unit_amount: Math.round(i.price * 100),
-          product_data: {
-            name: `${i.name} — Tam. ${i.size}`,
-            images: i.image ? [i.image] : undefined,
+      const lineItems = orderItems.map((i) => {
+        const publicImage = toPublicImageUrl(i.image, data.origin);
+        const product_data: { name: string; images?: string[] } = {
+          name: `${i.name} — Tam. ${i.size}`,
+        };
+        if (publicImage) product_data.images = [publicImage];
+        return {
+          quantity: i.quantity,
+          price_data: {
+            currency: "brl",
+            unit_amount: Math.round(i.price * 100),
+            product_data,
+          },
+        };
+      });
+
+      const shippingOptions = [
+        {
+          shipping_rate_data: {
+            type: "fixed_amount" as const,
+            display_name: quote.free ? "Frete grátis — envio nacional" : "Envio nacional",
+            fixed_amount: { amount: Math.round(shippingCost * 100), currency: "brl" },
+            delivery_estimate: {
+              minimum: { unit: "business_day" as const, value: quote.etaDays[0] },
+              maximum: { unit: "business_day" as const, value: quote.etaDays[1] },
+            },
           },
         },
-      }));
+      ];
 
-      const shippingOptions =
-        subtotal >= FREE_SHIPPING_MIN
-          ? [
-              {
-                shipping_rate_data: {
-                  type: "fixed_amount" as const,
-                  display_name: "Frete grátis — envio nacional",
-                  fixed_amount: { amount: 0, currency: "brl" },
-                  delivery_estimate: {
-                    minimum: { unit: "business_day" as const, value: 3 },
-                    maximum: { unit: "business_day" as const, value: 9 },
-                  },
-                },
-              },
-            ]
-          : [
-              {
-                shipping_rate_data: {
-                  type: "fixed_amount" as const,
-                  display_name: "Envio nacional",
-                  fixed_amount: { amount: FLAT_SHIPPING_CENTS, currency: "brl" },
-                  delivery_estimate: {
-                    minimum: { unit: "business_day" as const, value: 3 },
-                    maximum: { unit: "business_day" as const, value: 9 },
-                  },
-                },
-              },
-            ];
-
+      const successUrl = `${data.successUrl}${data.successUrl.includes("?") ? "&" : "?"}order=${orderNumber}&session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = data.cancelUrl;
 
       const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {
         mode: "payment",
         payment_method_types: ["card", "pix"],
         currency: "brl",
         locale: "pt-BR",
-        customer_email: customerEmail || undefined,
+        customer_email: data.customer.email,
         line_items: lineItems,
-        billing_address_collection: "required",
-        shipping_address_collection: { allowed_countries: ["BR"] },
         shipping_options: shippingOptions,
-        phone_number_collection: { enabled: true },
-        success_url: `${data.successUrl}?order=${orderNumber}&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: data.cancelUrl,
-        metadata: { orderNumber, userId },
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        metadata: {
+          orderNumber,
+          userId,
+          customerName: data.customer.name,
+          customerPhone: data.customer.phone,
+        },
         payment_intent_data: {
           description: `A&S Conccept · Pedido ${orderNumber}`,
           metadata: { orderNumber, userId },
         },
       };
-
 
       if (discount > 0) {
         const coupon = await stripe.coupons.create({
@@ -368,6 +457,20 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
         sessionParams.discounts = [{ coupon: coupon.id }];
       }
 
+      console.log("[checkout] creating Stripe session", {
+        orderNumber,
+        environment: data.environment,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        line_items: lineItems.map((l) => ({
+          quantity: l.quantity,
+          name: l.price_data.product_data.name,
+          unit_amount: l.price_data.unit_amount,
+          images: l.price_data.product_data.images,
+        })),
+        shipping_amount_cents: Math.round(shippingCost * 100),
+      });
+
       const session = await stripe.checkout.sessions.create(sessionParams);
 
       await supabaseAdmin
@@ -378,6 +481,7 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
       if (!session.url) return { error: "Stripe não retornou URL de checkout." };
       return { url: session.url, orderNumber };
     } catch (error) {
+      console.error("[checkout] Stripe error:", error);
       await supabaseAdmin
         .from("orders")
         .update({ status: "Falha no pagamento" } as never)
