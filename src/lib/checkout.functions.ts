@@ -522,36 +522,16 @@ export const confirmStripePayment = createServerFn({ method: "POST" })
     const paid = session.payment_status === "paid" || session.status === "complete";
     if (!paid) return { orderNumber: order.order_number, status: order.status, paid: false };
 
-    const shipping = (session as unknown as { shipping_details?: { name?: string; address?: Record<string, string | null> } })
-      .shipping_details;
-    const customer = session.customer_details;
-    const stripeAddr = (shipping?.address ?? customer?.address ?? {}) as Record<string, string | null>;
-    const namePayload = shipping?.name ?? customer?.name ?? null;
     const shippingCost = ((session.total_details?.amount_shipping ?? 0) as number) / 100;
     const totalPaid = ((session.amount_total ?? 0) as number) / 100;
 
-    // Normaliza endereço do Stripe para o shape ViaCEP usado na UI.
-    const line1 = (stripeAddr.line1 ?? "").trim();
-    const numMatch = line1.match(/,\s*(\d[\w-]*)\s*$/);
-    const logradouro = numMatch ? line1.slice(0, numMatch.index).trim() : line1;
-    const numero = numMatch ? numMatch[1] : "";
-    const addressPayload = {
-      cep: (stripeAddr.postal_code ?? "").toString(),
-      logradouro,
-      numero,
-      complemento: (stripeAddr.line2 ?? "").toString(),
-      bairro: "",
-      cidade: (stripeAddr.city ?? "").toString(),
-      uf: (stripeAddr.state ?? "").toString(),
-    };
-
+    // Endereço e nome já foram capturados na Etapa 1 do checkout; aqui apenas
+    // atualizamos status, frete e total confirmados pelo Stripe.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
       .from("orders")
       .update({
         status: "Preparando pedido",
-        address: addressPayload as never,
-        customer_name: namePayload,
         shipping_cost: shippingCost,
         total: totalPaid,
         updated_at: new Date().toISOString(),
