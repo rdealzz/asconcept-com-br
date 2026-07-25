@@ -73,12 +73,26 @@ function CheckoutPage() {
   const prefilledRef = useRef(false);
 
   // Auth guard: precisa estar logado para finalizar.
+  // IMPORTANTE: nunca chamamos openAuth() e navigate() no mesmo tick — abrir
+  // um portal (modal) enquanto a rota atual está sendo desmontada faz o React
+  // tentar inserir nós num pai que já saiu do DOM ("NotFoundError: Failed to
+  // execute 'insertBefore'"). Navegamos primeiro; o modal é aberto no próximo
+  // tick, já dentro da árvore da home.
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      openAuth();
       navigate({ to: "/" });
-      return;
+      const t = window.setTimeout(() => {
+        try {
+          openAuth();
+        } catch (err) {
+          console.error("[checkout] openAuth after navigate failed", err, {
+            loading,
+            user,
+          });
+        }
+      }, 0);
+      return () => window.clearTimeout(t);
     }
     if (items.length === 0) {
       navigate({ to: "/" });
