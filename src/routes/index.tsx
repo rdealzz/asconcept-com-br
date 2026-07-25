@@ -1104,20 +1104,17 @@ function ProductModal() {
               <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Conccept</p>
               <h2 className="mt-3 font-serif text-2xl leading-tight md:text-4xl">{active.name}</h2>
               <p className="mt-3 text-lg tabular-nums">{formatBRL(active.price)}</p>
-              <p className="mt-1 text-[11px] font-light italic tracking-wide text-[color:var(--gold)]">
-                ou {formatBRL(applyPixDiscount(active.price))} no Pix (5% de desconto)
-              </p>
-              <p className="mt-1 text-[10px] font-light italic tracking-wide text-muted-foreground/80">
-                Novos membros recebem 10% de desconto ao criar uma conta.
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <StockBadge qty={total} />
-                {lastItem && (
-                  <span className="inline-flex items-center gap-1 border border-[color:var(--gold)] bg-[color:var(--gold)]/10 px-2 py-1 text-[10px] font-medium tracking-luxe uppercase text-[color:var(--gold)]">
-                    ✦ Último Item
-                  </span>
-                )}
-              </div>
+              {(soldOut || lastItem) && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {lastItem ? (
+                    <span className="inline-flex items-center gap-1 border border-[color:var(--gold)]/70 bg-[color:var(--gold)]/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
+                      ✦ Último Item
+                    </span>
+                  ) : (
+                    <StockBadge qty={total} />
+                  )}
+                </div>
+              )}
               <p className="mt-6 text-sm leading-relaxed text-muted-foreground font-light">
                 {active.longDescription ?? active.description}
               </p>
