@@ -326,9 +326,11 @@ function CheckoutPage() {
                   {formatBRL(totalCard)}
                 </dd>
               </div>
-              <p className="pt-1 text-[11px] text-accent">
-                ou <span className="font-medium">{formatBRL(totalPix)}</span> no Pix (5% de desconto)
-              </p>
+              {PIX_ENABLED && (
+                <p className="pt-1 text-[11px] text-accent">
+                  ou <span className="font-medium">{formatBRL(totalPix)}</span> no Pix (5% de desconto)
+                </p>
+              )}
             </dl>
             <p className="mt-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />
