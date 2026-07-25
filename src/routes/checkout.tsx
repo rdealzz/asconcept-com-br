@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { useCart, formatBRL, PIX_DISCOUNT_RATE } from "@/lib/cart-context";
+import { useCart, formatBRL, PIX_DISCOUNT_RATE, PIX_ENABLED } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { createStripeHostedSession } from "@/lib/checkout.functions";
 import { getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
