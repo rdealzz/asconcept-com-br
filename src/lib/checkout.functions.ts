@@ -28,6 +28,9 @@ type CheckoutResult = {
 const PIX_DISCOUNT_RATE = 0.05;
 const INITIAL_STATUS = "Aguardando Aprovação";
 
+// Alterar para `true` quando o Pix for aprovado pela Stripe.
+const PIX_ENABLED = false;
+
 function sanitize(v: unknown, max = 200): string {
   const s = typeof v === "string" ? v : "";
   return s
