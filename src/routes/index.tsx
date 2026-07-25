@@ -1013,16 +1013,8 @@ function ProductCard({ product }: { product: Product }) {
         </div>
         <div className="shrink-0 text-right">
           <span className="block text-xs md:text-sm tabular-nums">{formatBRL(product.price)}</span>
-          <span className="mt-0.5 block text-[10px] font-light italic tracking-wide text-[color:var(--gold)]/90">
-            ou {formatBRL(applyPixDiscount(product.price))} no Pix
-          </span>
         </div>
       </div>
-      {showLastItem && (
-        <p className="mt-2 text-[10px] font-semibold uppercase tracking-luxe text-[color:var(--gold)]">
-          Garanta o seu antes que acabe!
-        </p>
-      )}
       {isAdmin && sizeStock && (
         <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
           Estoque · P{sizeStock.P} · M{sizeStock.M} · G{sizeStock.G} · GG{sizeStock.GG}
