@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { useCart, formatBRL, PIX_DISCOUNT_RATE } from "@/lib/cart-context";
+import { useCart, formatBRL, PIX_DISCOUNT_RATE, PIX_ENABLED } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { createStripeHostedSession } from "@/lib/checkout.functions";
 import { getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
@@ -326,9 +326,11 @@ function CheckoutPage() {
                   {formatBRL(totalCard)}
                 </dd>
               </div>
-              <p className="pt-1 text-[11px] text-accent">
-                ou <span className="font-medium">{formatBRL(totalPix)}</span> no Pix (5% de desconto)
-              </p>
+              {PIX_ENABLED && (
+                <p className="pt-1 text-[11px] text-accent">
+                  ou <span className="font-medium">{formatBRL(totalPix)}</span> no Pix (5% de desconto)
+                </p>
+              )}
             </dl>
             <p className="mt-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -571,10 +573,12 @@ function StepTwo({
             <span>Cartão de crédito · até 12×</span>
             <span className="tabular-nums font-medium">{formatBRL(totalCard)}</span>
           </li>
-          <li className="flex justify-between text-accent">
-            <span>Pix · 5% de desconto</span>
-            <span className="tabular-nums font-medium">{formatBRL(totalPix)}</span>
-          </li>
+          {PIX_ENABLED && (
+            <li className="flex justify-between text-accent">
+              <span>Pix · 5% de desconto</span>
+              <span className="tabular-nums font-medium">{formatBRL(totalPix)}</span>
+            </li>
+          )}
         </ul>
         <p className="mt-4 text-[11px] text-muted-foreground">
           A forma de pagamento é escolhida na próxima tela, dentro do ambiente do Stripe.

@@ -160,3 +160,10 @@ export const formatBRL = (n: number) =>
 export const PIX_DISCOUNT_RATE = 0.05;
 export const applyPixDiscount = (v: number) =>
   Math.max(0, v * (1 - PIX_DISCOUNT_RATE));
+
+/**
+ * Feature flag: exibição pública do Pix como forma de pagamento.
+ * Alterar para `true` quando o Pix for aprovado pela Stripe.
+ * A lógica de cálculo (PIX_DISCOUNT_RATE) permanece intacta para reativação rápida.
+ */
+export const PIX_ENABLED = false;

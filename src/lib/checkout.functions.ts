@@ -28,6 +28,9 @@ type CheckoutResult = {
 const PIX_DISCOUNT_RATE = 0.05;
 const INITIAL_STATUS = "Aguardando Aprovação";
 
+// Alterar para `true` quando o Pix for aprovado pela Stripe.
+const PIX_ENABLED = false;
+
 function sanitize(v: unknown, max = 200): string {
   const s = typeof v === "string" ? v : "";
   return s
@@ -427,7 +430,7 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
 
       const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {
         mode: "payment",
-        payment_method_types: ["card", "pix"],
+        payment_method_types: PIX_ENABLED ? ["card", "pix"] : ["card"],
         currency: "brl",
         locale: "pt-BR",
         customer_email: data.customer.email,

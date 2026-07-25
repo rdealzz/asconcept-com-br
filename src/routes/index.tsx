@@ -26,6 +26,7 @@ import {
   useCart,
   formatBRL,
   applyPixDiscount,
+  PIX_ENABLED,
   type Product,
   type ProductCategory,
 } from "@/lib/cart-context";
@@ -920,15 +921,11 @@ function StockBadge({ qty }: { qty: number }) {
     );
   if (qty === 1)
     return (
-      <span className="inline-flex animate-pulse items-center gap-1 border border-accent bg-accent/20 px-2 py-1 text-[10px] font-semibold tracking-luxe uppercase text-accent shadow-[0_0_12px_rgba(0,0,0,0.15)]">
-        ⚠️ Última unidade
+      <span className="inline-flex items-center gap-1 border border-accent/60 bg-accent/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-accent">
+        Última unidade
       </span>
     );
-  return (
-    <span className="inline-flex items-center gap-1 border border-emerald-600/40 bg-emerald-600/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-emerald-700">
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" /> Disponível
-    </span>
-  );
+  return null;
 }
 
 /* ---------- Product Card ---------- */
@@ -959,11 +956,12 @@ function ProductCard({ product }: { product: Product }) {
           }`}
         />
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
-          <StockBadge qty={total} />
-          {showLastItem && (
-            <span className="inline-flex items-center gap-1 border border-[color:var(--gold)] bg-background/95 px-2 py-1 text-[10px] font-medium tracking-luxe uppercase text-[color:var(--gold)] shadow-sm backdrop-blur">
+          {showLastItem ? (
+            <span className="inline-flex items-center gap-1 border border-[color:var(--gold)]/70 bg-background/95 px-2 py-1 text-[10px] tracking-luxe uppercase text-[color:var(--gold)] backdrop-blur">
               ✦ Último Item
             </span>
+          ) : (
+            <StockBadge qty={total} />
           )}
         </div>
         {isAdmin && (
@@ -1016,16 +1014,8 @@ function ProductCard({ product }: { product: Product }) {
         </div>
         <div className="shrink-0 text-right">
           <span className="block text-xs md:text-sm tabular-nums">{formatBRL(product.price)}</span>
-          <span className="mt-0.5 block text-[10px] font-light italic tracking-wide text-[color:var(--gold)]/90">
-            ou {formatBRL(applyPixDiscount(product.price))} no Pix
-          </span>
         </div>
       </div>
-      {showLastItem && (
-        <p className="mt-2 text-[10px] font-semibold uppercase tracking-luxe text-[color:var(--gold)]">
-          Garanta o seu antes que acabe!
-        </p>
-      )}
       {isAdmin && sizeStock && (
         <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
           Estoque · P{sizeStock.P} · M{sizeStock.M} · G{sizeStock.G} · GG{sizeStock.GG}
@@ -1115,20 +1105,17 @@ function ProductModal() {
               <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Conccept</p>
               <h2 className="mt-3 font-serif text-2xl leading-tight md:text-4xl">{active.name}</h2>
               <p className="mt-3 text-lg tabular-nums">{formatBRL(active.price)}</p>
-              <p className="mt-1 text-[11px] font-light italic tracking-wide text-[color:var(--gold)]">
-                ou {formatBRL(applyPixDiscount(active.price))} no Pix (5% de desconto)
-              </p>
-              <p className="mt-1 text-[10px] font-light italic tracking-wide text-muted-foreground/80">
-                Novos membros recebem 10% de desconto ao criar uma conta.
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <StockBadge qty={total} />
-                {lastItem && (
-                  <span className="inline-flex items-center gap-1 border border-[color:var(--gold)] bg-[color:var(--gold)]/10 px-2 py-1 text-[10px] font-medium tracking-luxe uppercase text-[color:var(--gold)]">
-                    ✦ Último Item
-                  </span>
-                )}
-              </div>
+              {(soldOut || lastItem) && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {lastItem ? (
+                    <span className="inline-flex items-center gap-1 border border-[color:var(--gold)]/70 bg-[color:var(--gold)]/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
+                      ✦ Último Item
+                    </span>
+                  ) : (
+                    <StockBadge qty={total} />
+                  )}
+                </div>
+              )}
               <p className="mt-6 text-sm leading-relaxed text-muted-foreground font-light">
                 {active.longDescription ?? active.description}
               </p>
@@ -1165,13 +1152,15 @@ function ProductModal() {
                     );
                   })}
                 </div>
-                <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
-                  {sizeSoldOut
-                    ? "Tamanho selecionado sem disponibilidade."
-                    : availableQty === 1
-                      ? "Última peça em estoque neste tamanho."
-                      : `${availableQty} unidades disponíveis no tamanho ${size}.`}
-                </p>
+                {(sizeSoldOut || availableQty === 1 || availableQty === 2) && (
+                  <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    {sizeSoldOut
+                      ? "Tamanho selecionado sem disponibilidade."
+                      : availableQty === 1
+                        ? "Última peça em estoque neste tamanho."
+                        : `${availableQty} unidades disponíveis no tamanho ${size}.`}
+                  </p>
+                )}
               </div>
 
               {/* Desktop CTA */}
@@ -1983,9 +1972,11 @@ function CartDrawer() {
               </span>
               <span className="font-serif text-xl tabular-nums">{formatBRL(subtotal)}</span>
             </div>
-            <p className="text-[11px] font-light italic tracking-wide text-[color:var(--gold)]">
-              ou {formatBRL(applyPixDiscount(subtotal))} no Pix (5% de desconto)
-            </p>
+            {PIX_ENABLED && (
+              <p className="text-[11px] font-light italic tracking-wide text-[color:var(--gold)]">
+                ou {formatBRL(applyPixDiscount(subtotal))} no Pix (5% de desconto)
+              </p>
+            )}
             <p className="text-[11px] font-light text-muted-foreground">
               Frete grátis para pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}. Impostos
               calculados no checkout.
