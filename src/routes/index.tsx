@@ -1971,9 +1971,11 @@ function CartDrawer() {
               </span>
               <span className="font-serif text-xl tabular-nums">{formatBRL(subtotal)}</span>
             </div>
-            <p className="text-[11px] font-light italic tracking-wide text-[color:var(--gold)]">
-              ou {formatBRL(applyPixDiscount(subtotal))} no Pix (5% de desconto)
-            </p>
+            {PIX_ENABLED && (
+              <p className="text-[11px] font-light italic tracking-wide text-[color:var(--gold)]">
+                ou {formatBRL(applyPixDiscount(subtotal))} no Pix (5% de desconto)
+              </p>
+            )}
             <p className="text-[11px] font-light text-muted-foreground">
               Frete grátis para pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}. Impostos
               calculados no checkout.
