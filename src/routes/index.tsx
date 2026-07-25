@@ -955,11 +955,12 @@ function ProductCard({ product }: { product: Product }) {
           }`}
         />
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
-          <StockBadge qty={total} />
-          {showLastItem && (
-            <span className="inline-flex items-center gap-1 border border-[color:var(--gold)] bg-background/95 px-2 py-1 text-[10px] font-medium tracking-luxe uppercase text-[color:var(--gold)] shadow-sm backdrop-blur">
+          {showLastItem ? (
+            <span className="inline-flex items-center gap-1 border border-[color:var(--gold)]/70 bg-background/95 px-2 py-1 text-[10px] tracking-luxe uppercase text-[color:var(--gold)] backdrop-blur">
               ✦ Último Item
             </span>
+          ) : (
+            <StockBadge qty={total} />
           )}
         </div>
         {isAdmin && (
