@@ -430,7 +430,7 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
 
       const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {
         mode: "payment",
-        payment_method_types: ["card", "pix"],
+        payment_method_types: PIX_ENABLED ? ["card", "pix"] : ["card"],
         currency: "brl",
         locale: "pt-BR",
         customer_email: data.customer.email,
