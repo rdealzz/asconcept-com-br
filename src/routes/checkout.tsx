@@ -573,10 +573,12 @@ function StepTwo({
             <span>Cartão de crédito · até 12×</span>
             <span className="tabular-nums font-medium">{formatBRL(totalCard)}</span>
           </li>
-          <li className="flex justify-between text-accent">
-            <span>Pix · 5% de desconto</span>
-            <span className="tabular-nums font-medium">{formatBRL(totalPix)}</span>
-          </li>
+          {PIX_ENABLED && (
+            <li className="flex justify-between text-accent">
+              <span>Pix · 5% de desconto</span>
+              <span className="tabular-nums font-medium">{formatBRL(totalPix)}</span>
+            </li>
+          )}
         </ul>
         <p className="mt-4 text-[11px] text-muted-foreground">
           A forma de pagamento é escolhida na próxima tela, dentro do ambiente do Stripe.
