@@ -920,15 +920,11 @@ function StockBadge({ qty }: { qty: number }) {
     );
   if (qty === 1)
     return (
-      <span className="inline-flex animate-pulse items-center gap-1 border border-accent bg-accent/20 px-2 py-1 text-[10px] font-semibold tracking-luxe uppercase text-accent shadow-[0_0_12px_rgba(0,0,0,0.15)]">
-        ⚠️ Última unidade
+      <span className="inline-flex items-center gap-1 border border-accent/60 bg-accent/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-accent">
+        Última unidade
       </span>
     );
-  return (
-    <span className="inline-flex items-center gap-1 border border-emerald-600/40 bg-emerald-600/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-emerald-700">
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" /> Disponível
-    </span>
-  );
+  return null;
 }
 
 /* ---------- Product Card ---------- */
