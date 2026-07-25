@@ -1151,13 +1151,15 @@ function ProductModal() {
                     );
                   })}
                 </div>
-                <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
-                  {sizeSoldOut
-                    ? "Tamanho selecionado sem disponibilidade."
-                    : availableQty === 1
-                      ? "Última peça em estoque neste tamanho."
-                      : `${availableQty} unidades disponíveis no tamanho ${size}.`}
-                </p>
+                {(sizeSoldOut || availableQty === 1 || availableQty === 2) && (
+                  <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    {sizeSoldOut
+                      ? "Tamanho selecionado sem disponibilidade."
+                      : availableQty === 1
+                        ? "Última peça em estoque neste tamanho."
+                        : `${availableQty} unidades disponíveis no tamanho ${size}.`}
+                  </p>
+                )}
               </div>
 
               {/* Desktop CTA */}
