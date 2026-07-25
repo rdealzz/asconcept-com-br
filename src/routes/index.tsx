@@ -26,6 +26,7 @@ import {
   useCart,
   formatBRL,
   applyPixDiscount,
+  PIX_ENABLED,
   type Product,
   type ProductCategory,
 } from "@/lib/cart-context";
