@@ -90,7 +90,10 @@ export type Database = {
           customer_phone: string | null
           discount: number
           id: string
+          installments: number | null
           items: Json
+          mp_payment_id: string | null
+          mp_status: string | null
           order_number: string
           payment_method: string
           shipping_cost: number
@@ -112,7 +115,10 @@ export type Database = {
           customer_phone?: string | null
           discount?: number
           id?: string
+          installments?: number | null
           items?: Json
+          mp_payment_id?: string | null
+          mp_status?: string | null
           order_number: string
           payment_method: string
           shipping_cost?: number
@@ -134,7 +140,10 @@ export type Database = {
           customer_phone?: string | null
           discount?: number
           id?: string
+          installments?: number | null
           items?: Json
+          mp_payment_id?: string | null
+          mp_status?: string | null
           order_number?: string
           payment_method?: string
           shipping_cost?: number
