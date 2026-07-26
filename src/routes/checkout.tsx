@@ -1,11 +1,18 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, Loader2, Lock, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, CreditCard, Loader2, QrCode, ShieldCheck } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useCart, formatBRL, PIX_DISCOUNT_RATE, PIX_ENABLED } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
-import { createStripeHostedSession } from "@/lib/checkout.functions";
-import { getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
+import {
+  createPendingOrder,
+  createPixPayment,
+  getPaymentStatus,
+  payWithCardToken,
+} from "@/lib/payments.functions";
+import { formatCpf, isValidCpf } from "@/lib/mercadopago";
+import { CardBrick, type CardFormData } from "@/components/CardBrick";
+import { PixPanel, type PixCharge } from "@/components/PixPanel";
 import { quoteShipping, formatCep, normalizeCep } from "@/lib/shipping";
 
 export const Route = createFileRoute("/checkout")({
@@ -16,7 +23,7 @@ export const Route = createFileRoute("/checkout")({
       {
         name: "description",
         content:
-          "Complete seu pedido A&S Conccept com envio nacional e pagamento seguro pelo Stripe.",
+          "Complete seu pedido A&S Conccept com envio nacional e pagamento seguro no próprio site.",
       },
       { name: "robots", content: "noindex" },
     ],
@@ -28,6 +35,7 @@ type CustomerForm = {
   name: string;
   email: string;
   phone: string;
+  cpf: string;
   cep: string;
   logradouro: string;
   numero: string;
@@ -41,6 +49,7 @@ const EMPTY: CustomerForm = {
   name: "",
   email: "",
   phone: "",
+  cpf: "",
   cep: "",
   logradouro: "",
   numero: "",
@@ -49,6 +58,8 @@ const EMPTY: CustomerForm = {
   cidade: "",
   uf: "",
 };
+
+type PayMethod = "card" | "pix";
 
 function formatPhoneBR(raw: string): string {
   const d = raw.replace(/\D/g, "").slice(0, 11);
@@ -59,25 +70,26 @@ function formatPhoneBR(raw: string): string {
 }
 
 function CheckoutPage() {
-  const { items, coupon, couponDiscount, subtotal, count } = useCart();
+  const { items, coupon, couponDiscount, subtotal, count, clear } = useCart();
   const { user, loading, openAuth } = useAuth();
   const navigate = useNavigate();
-  const startSession = useServerFn(createStripeHostedSession);
+  const startOrder = useServerFn(createPendingOrder);
+  const payCard = useServerFn(payWithCardToken);
+  const startPix = useServerFn(createPixPayment);
+  const checkStatus = useServerFn(getPaymentStatus);
 
   const [step, setStep] = useState<1 | 2>(1);
+  const [method, setMethod] = useState<PayMethod>("card");
   const [form, setForm] = useState<CustomerForm>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<keyof CustomerForm, string>>>({});
   const [cepLoading, setCepLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pix, setPix] = useState<PixCharge | null>(null);
   const prefilledRef = useRef(false);
 
-  // Auth guard: precisa estar logado para finalizar.
-  // IMPORTANTE: nunca chamamos openAuth() e navigate() no mesmo tick — abrir
-  // um portal (modal) enquanto a rota atual está sendo desmontada faz o React
-  // tentar inserir nós num pai que já saiu do DOM ("NotFoundError: Failed to
-  // execute 'insertBefore'"). Navegamos primeiro; o modal é aberto no próximo
-  // tick, já dentro da árvore da home.
+  // Auth guard: navegamos primeiro e abrimos o modal no tick seguinte para não
+  // montar um portal enquanto esta rota é desmontada.
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -86,20 +98,16 @@ function CheckoutPage() {
         try {
           openAuth();
         } catch (err) {
-          console.error("[checkout] openAuth after navigate failed", err, {
-            loading,
-            user,
-          });
+          console.error("[checkout] openAuth after navigate failed", err);
         }
       }, 0);
       return () => window.clearTimeout(t);
     }
-    if (items.length === 0) {
+    if (items.length === 0 && !pix) {
       navigate({ to: "/" });
     }
-  }, [loading, user, items, navigate, openAuth]);
+  }, [loading, user, items, navigate, openAuth, pix]);
 
-  // Pré-preenche com dados do perfil.
   useEffect(() => {
     if (prefilledRef.current || !user) return;
     prefilledRef.current = true;
@@ -107,7 +115,6 @@ function CheckoutPage() {
       ...f,
       name: f.name || user.name || "",
       email: f.email || user.email || "",
-      phone: f.phone,
     }));
   }, [user]);
 
@@ -120,13 +127,13 @@ function CheckoutPage() {
   const shippingCost = shippingQuote?.displayCost ?? 0;
   const totalCard = Math.max(0, subtotal - couponDiscount) + shippingCost;
   const totalPix = Math.max(0, totalCard * (1 - PIX_DISCOUNT_RATE));
+  const totalDue = method === "pix" && PIX_ENABLED ? totalPix : totalCard;
 
   const setField = <K extends keyof CustomerForm>(k: K, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((e) => ({ ...e, [k]: undefined }));
   };
 
-  // Busca ViaCEP quando CEP completo.
   const onCepChange = async (raw: string) => {
     const formatted = formatCep(raw);
     setField("cep", formatted);
@@ -156,11 +163,10 @@ function CheckoutPage() {
   const validateStep1 = (): boolean => {
     const e: Partial<Record<keyof CustomerForm, string>> = {};
     if (form.name.trim().length < 3) e.name = "Informe seu nome completo.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
-      e.email = "E-mail inválido.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = "E-mail inválido.";
     const phoneDigits = form.phone.replace(/\D/g, "");
-    if (phoneDigits.length < 10 || phoneDigits.length > 11)
-      e.phone = "Telefone inválido.";
+    if (phoneDigits.length < 10 || phoneDigits.length > 11) e.phone = "Telefone inválido.";
+    if (!isValidCpf(form.cpf)) e.cpf = "CPF inválido.";
     if (normalizeCep(form.cep).length !== 8) e.cep = "CEP inválido.";
     if (!form.logradouro.trim()) e.logradouro = "Informe o endereço.";
     if (!form.numero.trim()) e.numero = "Informe o número.";
@@ -182,52 +188,135 @@ function CheckoutPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const startPayment = async () => {
-    if (!isPaymentsConfigured()) {
-      setError(
-        "Pagamentos ainda não configurados para esta build. Conclua a etapa de go-live para aceitar pagamentos reais.",
-      );
-      return;
-    }
-    setSubmitting(true);
+  const customerPayload = useCallback(
+    () => ({
+      name: form.name.trim(),
+      email: form.email.trim().toLowerCase(),
+      phone: form.phone.replace(/\D/g, ""),
+      cpf: form.cpf.replace(/\D/g, ""),
+      cep: normalizeCep(form.cep),
+      logradouro: form.logradouro.trim(),
+      numero: form.numero.trim(),
+      complemento: form.complemento.trim(),
+      bairro: form.bairro.trim(),
+      cidade: form.cidade.trim(),
+      uf: form.uf.trim().toUpperCase(),
+    }),
+    [form],
+  );
+
+  const itemsPayload = useCallback(
+    () => items.map((i) => ({ id: i.id, quantity: i.qty, size: i.size as "P" | "M" | "G" | "GG" })),
+    [items],
+  );
+
+  // Cartão: cria pedido pendente e envia o token gerado pelo Brick.
+  const onCardSubmit = async (card: CardFormData) => {
     setError(null);
+    setSubmitting(true);
     try {
-      const origin = window.location.origin;
-      const result = await startSession({
+      const pending = await startOrder({
         data: {
-          items: items.map((i) => ({ id: i.id, quantity: i.qty, size: i.size as "P"|"M"|"G"|"GG" })),
+          items: itemsPayload(),
           couponCode: coupon?.code ?? null,
-          environment: getStripeEnvironment(),
-          successUrl: `${origin}/sucesso`,
-          cancelUrl: `${origin}/checkout`,
-          origin,
-          customer: {
-            name: form.name.trim(),
-            email: form.email.trim().toLowerCase(),
-            phone: form.phone.replace(/\D/g, ""),
-            cep: normalizeCep(form.cep),
-            logradouro: form.logradouro.trim(),
-            numero: form.numero.trim(),
-            complemento: form.complemento.trim(),
-            bairro: form.bairro.trim(),
-            cidade: form.cidade.trim(),
-            uf: form.uf.trim().toUpperCase(),
-          },
+          method: "card",
+          customer: customerPayload(),
         },
       });
-      if ("error" in result) {
-        setError(result.error);
-        setSubmitting(false);
+      if ("error" in pending) {
+        setError(pending.error);
         return;
       }
-      window.location.href = result.url;
+      const res = await payCard({
+        data: {
+          orderNumber: pending.orderNumber,
+          token: card.token,
+          paymentMethodId: card.paymentMethodId,
+          issuerId: card.issuerId,
+          installments: card.installments,
+          payerEmail: card.payerEmail,
+          cpf: form.cpf.replace(/\D/g, ""),
+        },
+      });
+      if (res.approved) {
+        clear();
+        navigate({ to: "/sucesso", search: { order: res.orderNumber } });
+        return;
+      }
+      if (res.status === "Aguardando Pagamento" && res.message?.includes("análise")) {
+        clear();
+        navigate({ to: "/sucesso", search: { order: res.orderNumber } });
+        return;
+      }
+      setError(res.message ?? "Pagamento não aprovado.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao iniciar pagamento.");
+      setError(e instanceof Error ? e.message : "Falha ao processar o pagamento.");
+    } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading || !user || items.length === 0) {
+  // Pix: cria pedido pendente e gera o QR Code.
+  const onPixSubmit = async () => {
+    setError(null);
+    setSubmitting(true);
+    try {
+      const pending = await startOrder({
+        data: {
+          items: itemsPayload(),
+          couponCode: coupon?.code ?? null,
+          method: "pix",
+          customer: customerPayload(),
+        },
+      });
+      if ("error" in pending) {
+        setError(pending.error);
+        return;
+      }
+      const charge = await startPix({
+        data: { orderNumber: pending.orderNumber, cpf: form.cpf.replace(/\D/g, "") },
+      });
+      if ("error" in charge) {
+        setError(charge.error);
+        return;
+      }
+      setPix(charge);
+      clear();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao gerar cobrança Pix.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Polling enquanto o cliente paga o Pix (webhook é a fonte oficial).
+  useEffect(() => {
+    if (!pix) return;
+    let cancelled = false;
+    let attempts = 0;
+    const tick = async () => {
+      attempts += 1;
+      try {
+        const res = await checkStatus({ data: { orderNumber: pix.orderNumber } });
+        if (cancelled) return;
+        if (res.paid) {
+          navigate({ to: "/sucesso", search: { order: pix.orderNumber } });
+          return;
+        }
+      } catch {
+        /* silencioso */
+      }
+      if (!cancelled && attempts < 120) window.setTimeout(tick, 5000);
+    };
+    const id = window.setTimeout(tick, 5000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+    };
+  }, [pix, checkStatus, navigate]);
+
+  if (loading || !user || (items.length === 0 && !pix)) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-accent" strokeWidth={1.5} />
@@ -249,95 +338,110 @@ function CheckoutPage() {
           <span className="w-40" />
         </header>
 
-        <Stepper step={step} />
+        {pix ? (
+          <div className="mx-auto max-w-xl">
+            <PixPanel charge={pix} awaiting />
+            <Link
+              to="/pedidos/$id"
+              params={{ id: pix.orderNumber }}
+              className="mt-6 inline-block border border-border px-6 py-3 text-[11px] uppercase tracking-luxe text-charcoal"
+            >
+              Acompanhar pedido
+            </Link>
+          </div>
+        ) : (
+          <>
+            <Stepper step={step} />
 
-        <div className="mt-10 grid gap-10 lg:grid-cols-[1.4fr_1fr]">
-          <section>
-            {step === 1 ? (
-              <StepOne
-                form={form}
-                errors={errors}
-                setField={setField}
-                onCepChange={onCepChange}
-                cepLoading={cepLoading}
-                onSubmit={goToPayment}
-              />
-            ) : (
-              <StepTwo
-                form={form}
-                onEdit={() => setStep(1)}
-                onPay={startPayment}
-                submitting={submitting}
-                totalCard={totalCard}
-                totalPix={totalPix}
-              />
-            )}
-            {error && (
-              <p className="mt-6 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                {error}
-              </p>
-            )}
-          </section>
+            <div className="mt-10 grid gap-10 lg:grid-cols-[1.4fr_1fr]">
+              <section>
+                {step === 1 ? (
+                  <StepOne
+                    form={form}
+                    errors={errors}
+                    setField={setField}
+                    onCepChange={onCepChange}
+                    cepLoading={cepLoading}
+                    onSubmit={goToPayment}
+                  />
+                ) : (
+                  <StepTwo
+                    form={form}
+                    method={method}
+                    setMethod={setMethod}
+                    onEdit={() => setStep(1)}
+                    submitting={submitting}
+                    totalCard={totalCard}
+                    totalPix={totalPix}
+                    onCardSubmit={onCardSubmit}
+                    onPixSubmit={onPixSubmit}
+                  />
+                )}
+                {error && (
+                  <p className="mt-6 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                    {error}
+                  </p>
+                )}
+              </section>
 
-          <aside className="h-fit border border-border bg-card/40 p-6">
-            <h2 className="text-[11px] uppercase tracking-luxe text-muted-foreground">
-              Resumo · {count} {count === 1 ? "peça" : "peças"}
-            </h2>
-            <ul className="mt-4 divide-y divide-border">
-              {items.map((i) => (
-                <li key={`${i.id}-${i.size}`} className="flex gap-3 py-3">
-                  <img src={i.image} alt={i.name} className="h-16 w-12 object-cover" />
-                  <div className="flex-1 text-sm">
-                    <p className="font-serif">{i.name}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Tam. {i.size} · {i.qty}×
-                    </p>
+              <aside className="h-fit border border-border bg-card/40 p-6">
+                <h2 className="text-[11px] uppercase tracking-luxe text-muted-foreground">
+                  Resumo · {count} {count === 1 ? "peça" : "peças"}
+                </h2>
+                <ul className="mt-4 divide-y divide-border">
+                  {items.map((i) => (
+                    <li key={`${i.id}-${i.size}`} className="flex gap-3 py-3">
+                      <img src={i.image} alt={i.name} className="h-16 w-12 object-cover" />
+                      <div className="flex-1 text-sm">
+                        <p className="font-serif">{i.name}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Tam. {i.size} · {i.qty}×
+                        </p>
+                      </div>
+                      <span className="text-sm tabular-nums">{formatBRL(i.price * i.qty)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <dl className="mt-4 space-y-1.5 border-t border-border pt-4 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Subtotal</dt>
+                    <dd className="tabular-nums">{formatBRL(subtotal)}</dd>
                   </div>
-                  <span className="text-sm tabular-nums">
-                    {formatBRL(i.price * i.qty)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <dl className="mt-4 space-y-1.5 border-t border-border pt-4 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Subtotal</dt>
-                <dd className="tabular-nums">{formatBRL(subtotal)}</dd>
-              </div>
-              {couponDiscount > 0 && (
-                <div className="flex justify-between text-accent">
-                  <dt>Cupom {coupon?.code}</dt>
-                  <dd className="tabular-nums">− {formatBRL(couponDiscount)}</dd>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Frete</dt>
-                <dd className="tabular-nums">
-                  {shippingQuote
-                    ? shippingQuote.free
-                      ? "Grátis"
-                      : formatBRL(shippingCost)
-                    : "—"}
-                </dd>
-              </div>
-              <div className="mt-2 flex items-baseline justify-between border-t border-border pt-3">
-                <dt className="text-[11px] uppercase tracking-luxe">Total</dt>
-                <dd className="font-serif text-2xl tabular-nums">
-                  {formatBRL(totalCard)}
-                </dd>
-              </div>
-              {PIX_ENABLED && (
-                <p className="pt-1 text-[11px] text-accent">
-                  ou <span className="font-medium">{formatBRL(totalPix)}</span> no Pix (5% de desconto)
+                  {couponDiscount > 0 && (
+                    <div className="flex justify-between text-accent">
+                      <dt>Cupom {coupon?.code}</dt>
+                      <dd className="tabular-nums">− {formatBRL(couponDiscount)}</dd>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Frete</dt>
+                    <dd className="tabular-nums">
+                      {shippingQuote
+                        ? shippingQuote.free
+                          ? "Grátis"
+                          : formatBRL(shippingCost)
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between border-t border-border pt-3">
+                    <dt className="text-[11px] uppercase tracking-luxe">Total</dt>
+                    <dd className="font-serif text-2xl tabular-nums">{formatBRL(totalDue)}</dd>
+                  </div>
+                  {PIX_ENABLED && method === "card" && (
+                    <p className="pt-1 text-[11px] text-accent">
+                      ou <span className="font-medium">{formatBRL(totalPix)}</span> no Pix (5% de
+                      desconto)
+                    </p>
+                  )}
+                </dl>
+                <p className="mt-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+                  <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  Pagamento processado com segurança pelo Mercado Pago
                 </p>
-              )}
-            </dl>
-            <p className="mt-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-              <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />
-              Pagamento processado com segurança pelo Stripe
-            </p>
-          </aside>
-        </div>
+              </aside>
+            </div>
+          </>
+        )}
       </div>
     </main>
   );
@@ -347,12 +451,16 @@ function Stepper({ step }: { step: 1 | 2 }) {
   return (
     <ol className="flex items-center justify-center gap-6 text-[11px] uppercase tracking-luxe">
       <li className={step === 1 ? "text-charcoal" : "text-accent"}>
-        <span className="mr-2 inline-flex h-6 w-6 items-center justify-center border border-current tabular-nums">1</span>
+        <span className="mr-2 inline-flex h-6 w-6 items-center justify-center border border-current tabular-nums">
+          1
+        </span>
         Dados & Entrega
       </li>
       <span className="h-px w-10 bg-border" />
       <li className={step === 2 ? "text-charcoal" : "text-muted-foreground"}>
-        <span className="mr-2 inline-flex h-6 w-6 items-center justify-center border border-current tabular-nums">2</span>
+        <span className="mr-2 inline-flex h-6 w-6 items-center justify-center border border-current tabular-nums">
+          2
+        </span>
         Pagamento
       </li>
     </ol>
@@ -442,6 +550,16 @@ function StepOne({
             autoComplete="tel"
           />
         </Field>
+        <Field label="CPF" error={errors.cpf}>
+          <input
+            className={inputCls}
+            value={form.cpf}
+            onChange={(e) => setField("cpf", formatCpf(e.target.value))}
+            placeholder="000.000.000-00"
+            inputMode="numeric"
+            maxLength={14}
+          />
+        </Field>
       </div>
 
       <div>
@@ -449,7 +567,11 @@ function StepOne({
       </div>
 
       <div className="grid gap-5 sm:grid-cols-6">
-        <Field label={cepLoading ? "CEP · buscando…" : "CEP"} error={errors.cep} className="sm:col-span-2">
+        <Field
+          label={cepLoading ? "CEP · buscando…" : "CEP"}
+          error={errors.cep}
+          className="sm:col-span-2"
+        >
           <input
             className={inputCls}
             value={form.cep}
@@ -518,27 +640,34 @@ function StepOne({
 
 function StepTwo({
   form,
+  method,
+  setMethod,
   onEdit,
-  onPay,
   submitting,
   totalCard,
   totalPix,
+  onCardSubmit,
+  onPixSubmit,
 }: {
   form: CustomerForm;
+  method: PayMethod;
+  setMethod: (m: PayMethod) => void;
   onEdit: () => void;
-  onPay: () => void;
   submitting: boolean;
   totalCard: number;
   totalPix: number;
+  onCardSubmit: (card: CardFormData) => Promise<void>;
+  onPixSubmit: () => void;
 }) {
   const addressLine = `${form.logradouro}, ${form.numero}${form.complemento ? " — " + form.complemento : ""}`;
   const cityLine = `${form.bairro} · ${form.cidade}/${form.uf} · CEP ${formatCep(form.cep)}`;
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="font-serif text-2xl text-charcoal">Pagamento</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Você será conduzido ao ambiente seguro do Stripe para concluir a compra.
+          Todo o pagamento acontece aqui mesmo, sem sair do site.
         </p>
       </div>
 
@@ -564,39 +693,95 @@ function StepTwo({
         </div>
       </section>
 
-      <section className="border border-border p-6">
-        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-          Formas de pagamento
-        </p>
-        <ul className="mt-4 space-y-2 text-sm">
-          <li className="flex justify-between">
-            <span>Cartão de crédito · até 12×</span>
-            <span className="tabular-nums font-medium">{formatBRL(totalCard)}</span>
-          </li>
-          {PIX_ENABLED && (
-            <li className="flex justify-between text-accent">
-              <span>Pix · 5% de desconto</span>
-              <span className="tabular-nums font-medium">{formatBRL(totalPix)}</span>
-            </li>
-          )}
-        </ul>
-        <p className="mt-4 text-[11px] text-muted-foreground">
-          A forma de pagamento é escolhida na próxima tela, dentro do ambiente do Stripe.
-        </p>
-      </section>
+      {PIX_ENABLED && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <MethodTile
+            active={method === "card"}
+            onClick={() => setMethod("card")}
+            icon={<CreditCard className="h-4 w-4" strokeWidth={1.5} />}
+            title="Cartão de crédito"
+            subtitle={`até 12× · ${formatBRL(totalCard)}`}
+          />
+          <MethodTile
+            active={method === "pix"}
+            onClick={() => setMethod("pix")}
+            icon={<QrCode className="h-4 w-4" strokeWidth={1.5} />}
+            title="Pix"
+            subtitle={`5% de desconto · ${formatBRL(totalPix)}`}
+          />
+        </div>
+      )}
 
-      <button
-        onClick={onPay}
-        disabled={submitting}
-        className="inline-flex w-full items-center justify-center gap-2 bg-charcoal px-8 py-4 text-[11px] uppercase tracking-luxe text-ivory transition-colors hover:bg-navy disabled:opacity-60 sm:w-auto"
-      >
-        {submitting ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Lock className="h-4 w-4" strokeWidth={1.5} />
-        )}
-        {submitting ? "Preparando ambiente seguro…" : "Pagar com segurança"}
-      </button>
+      {method === "card" ? (
+        <section className="border border-border p-6">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+            Dados do cartão
+          </p>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Os dados do seu cartão são enviados criptografados diretamente ao Mercado Pago.
+          </p>
+          <div className="mt-6">
+            <CardBrick amount={totalCard} email={form.email} onSubmitCard={onCardSubmit} />
+          </div>
+          {submitting && (
+            <p className="mt-4 inline-flex items-center gap-2 text-[11px] text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" strokeWidth={1.5} />
+              Processando pagamento…
+            </p>
+          )}
+        </section>
+      ) : (
+        <section className="border border-border p-6">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+            Pix · 5% de desconto
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Geramos o QR Code na próxima tela, aqui mesmo no site. A confirmação é automática.
+          </p>
+          <p className="mt-4 font-serif text-2xl tabular-nums text-charcoal">
+            {formatBRL(totalPix)}
+          </p>
+          <button
+            onClick={onPixSubmit}
+            disabled={submitting}
+            className="mt-6 inline-flex w-full items-center justify-center gap-2 bg-charcoal px-8 py-4 text-[11px] uppercase tracking-luxe text-ivory transition-colors hover:bg-navy disabled:opacity-60 sm:w-auto"
+          >
+            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {submitting ? "Gerando QR Code…" : "Gerar QR Code Pix"}
+          </button>
+        </section>
+      )}
     </div>
+  );
+}
+
+function MethodTile({
+  active,
+  onClick,
+  icon,
+  title,
+  subtitle,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-3 border px-4 py-4 text-left transition-colors ${
+        active
+          ? "border-[color:var(--gold)] bg-[color:var(--gold)]/5"
+          : "border-border hover:border-foreground/40"
+      }`}
+    >
+      <span className={active ? "text-accent" : "text-muted-foreground"}>{icon}</span>
+      <span>
+        <span className="block text-[11px] uppercase tracking-luxe text-charcoal">{title}</span>
+        <span className="block text-[11px] text-muted-foreground">{subtitle}</span>
+      </span>
+    </button>
   );
 }
