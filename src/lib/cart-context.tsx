@@ -163,7 +163,7 @@ export const applyPixDiscount = (v: number) =>
 
 /**
  * Feature flag: exibição pública do Pix como forma de pagamento.
- * Alterar para `true` quando o Pix for aprovado pela Stripe.
- * A lógica de cálculo (PIX_DISCOUNT_RATE) permanece intacta para reativação rápida.
+ * Alterar para `false` caso o Pix precise ser ocultado temporariamente.
+ * A lógica de cálculo (PIX_DISCOUNT_RATE) permanece intacta.
  */
-export const PIX_ENABLED = false;
+export const PIX_ENABLED = true;
