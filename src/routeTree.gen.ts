@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PedidosIndexRouteImport } from './routes/pedidos.index'
 import { Route as PedidosIdRouteImport } from './routes/pedidos.$id'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
+import { Route as ApiPublicPaymentsMercadopagoRouteImport } from './routes/api/public/payments/mercadopago'
 
 const SucessoRoute = SucessoRouteImport.update({
   id: '/sucesso',
@@ -53,6 +54,12 @@ const ApiPublicPaymentsWebhookRoute =
     path: '/api/public/payments/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicPaymentsMercadopagoRoute =
+  ApiPublicPaymentsMercadopagoRouteImport.update({
+    id: '/api/public/payments/mercadopago',
+    path: '/api/public/payments/mercadopago',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -61,6 +68,7 @@ export interface FileRoutesByFullPath {
   '/sucesso': typeof SucessoRoute
   '/pedidos/$id': typeof PedidosIdRoute
   '/pedidos/': typeof PedidosIndexRoute
+  '/api/public/payments/mercadopago': typeof ApiPublicPaymentsMercadopagoRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -70,6 +78,7 @@ export interface FileRoutesByTo {
   '/sucesso': typeof SucessoRoute
   '/pedidos/$id': typeof PedidosIdRoute
   '/pedidos': typeof PedidosIndexRoute
+  '/api/public/payments/mercadopago': typeof ApiPublicPaymentsMercadopagoRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRoutesById {
@@ -80,6 +89,7 @@ export interface FileRoutesById {
   '/sucesso': typeof SucessoRoute
   '/pedidos/$id': typeof PedidosIdRoute
   '/pedidos/': typeof PedidosIndexRoute
+  '/api/public/payments/mercadopago': typeof ApiPublicPaymentsMercadopagoRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRouteTypes {
@@ -91,6 +101,7 @@ export interface FileRouteTypes {
     | '/sucesso'
     | '/pedidos/$id'
     | '/pedidos/'
+    | '/api/public/payments/mercadopago'
     | '/api/public/payments/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -100,6 +111,7 @@ export interface FileRouteTypes {
     | '/sucesso'
     | '/pedidos/$id'
     | '/pedidos'
+    | '/api/public/payments/mercadopago'
     | '/api/public/payments/webhook'
   id:
     | '__root__'
@@ -109,6 +121,7 @@ export interface FileRouteTypes {
     | '/sucesso'
     | '/pedidos/$id'
     | '/pedidos/'
+    | '/api/public/payments/mercadopago'
     | '/api/public/payments/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -119,6 +132,7 @@ export interface RootRouteChildren {
   SucessoRoute: typeof SucessoRoute
   PedidosIdRoute: typeof PedidosIdRoute
   PedidosIndexRoute: typeof PedidosIndexRoute
+  ApiPublicPaymentsMercadopagoRoute: typeof ApiPublicPaymentsMercadopagoRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
 }
 
@@ -173,6 +187,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPaymentsWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/payments/mercadopago': {
+      id: '/api/public/payments/mercadopago'
+      path: '/api/public/payments/mercadopago'
+      fullPath: '/api/public/payments/mercadopago'
+      preLoaderRoute: typeof ApiPublicPaymentsMercadopagoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -183,6 +204,7 @@ const rootRouteChildren: RootRouteChildren = {
   SucessoRoute: SucessoRoute,
   PedidosIdRoute: PedidosIdRoute,
   PedidosIndexRoute: PedidosIndexRoute,
+  ApiPublicPaymentsMercadopagoRoute: ApiPublicPaymentsMercadopagoRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
 }
 export const routeTree = rootRouteImport

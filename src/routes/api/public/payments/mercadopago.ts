@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { mapMpStatus, mpGetPayment, verifyMpWebhook } from "@/lib/mercadopago.server";
-
 async function syncPayment(paymentId: string) {
+  const { mapMpStatus, mpGetPayment } = await import("@/lib/mercadopago.server");
   const payment = await mpGetPayment(paymentId);
   if (!payment) return;
   const orderNumber = payment.external_reference;
@@ -57,6 +56,7 @@ export const Route = createFileRoute("/api/public/payments/mercadopago")({
           );
           if (!paymentId) return Response.json({ received: true, ignored: "no id" });
 
+          const { verifyMpWebhook } = await import("@/lib/mercadopago.server");
           const valid = await verifyMpWebhook(request, paymentId);
           if (!valid) return new Response("Invalid signature", { status: 401 });
 

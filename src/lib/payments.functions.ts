@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequestUrl } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { AVAILABLE_COUPONS, calcDiscount } from "@/lib/coupons";
 import { quoteShipping } from "@/lib/shipping";
@@ -243,10 +242,10 @@ async function loadOwnOrder(
   return row;
 }
 
-function notificationUrl(): string {
+async function notificationUrl(): Promise<string> {
   try {
-    const url = getRequestUrl();
-    return `${url.origin}/api/public/payments/mercadopago`;
+    const { getRequestUrl } = await import("@tanstack/react-start/server");
+    return `${getRequestUrl().origin}/api/public/payments/mercadopago`;
   } catch {
     return "";
   }
@@ -348,7 +347,7 @@ export const payWithCardToken = createServerFn({ method: "POST" })
         },
       };
       if (data.issuerId) body.issuer_id = data.issuerId;
-      const notify = notificationUrl();
+      const notify = await notificationUrl();
       if (notify.startsWith("https://")) body.notification_url = notify;
 
       let payment;
@@ -429,7 +428,7 @@ export const createPixPayment = createServerFn({ method: "POST" })
           identification: { type: "CPF", number: data.cpf },
         },
       };
-      const notify = notificationUrl();
+      const notify = await notificationUrl();
       if (notify.startsWith("https://")) body.notification_url = notify;
 
       let payment;
