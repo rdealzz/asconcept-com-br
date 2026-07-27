@@ -210,23 +210,41 @@ function CheckoutPage() {
     [items],
   );
 
+  // Reaproveita o mesmo pedido pendente em novas tentativas com o mesmo carrinho,
+  // evitando pedidos duplicados (e recobrança do cupom) a cada cartão recusado.
+  const ensurePendingOrder = useCallback(
+    async (payMethod: PayMethod) => {
+      const itemsData = itemsPayload();
+      const customer = customerPayload();
+      const signature = JSON.stringify([payMethod, itemsData, customer, coupon?.code ?? null]);
+      const cached = pendingRef.current;
+      if (cached && cached.signature === signature) return { orderNumber: cached.orderNumber };
+      const created = await startOrder({
+        data: {
+          items: itemsData,
+          couponCode: coupon?.code ?? null,
+          method: payMethod,
+          customer,
+        },
+      });
+      if ("error" in created) return created;
+      pendingRef.current = { signature, orderNumber: created.orderNumber };
+      return created;
+    },
+    [itemsPayload, customerPayload, coupon, startOrder],
+  );
+
   // Cartão: cria pedido pendente e envia o token gerado pelo Brick.
   const onCardSubmit = async (card: CardFormData) => {
     setError(null);
     setSubmitting(true);
     try {
-      const pending = await startOrder({
-        data: {
-          items: itemsPayload(),
-          couponCode: coupon?.code ?? null,
-          method: "card",
-          customer: customerPayload(),
-        },
-      });
+      const pending = await ensurePendingOrder("card");
       if ("error" in pending) {
         setError(pending.error);
         return;
       }
+
       const res = await payCard({
         data: {
           orderNumber: pending.orderNumber,
