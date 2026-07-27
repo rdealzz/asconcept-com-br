@@ -34,6 +34,8 @@ type OrderRow = {
   customer_email: string;
   customer_name: string | null;
   mp_payment_id: string | null;
+  coupon_code: string | null;
+
 };
 
 const PAID_STATUSES = new Set(["Preparando pedido", "Em trânsito", "Entregue"]);
@@ -45,7 +47,10 @@ async function loadOwnOrder(
 ): Promise<OrderRow> {
   const { data, error } = await supabase
     .from("orders")
-    .select("order_number, total, status, user_id, customer_email, customer_name, mp_payment_id")
+    .select(
+      "order_number, total, status, user_id, customer_email, customer_name, mp_payment_id, coupon_code",
+    )
+
     .eq("order_number", orderNumber)
     .maybeSingle();
   if (error || !data) throw new Error("Pedido não encontrado.");
@@ -271,6 +276,12 @@ export async function payWithCardCore(
   await persistPayment(order.order_number, payment, internal);
 
   if (payment.status === "approved") {
+    // Garante que o cupom fique registrado como consumido (caso tenha sido
+    // liberado por uma tentativa recusada anterior deste mesmo pedido).
+    if (order.coupon_code) {
+      const { claimCouponUse } = await import("@/lib/coupon-uses.server");
+      await claimCouponUse(userId, order.coupon_code, order.order_number);
+    }
     return { orderNumber: order.order_number, status: internal, approved: true };
   }
   if (payment.status === "in_process" || payment.status === "pending") {
@@ -281,6 +292,13 @@ export async function payWithCardCore(
       message: "Pagamento em análise. Avisaremos por e-mail assim que for aprovado.",
     };
   }
+
+  // Pagamento recusado: devolve o cupom para o cliente poder tentar de novo.
+  if (order.coupon_code) {
+    const { releaseCouponUse } = await import("@/lib/coupon-uses.server");
+    await releaseCouponUse(userId, order.coupon_code);
+  }
+
   return {
     orderNumber: order.order_number,
     status: internal,
