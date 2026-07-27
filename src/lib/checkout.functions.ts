@@ -515,9 +515,14 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
         .from("orders")
         .update({ status: "Falha no pagamento" } as never)
         .eq("order_number", orderNumber);
+      if (acceptedCoupon) {
+        const { releaseCouponUse } = await import("@/lib/coupon-uses.server");
+        await releaseCouponUse(userId, acceptedCoupon);
+      }
       const { getStripeErrorMessage } = await import("@/lib/stripe.server");
       return { error: getStripeErrorMessage(error) };
     }
+
   });
 
 // Confirma o pagamento no retorno do Stripe (fallback ao webhook).
