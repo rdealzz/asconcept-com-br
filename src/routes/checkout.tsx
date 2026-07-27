@@ -281,14 +281,8 @@ function CheckoutPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const pending = await startOrder({
-        data: {
-          items: itemsPayload(),
-          couponCode: coupon?.code ?? null,
-          method: "pix",
-          customer: customerPayload(),
-        },
-      });
+      const pending = await ensurePendingOrder("pix");
+
       if ("error" in pending) {
         setError(pending.error);
         return;
