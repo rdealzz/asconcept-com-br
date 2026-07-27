@@ -34,6 +34,8 @@ type OrderRow = {
   customer_email: string;
   customer_name: string | null;
   mp_payment_id: string | null;
+  coupon_code: string | null;
+
 };
 
 const PAID_STATUSES = new Set(["Preparando pedido", "Em trânsito", "Entregue"]);
