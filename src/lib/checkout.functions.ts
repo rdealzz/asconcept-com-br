@@ -373,6 +373,15 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
       uf: data.customer.uf,
     };
 
+    // Reserva o cupom antes de gravar o pedido (UNIQUE (user_id, code) evita corrida).
+    if (acceptedCoupon) {
+      const { claimCouponUse } = await import("@/lib/coupon-uses.server");
+      const claimed = await claimCouponUse(userId, acceptedCoupon, orderNumber);
+      if (!claimed) {
+        return { error: "Este cupom já foi utilizado. Remova o cupom para continuar." };
+      }
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const baseInsert = {
       order_number: orderNumber,
@@ -399,9 +408,14 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
         .insert(baseInsert as never);
       if (retryErr) {
         console.error("[checkout] insert order failed:", insertErr, retryErr);
+        if (acceptedCoupon) {
+          const { releaseCouponUse } = await import("@/lib/coupon-uses.server");
+          await releaseCouponUse(userId, acceptedCoupon);
+        }
         return { error: retryErr.message };
       }
     }
+
 
     try {
       const { createStripeClient, getStripeErrorMessage } = await import("@/lib/stripe.server");
