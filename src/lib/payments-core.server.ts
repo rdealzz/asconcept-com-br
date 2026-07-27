@@ -276,6 +276,12 @@ export async function payWithCardCore(
   await persistPayment(order.order_number, payment, internal);
 
   if (payment.status === "approved") {
+    // Garante que o cupom fique registrado como consumido (caso tenha sido
+    // liberado por uma tentativa recusada anterior deste mesmo pedido).
+    if (order.coupon_code) {
+      const { claimCouponUse } = await import("@/lib/coupon-uses.server");
+      await claimCouponUse(userId, order.coupon_code, order.order_number);
+    }
     return { orderNumber: order.order_number, status: internal, approved: true };
   }
   if (payment.status === "in_process" || payment.status === "pending") {
@@ -286,6 +292,13 @@ export async function payWithCardCore(
       message: "Pagamento em análise. Avisaremos por e-mail assim que for aprovado.",
     };
   }
+
+  // Pagamento recusado: devolve o cupom para o cliente poder tentar de novo.
+  if (order.coupon_code) {
+    const { releaseCouponUse } = await import("@/lib/coupon-uses.server");
+    await releaseCouponUse(userId, order.coupon_code);
+  }
+
   return {
     orderNumber: order.order_number,
     status: internal,
