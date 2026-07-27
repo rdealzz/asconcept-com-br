@@ -40,10 +40,6 @@ export async function hasUsedCoupon(userId: string, code: string): Promise<boole
   return !!data;
 }
 
-export async function markCouponUsed(userId: string, code: string, orderId?: string) {
-  await supabase.from("coupon_uses").insert({
-    user_id: userId,
-    code: code.trim().toUpperCase(),
-    order_id: orderId ?? null,
-  } as never);
-}
+// O registro de uso de cupom é feito exclusivamente no servidor
+// (src/lib/coupon-uses.server.ts), nunca pelo cliente.
+

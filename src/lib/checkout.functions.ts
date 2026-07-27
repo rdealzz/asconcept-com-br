@@ -158,6 +158,13 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
       discount,
     };
 
+    // Reserva o cupom antes de gravar o pedido (UNIQUE (user_id, code) evita corrida).
+    if (acceptedCoupon) {
+      const { claimCouponUse } = await import("@/lib/coupon-uses.server");
+      const claimed = await claimCouponUse(userId, acceptedCoupon, orderNumber);
+      if (!claimed) throw new Error("Este cupom já foi utilizado.");
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: inserted, error: insertErr } = await supabaseAdmin
       .from("orders")
@@ -166,8 +173,13 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
       .single();
 
     if (insertErr || !inserted) {
+      if (acceptedCoupon) {
+        const { releaseCouponUse } = await import("@/lib/coupon-uses.server");
+        await releaseCouponUse(userId, acceptedCoupon);
+      }
       throw new Error(insertErr?.message ?? "Não foi possível registrar o pedido.");
     }
+
 
     return {
       orderNumber: (inserted as { order_number: string }).order_number,
@@ -361,6 +373,15 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
       uf: data.customer.uf,
     };
 
+    // Reserva o cupom antes de gravar o pedido (UNIQUE (user_id, code) evita corrida).
+    if (acceptedCoupon) {
+      const { claimCouponUse } = await import("@/lib/coupon-uses.server");
+      const claimed = await claimCouponUse(userId, acceptedCoupon, orderNumber);
+      if (!claimed) {
+        return { error: "Este cupom já foi utilizado. Remova o cupom para continuar." };
+      }
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const baseInsert = {
       order_number: orderNumber,
@@ -387,9 +408,14 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
         .insert(baseInsert as never);
       if (retryErr) {
         console.error("[checkout] insert order failed:", insertErr, retryErr);
+        if (acceptedCoupon) {
+          const { releaseCouponUse } = await import("@/lib/coupon-uses.server");
+          await releaseCouponUse(userId, acceptedCoupon);
+        }
         return { error: retryErr.message };
       }
     }
+
 
     try {
       const { createStripeClient, getStripeErrorMessage } = await import("@/lib/stripe.server");
@@ -489,9 +515,14 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
         .from("orders")
         .update({ status: "Falha no pagamento" } as never)
         .eq("order_number", orderNumber);
+      if (acceptedCoupon) {
+        const { releaseCouponUse } = await import("@/lib/coupon-uses.server");
+        await releaseCouponUse(userId, acceptedCoupon);
+      }
       const { getStripeErrorMessage } = await import("@/lib/stripe.server");
       return { error: getStripeErrorMessage(error) };
     }
+
   });
 
 // Confirma o pagamento no retorno do Stripe (fallback ao webhook).

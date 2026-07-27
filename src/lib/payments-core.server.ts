@@ -180,6 +180,15 @@ export async function createPendingOrderCore(
     uf: data.customer.uf,
   };
 
+  // Reserva o cupom antes de gravar o pedido (UNIQUE (user_id, code) evita corrida).
+  if (acceptedCoupon) {
+    const { claimCouponUse } = await import("@/lib/coupon-uses.server");
+    const claimed = await claimCouponUse(userId, acceptedCoupon, orderNumber);
+    if (!claimed) {
+      return { error: "Este cupom já foi utilizado. Remova o cupom para continuar." };
+    }
+  }
+
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { error: insertErr } = await supabaseAdmin.from("orders").insert({
     order_number: orderNumber,
@@ -199,8 +208,13 @@ export async function createPendingOrderCore(
   } as never);
   if (insertErr) {
     console.error("[mp] insert pending order failed:", insertErr);
+    if (acceptedCoupon) {
+      const { releaseCouponUse } = await import("@/lib/coupon-uses.server");
+      await releaseCouponUse(userId, acceptedCoupon);
+    }
     return { error: "Não foi possível registrar o pedido." };
   }
+
 
   return { orderNumber, total, subtotal, shippingCost, discount };
 }
