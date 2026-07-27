@@ -47,7 +47,10 @@ async function loadOwnOrder(
 ): Promise<OrderRow> {
   const { data, error } = await supabase
     .from("orders")
-    .select("order_number, total, status, user_id, customer_email, customer_name, mp_payment_id")
+    .select(
+      "order_number, total, status, user_id, customer_email, customer_name, mp_payment_id, coupon_code",
+    )
+
     .eq("order_number", orderNumber)
     .maybeSingle();
   if (error || !data) throw new Error("Pedido não encontrado.");
