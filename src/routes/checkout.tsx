@@ -87,6 +87,8 @@ function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [pix, setPix] = useState<PixCharge | null>(null);
   const prefilledRef = useRef(false);
+  const pendingRef = useRef<{ signature: string; orderNumber: string } | null>(null);
+
 
   // Auth guard: navegamos primeiro e abrimos o modal no tick seguinte para não
   // montar um portal enquanto esta rota é desmontada.
