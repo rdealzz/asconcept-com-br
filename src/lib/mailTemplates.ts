@@ -24,9 +24,13 @@ const shell = (title: string, preheader: string, inner: string) => `
         <td align="center" style="padding:48px 16px;">
           <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #E9E4D6;">
             <tr>
-              <td style="padding:32px 40px;border-bottom:1px solid #E9E4D6;text-align:center;">
-                <div style="font-family:'Playfair Display',Georgia,serif;font-size:22px;letter-spacing:0.35em;color:${BRAND.charcoal};">A&amp;S CONCCEPT</div>
-                <div style="margin-top:6px;font-size:10px;letter-spacing:0.32em;color:${BRAND.gold};text-transform:uppercase;">The New Era of Heritage</div>
+              <td style="padding:0;border-bottom:1px solid #E9E4D6;text-align:center;">
+                <img
+                  src="https://asconccept.com.br/email-banner.png"
+                  alt="A&amp;S Conccept — The New Era of Heritage"
+                  width="560"
+                  style="display:block;width:100%;max-width:560px;height:auto;border:0;"
+                />
               </td>
             </tr>
             <tr>

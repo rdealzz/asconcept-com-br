@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 
@@ -66,6 +66,15 @@ export function CardBrick({ amount, email, onSubmitCard }: BrickProps) {
     );
   }
 
+  // Memoizado: o SDK do Mercado Pago trata um novo objeto de "initialization"
+  // como sinal para desmontar e remontar o formulário. Sem isso, o Brick
+  // reinicializa a cada renderização do componente pai e pode falhar
+  // internamente com "Cannot read properties of null (reading 'onReady')".
+  const initialization = useMemo(
+    () => ({ amount, payer: { email } }),
+    [amount, email],
+  );
+
   if (!ready || !Brick) {
     return (
       <div className="flex items-center gap-3 px-1 py-8 text-sm text-muted-foreground">
@@ -78,7 +87,7 @@ export function CardBrick({ amount, email, onSubmitCard }: BrickProps) {
   return (
     <div className="mp-brick">
       <Brick
-        initialization={{ amount, payer: { email } }}
+        initialization={initialization}
         customization={brickCustomization}
         onSubmit={async (formData: {
           token: string;
