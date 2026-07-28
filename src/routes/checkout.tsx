@@ -70,7 +70,7 @@ function formatPhoneBR(raw: string): string {
 }
 
 function CheckoutPage() {
-  const { items, coupon, couponDiscount, subtotal, count, clear } = useCart();
+  const { items, coupon, couponDiscount, subtotal, count, clear, hydrated } = useCart();
   const { user, loading, openAuth } = useAuth();
   const navigate = useNavigate();
   const startOrder = useServerFn(createPendingOrder);
@@ -90,25 +90,9 @@ function CheckoutPage() {
   const pendingRef = useRef<{ signature: string; orderNumber: string } | null>(null);
 
 
-  // Auth guard: navegamos primeiro e abrimos o modal no tick seguinte para não
-  // montar um portal enquanto esta rota é desmontada.
-  useEffect(() => {
-    if (loading) return;
-    if (!user) {
-      navigate({ to: "/" });
-      const t = window.setTimeout(() => {
-        try {
-          openAuth();
-        } catch (err) {
-          console.error("[checkout] openAuth after navigate failed", err);
-        }
-      }, 0);
-      return () => window.clearTimeout(t);
-    }
-    if (items.length === 0 && !pix) {
-      navigate({ to: "/" });
-    }
-  }, [loading, user, items, navigate, openAuth, pix]);
+  // Sem redirecionar: a página mostra o estado certo (entrar / sacola vazia).
+  // Redirecionar dentro de efeito quebrava o checkout em acesso direto ou F5,
+  // porque o carrinho ainda não tinha sido restaurado do navegador.
 
   useEffect(() => {
     if (prefilledRef.current || !user) return;
@@ -330,11 +314,45 @@ function CheckoutPage() {
     };
   }, [pix, checkStatus, navigate]);
 
-  if (loading || !user || (items.length === 0 && !pix)) {
+  if (loading || !hydrated) {
     return (
       <main className="flex min-h-[70vh] items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-accent" strokeWidth={1.5} />
       </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <CheckoutNotice
+        title="Entre para finalizar"
+        text="Faça login ou crie sua conta para concluir o pedido com segurança."
+        action={
+          <button
+            onClick={() => openAuth()}
+            className="border border-charcoal bg-charcoal px-8 py-3 text-[11px] uppercase tracking-luxe text-background"
+          >
+            Entrar
+          </button>
+        }
+      />
+    );
+  }
+
+  if (items.length === 0 && !pix) {
+    return (
+      <CheckoutNotice
+        title="Sua sacola está vazia"
+        text="Explore a coleção e adicione peças para finalizar a compra."
+        action={
+          <Link
+            to="/"
+            className="border border-charcoal bg-charcoal px-8 py-3 text-[11px] uppercase tracking-luxe text-background"
+          >
+            Ver coleção
+          </Link>
+        }
+      />
     );
   }
 
@@ -797,5 +815,27 @@ function MethodTile({
         <span className="block text-[11px] text-muted-foreground">{subtitle}</span>
       </span>
     </button>
+  );
+}
+
+
+function CheckoutNotice({
+  title,
+  text,
+  action,
+}: {
+  title: string;
+  text: string;
+  action: React.ReactNode;
+}) {
+  return (
+    <main className="flex min-h-[70vh] items-center justify-center bg-background px-6">
+      <div className="max-w-md text-center">
+        <p className="text-[11px] uppercase tracking-luxe text-muted-foreground">A&S Conccept</p>
+        <h1 className="mt-4 font-serif text-3xl text-charcoal">{title}</h1>
+        <p className="mt-3 text-sm text-muted-foreground">{text}</p>
+        <div className="mt-8 flex justify-center">{action}</div>
+      </div>
+    </main>
   );
 }
