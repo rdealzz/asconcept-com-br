@@ -102,9 +102,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin: true,
       }));
     }
+    // Nunca deixamos uma falha de leitura derrubar a sessão: o usuário
+    // continua logado (sem perfil/admin) em vez de ficar em limbo.
     const [profile, admin] = await Promise.all([
-      loadProfile(userId),
-      checkIsAdmin(userId),
+      loadProfile(userId).catch((err) => {
+        console.error("[auth] loadProfile falhou", err);
+        return null;
+      }),
+      checkIsAdmin(userId).catch((err) => {
+        console.error("[auth] checkIsAdmin falhou", err);
+        return false;
+      }),
     ]);
     const resolvedEmail = profile?.email ?? email;
     setUser({
