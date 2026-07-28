@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, CreditCard, Loader2, QrCode, ShieldCheck } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useCart, formatBRL, PIX_DISCOUNT_RATE, PIX_ENABLED } from "@/lib/cart-context";
@@ -826,7 +826,7 @@ function CheckoutNotice({
 }: {
   title: string;
   text: string;
-  action: React.ReactNode;
+  action: ReactNode;
 }) {
   return (
     <main className="flex min-h-[70vh] items-center justify-center bg-background px-6">
