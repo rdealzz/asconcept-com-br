@@ -1,51 +1,40 @@
-## Configuração do Webhook do Mercado Pago — tudo o que você precisa
+## O que encontrei
 
-### 1. URL de notificação (já existe no projeto)
-Use a URL de produção do site:
+O problema não são as chaves do Mercado Pago — elas estão salvas (`MP_ACCESS_TOKEN`, `MP_PUBLIC_KEY`, `MP_WEBHOOK_SECRET`) e a API respondeu com sucesso nos testes. A página `/checkout` existe e o servidor a entrega com HTTP 200. O que quebra é o próprio código da página, em dois pontos:
 
-```text
-https://asconccept.com.br/api/public/payments/mercadopago
-```
+**1. O checkout se auto-expulsa antes do carrinho carregar (causa principal)**
 
-Alternativas equivalentes (caso o painel recuse o domínio próprio):
-```text
-https://asconcept-com-br.lovable.app/api/public/payments/mercadopago
-```
+Em `src/routes/checkout.tsx` existe um efeito que faz `navigate({ to: "/" })` quando `items.length === 0`. Só que os itens do carrinho são restaurados do `localStorage` dentro de um efeito do `CartProvider` (`src/lib/cart-context.tsx`), que roda **depois** do efeito da página filha. Ou seja: ao abrir `/checkout` diretamente, dar F5 ou voltar pelo histórico, a página vê o carrinho vazio por um instante e manda o usuário de volta para a home — parecendo que "o checkout não carrega".
 
-Importante: a rota só responde em produção depois de publicar o site (botão Publish). O endpoint aceita apenas **POST** e é público (não exige login), como o Mercado Pago exige.
+**2. A sessão pode ficar travada em "carregando" para sempre**
 
-### 2. Passo a passo no painel do Mercado Pago
-1. Acesse **Seus negócios → Configurações → Suas integrações** e abra a sua aplicação.
-2. No menu lateral, clique em **Webhooks / Notificações Webhook**.
-3. Em **Modo produção**, cole a URL acima no campo "URL de produção".
-4. Em **Eventos**, marque somente **Pagamentos** (`payment`). Não marque Checkout Pro/Merchant Orders — não usamos.
-5. Clique em **Salvar**.
-6. Após salvar, o painel exibe a **Assinatura secreta** (clique em "Revelar"/olho e copie). É um valor longo, tipo `e8f3...`. Guarde: ele vira o secret `MP_WEBHOOK_SECRET`.
-7. Use o botão **Simular** do painel para enviar um teste; a resposta esperada é **200**.
+Em `src/lib/auth-context.tsx`, o `setLoading(false)` só é chamado **depois** de `await hydrateSession(...)`. Se qualquer consulta dentro dela falhar (perfil, verificação de admin, e-mail de boas-vindas), a promessa rejeita e `loading` nunca vira `false`. Como o checkout renderiza apenas um spinner enquanto `loading` for verdadeiro, a tela fica girando indefinidamente.
 
-### 3. Credenciais a cadastrar no cofre do app
-Assim que tiver os três valores em mãos, eu abro o formulário seguro (você nunca cola no chat):
+## O que vou fazer
 
-| Secret | Onde pegar | Formato |
-|---|---|---|
-| `MP_ACCESS_TOKEN` | Suas integrações → sua aplicação → **Credenciais de produção** → Access Token | `APP_USR-...` |
-| `MP_PUBLIC_KEY` | Mesma tela → Public Key | `APP_USR-...` |
-| `MP_WEBHOOK_SECRET` | Tela de Webhooks → Assinatura secreta | string hexadecimal longa |
+1. **Aguardar a hidratação do carrinho antes de qualquer redirecionamento**
+   - Expor um sinal `hydrated` no `CartProvider` (estado real, não `useRef`).
+   - No `/checkout`, só considerar "carrinho vazio" depois que `hydrated` for verdadeiro.
 
-### 4. Como o webhook funciona no site (já implementado)
-- Recebe o POST do Mercado Pago e valida o header `x-signature` com HMAC-SHA256 usando `MP_WEBHOOK_SECRET`. Assinatura inválida → resposta 401 (por isso o secret precisa estar exatamente igual ao do painel).
-- Consulta o pagamento na API do Mercado Pago e localiza o pedido pelo `external_reference` (o número `AS-xxxxxx`).
-- Atualiza `mp_payment_id`, `mp_status` e o `status` do pedido: aprovado → "Preparando pedido"; pendente → "Aguardando Pagamento"; recusado → "Pagamento recusado".
-- Em pagamento aprovado, baixa o estoque uma única vez (proteção contra notificação duplicada).
+2. **Nunca travar a sessão**
+   - Envolver a hidratação da sessão em `try/finally`, garantindo `setLoading(false)` sempre.
+   - Isolar a chamada de e-mail de boas-vindas para que uma falha nela não derrube o login.
 
-### 5. Checklist de validação depois de configurar
-1. Publicar o site (para a URL de produção existir).
-2. Cadastrar os 3 secrets.
-3. Simular a notificação no painel → esperar 200.
-4. Pedido real de R$ 1,00 no cartão → status deve virar "Preparando pedido".
-5. Pedido real de R$ 1,00 no Pix → após pagar o QR Code, o status muda sozinho via webhook (além do polling da tela).
+3. **Trocar o redirecionamento silencioso por uma tela clara**
+   - Sacola vazia: mostrar "Sua sacola está vazia" com botão para a coleção, em vez de jogar o usuário para a home sem explicação.
+   - Sem login: mostrar aviso com botão "Entrar", em vez de redirecionar + abrir modal (que já causou erro de portal antes).
 
-### Detalhes técnicos
-- Arquivo do endpoint: `src/routes/api/public/payments/mercadopago.ts`; verificação de assinatura em `src/lib/mercadopago.server.ts` (`verifyMpWebhook`).
-- O manifesto assinado segue o padrão oficial `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`.
-- Nenhuma alteração de código é necessária nesta etapa — apenas publicar, cadastrar os secrets e configurar o painel.
+4. **Blindar o formulário de cartão**
+   - No `CardBrick`, aguardar o SDK global do Mercado Pago já carregado no HTML, com mensagem de erro visível e opção de tentar de novo caso a chave pública não chegue.
+   - Mostrar mensagem explícita se o pagamento por cartão ficar indisponível, em vez de spinner infinito.
+
+5. **Validar de ponta a ponta**
+   - Abrir `/checkout` no navegador de teste (acesso direto e F5) e conferir que a Etapa 1 renderiza, o CEP calcula o frete, e a Etapa 2 monta o formulário de cartão e o painel Pix.
+
+## Detalhes técnicos
+
+- `src/lib/cart-context.tsx`: `hydrated` passa de `useRef` para estado exposto no contexto.
+- `src/routes/checkout.tsx`: guarda de rota reescrita (sem `navigate` no efeito), estados de "vazio" e "sem login" renderizados.
+- `src/lib/auth-context.tsx`: `try/finally` no bootstrap da sessão.
+- `src/components/CardBrick.tsx`: espera pelo `window.MercadoPago` já injetado em `__root.tsx` e trata erro de chave.
+- Nenhuma alteração de banco de dados, de secrets ou da lógica de preço/cupom no servidor.

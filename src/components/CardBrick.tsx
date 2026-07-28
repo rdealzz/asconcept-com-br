@@ -28,11 +28,23 @@ export function CardBrick({ amount, email, onSubmitCard }: BrickProps) {
   const fetchKey = useServerFn(getMpPublicKey);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [Brick, setBrick] = useState<any>(null);
 
+  // Memoizado: o SDK do Mercado Pago trata um novo objeto de "initialization"
+  // como sinal para desmontar e remontar o formulário. Sem isso, o Brick
+  // reinicializa a cada renderização do componente pai e pode falhar
+  // internamente com "Cannot read properties of null (reading 'onReady')".
+  // Precisa ficar antes de qualquer `return` para não quebrar a ordem dos hooks.
+  const initialization = useMemo(
+    () => ({ amount, payer: { email } }),
+    [amount, email],
+  );
+
   useEffect(() => {
     let cancelled = false;
+    setError(null);
     (async () => {
       try {
         const { publicKey } = await fetchKey();
@@ -46,7 +58,7 @@ export function CardBrick({ amount, email, onSubmitCard }: BrickProps) {
         const mod = await import("@mercadopago/sdk-react");
         mod.initMercadoPago(publicKey, { locale: "pt-BR" });
         if (cancelled) return;
-        setBrick(mod.CardPayment);
+        setBrick(() => mod.CardPayment);
         setReady(true);
       } catch (e) {
         console.error("[mp] brick init failed", e);
@@ -56,24 +68,22 @@ export function CardBrick({ amount, email, onSubmitCard }: BrickProps) {
     return () => {
       cancelled = true;
     };
-  }, [fetchKey]);
+  }, [fetchKey, attempt]);
 
   if (error) {
     return (
-      <p className="border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-        {error}
-      </p>
+      <div className="border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <p>{error}</p>
+        <button
+          type="button"
+          onClick={() => setAttempt((a) => a + 1)}
+          className="mt-3 border border-destructive/50 px-4 py-2 text-[11px] uppercase tracking-luxe"
+        >
+          Tentar novamente
+        </button>
+      </div>
     );
   }
-
-  // Memoizado: o SDK do Mercado Pago trata um novo objeto de "initialization"
-  // como sinal para desmontar e remontar o formulário. Sem isso, o Brick
-  // reinicializa a cada renderização do componente pai e pode falhar
-  // internamente com "Cannot read properties of null (reading 'onReady')".
-  const initialization = useMemo(
-    () => ({ amount, payer: { email } }),
-    [amount, email],
-  );
 
   if (!ready || !Brick) {
     return (
@@ -83,6 +93,7 @@ export function CardBrick({ amount, email, onSubmitCard }: BrickProps) {
       </div>
     );
   }
+
 
   return (
     <div className="mp-brick">

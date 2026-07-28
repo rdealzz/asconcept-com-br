@@ -40,6 +40,8 @@ type CartCtx = {
   couponCode: string | null;
   couponDiscount: number;
   setCoupon: (coupon: Coupon | null) => void;
+  /** true depois que o carrinho salvo no navegador foi restaurado. */
+  hydrated: boolean;
 };
 
 const Ctx = createContext<CartCtx | null>(null);
@@ -51,7 +53,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setOpen] = useState(false);
   const [coupon, setCouponState] = useState<Coupon | null>(null);
-  const hydrated = useRef(false);
+  const [hydrated, setHydrated] = useState(false);
+  const hydratedRef = useRef(false);
 
   // Hydrate from localStorage on client mount to avoid SSR mismatch.
   useEffect(() => {
@@ -69,18 +72,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-    hydrated.current = true;
+    hydratedRef.current = true;
+    setHydrated(true);
   }, []);
 
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydratedRef.current) return;
     try {
       localStorage.setItem(CART_KEY, JSON.stringify(items));
     } catch { /* ignore */ }
   }, [items]);
 
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydratedRef.current) return;
     try {
       if (coupon) localStorage.setItem(COUPON_KEY, JSON.stringify(coupon));
       else localStorage.removeItem(COUPON_KEY);
@@ -140,6 +144,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         couponCode: coupon?.code ?? null,
         couponDiscount,
         setCoupon: (c) => setCouponState(c),
+        hydrated,
       }}
     >
       {children}

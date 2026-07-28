@@ -102,9 +102,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin: true,
       }));
     }
+    // Nunca deixamos uma falha de leitura derrubar a sessão: o usuário
+    // continua logado (sem perfil/admin) em vez de ficar em limbo.
     const [profile, admin] = await Promise.all([
-      loadProfile(userId),
-      checkIsAdmin(userId),
+      loadProfile(userId).catch((err) => {
+        console.error("[auth] loadProfile falhou", err);
+        return null;
+      }),
+      checkIsAdmin(userId).catch((err) => {
+        console.error("[auth] checkIsAdmin falhou", err);
+        return false;
+      }),
     ]);
     const resolvedEmail = profile?.email ?? email;
     setUser({
@@ -135,14 +143,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!mounted) return;
-      const session = data.session;
-      if (session?.user) {
-        await hydrateSession(session.user.id, session.user.email ?? "");
+    // O `finally` é essencial: se a hidratação falhar (perfil, RPC de admin,
+    // rede), `loading` precisa virar false mesmo assim — caso contrário o
+    // checkout fica preso no spinner para sempre.
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!mounted) return;
+        const session = data.session;
+        if (session?.user) {
+          await hydrateSession(session.user.id, session.user.email ?? "");
+        }
+      } catch (err) {
+        console.error("[auth] bootstrap falhou", err);
+      } finally {
+        if (mounted) setLoading(false);
       }
-      setLoading(false);
-    });
+    })();
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT" || !session?.user) {
@@ -154,7 +171,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
         // Defer to avoid deadlocks
         setTimeout(() => {
-          void hydrateSession(session.user.id, session.user.email ?? "");
+          void hydrateSession(session.user.id, session.user.email ?? "").catch((err) =>
+            console.error("[auth] hidratação falhou", err),
+          );
         }, 0);
       }
     });
