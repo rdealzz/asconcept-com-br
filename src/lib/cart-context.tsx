@@ -40,6 +40,8 @@ type CartCtx = {
   couponCode: string | null;
   couponDiscount: number;
   setCoupon: (coupon: Coupon | null) => void;
+  /** true depois que o carrinho salvo no navegador foi restaurado. */
+  hydrated: boolean;
 };
 
 const Ctx = createContext<CartCtx | null>(null);
