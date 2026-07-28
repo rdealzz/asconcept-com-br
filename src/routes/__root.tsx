@@ -120,6 +120,15 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        {/*
+          Carregado diretamente no HTML (em vez de depender só do
+          initMercadoPago() do pacote @mercadopago/sdk-react) porque em
+          alguns ambientes o wrapper React falha em injetar esse script
+          sozinho, deixando window.MercadoPago undefined e quebrando o
+          formulário de cartão com "Cannot read properties of null
+          (reading 'onReady')". Ver: https://github.com/mercadopago/sdk-js
+        */}
+        <script src="https://sdk.mercadopago.com/js/v2" async></script>
       </head>
       <body>
         {children}
