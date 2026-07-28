@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /checkout
+Disallow: /pedidos
+Disallow: /reset-password
+Disallow: /api/
+
+Sitemap: https://asconccept.com.br/sitemap.xml
