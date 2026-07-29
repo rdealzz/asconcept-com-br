@@ -7,6 +7,7 @@ import { Check, Loader2 } from "lucide-react";
 import { confirmStripePayment } from "@/lib/checkout.functions";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { useCart } from "@/lib/cart-context";
+import { ContactStrip } from "@/components/ContactStrip";
 
 
 export const Route = createFileRoute("/sucesso")({
@@ -131,6 +132,7 @@ function SucessoPage() {
           </>
         )}
       </div>
+    <ContactStrip />
     </main>
   );
 }

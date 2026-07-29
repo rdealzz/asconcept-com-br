@@ -14,6 +14,7 @@ import { formatCpf, isValidCpf } from "@/lib/mercadopago";
 import { CardBrick, type CardFormData } from "@/components/CardBrick";
 import { PixPanel, type PixCharge } from "@/components/PixPanel";
 import { quoteShipping, formatCep, normalizeCep } from "@/lib/shipping";
+import { ContactStrip } from "@/components/ContactStrip";
 
 export const Route = createFileRoute("/checkout")({
   ssr: false,
