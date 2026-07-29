@@ -35,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 import { AVAILABLE_COUPONS, findCoupon, hasUsedCoupon } from "@/lib/coupons";
+import { SUPPORT_EMAIL, WHATSAPP_DISPLAY, WHATSAPP_LINK } from "@/components/WhatsAppFab";
 
 import heroAsset from "@/assets/hero-amalfi-men.jpg.asset.json";
 const hero = heroAsset.url;
