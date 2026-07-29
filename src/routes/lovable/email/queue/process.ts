@@ -60,7 +60,8 @@ async function moveToDlq(
   }
 }
 
-export const Route = createFileRoute("/lovable/email/queue/process")({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const Route = (createFileRoute("/lovable/email/queue/process") as any)({
   server: {
     handlers: {
       POST: async ({ request }: { request: Request }) => {
