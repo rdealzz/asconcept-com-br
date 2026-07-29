@@ -729,6 +729,11 @@ function Products() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let inTab = products.filter((p) => (p.category ?? "clothes") === tab);
+    // Produtos sem estoque em nenhum tamanho somem da vitrine pública,
+    // mas continuam visíveis para o admin (para repor estoque ou excluir).
+    if (!isAdmin) {
+      inTab = inTab.filter((p) => totalStock(stock[p.id]) > 0);
+    }
     if (tab === "clothes" && subFilter !== "todos") {
       inTab = inTab.filter((p) => matchesSub(p.name, p.description, subFilter));
     }
@@ -739,7 +744,7 @@ function Products() {
         p.description.toLowerCase().includes(q) ||
         (p.longDescription ?? "").toLowerCase().includes(q),
     );
-  }, [query, products, tab, subFilter]);
+  }, [query, products, tab, subFilter, isAdmin, stock]);
 
   const showSneakersComingSoon = tab === "sneakers" && !isAdmin && filtered.length === 0;
 
