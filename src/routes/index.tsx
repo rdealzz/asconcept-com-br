@@ -1342,7 +1342,9 @@ function AdminEditModal() {
   const onSave = () => {
     const name = form.name.trim();
     if (!name) return alert("Informe o nome do produto.");
-    if (!form.image) return alert("Envie uma foto do produto.");
+    const gallery = form.gallery.slice(0, MAX_PRODUCT_IMAGES);
+    if (!gallery.length) return alert("Envie ao menos uma foto do produto.");
+    const cover = gallery[0];
     const price = Math.max(0, Number(form.price) || 0);
     const stockObj = coerceSizeStock(form.stock);
 
@@ -1353,8 +1355,8 @@ function AdminEditModal() {
           description: form.description.trim() || name,
           longDescription: form.longDescription.trim() || undefined,
           price,
-          image: form.image,
-          gallery: [form.image],
+          image: cover,
+          gallery,
           category: form.category,
           forceLastItem: form.forceLastItem || undefined,
         },
@@ -1366,8 +1368,8 @@ function AdminEditModal() {
         description: form.description.trim(),
         longDescription: form.longDescription.trim() || undefined,
         price,
-        image: form.image,
-        gallery: [form.image],
+        image: cover,
+        gallery,
         category: form.category,
         forceLastItem: form.forceLastItem || undefined,
       });
