@@ -964,8 +964,24 @@ function ProductCard({ product }: { product: Product }) {
             <StockBadge qty={total} />
           )}
         </div>
+        {soldOut ? (
+          <>
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <span className="rotate-[-8deg] border-2 border-destructive/80 bg-charcoal/40 px-6 py-2 font-serif text-2xl tracking-widest text-destructive backdrop-blur">
+                SOLD OUT
+              </span>
+            </div>
+            <div className="pointer-events-none absolute inset-x-4 bottom-4 border border-ivory/40 bg-charcoal/80 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory/80 backdrop-blur-sm">
+              Produto Esgotado
+            </div>
+          </>
+        ) : (
+          <div className="pointer-events-none absolute inset-x-4 bottom-4 translate-y-6 border border-ivory/80 bg-charcoal/70 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory opacity-0 backdrop-blur-sm transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">
+            Ver Produto
+          </div>
+        )}
         {isAdmin && (
-          <div className="absolute right-3 top-3 flex flex-col gap-2">
+          <div className="pointer-events-auto absolute right-3 top-3 z-30 flex flex-col gap-2">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -986,22 +1002,6 @@ function ProductCard({ product }: { product: Product }) {
             >
               <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
             </button>
-          </div>
-        )}
-        {soldOut ? (
-          <>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="rotate-[-8deg] border-2 border-destructive/80 bg-charcoal/40 px-6 py-2 font-serif text-2xl tracking-widest text-destructive backdrop-blur">
-                SOLD OUT
-              </span>
-            </div>
-            <div className="absolute inset-x-4 bottom-4 border border-ivory/40 bg-charcoal/80 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory/80 backdrop-blur-sm">
-              Produto Esgotado
-            </div>
-          </>
-        ) : (
-          <div className="absolute inset-x-4 bottom-4 translate-y-6 border border-ivory/80 bg-charcoal/70 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory opacity-0 backdrop-blur-sm transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">
-            Ver Produto
           </div>
         )}
       </div>
