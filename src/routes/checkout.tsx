@@ -475,6 +475,7 @@ function CheckoutPage() {
                 </p>
               </aside>
             </div>
+            <ContactStrip />
           </>
         )}
       </div>
