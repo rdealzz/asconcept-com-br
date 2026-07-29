@@ -728,69 +728,127 @@ function AdminOrderCard({ order }: { order: Order }) {
 /* ---------- Cliente ---------- */
 
 function CustomerOrderCard({ order }: { order: Order }) {
-  const created = new Date(order.createdAt).toLocaleString("pt-BR");
+  const [openDetails, setOpenDetails] = useState(false);
+  const created = new Date(order.createdAt).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+  const first = order.items[0];
+  const extra = order.items.length - 1;
+  const addr = order.address;
+
   return (
-    <li className="border border-border bg-card">
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-6 py-4">
-        <div>
+    <li className="border border-border bg-card transition-shadow hover:shadow-[0_12px_32px_-24px_rgba(0,0,0,0.5)]">
+      <div className="flex flex-wrap items-center gap-6 p-6 md:p-8">
+        <div className="relative h-24 w-20 flex-none overflow-hidden bg-secondary">
+          {first?.image ? (
+            <img src={first.image} alt={first.name} className="h-full w-full object-cover" />
+          ) : null}
+          {extra > 0 && (
+            <span className="absolute inset-x-0 bottom-0 bg-charcoal/80 py-0.5 text-center text-[9px] tracking-luxe uppercase text-ivory">
+              +{extra}
+            </span>
+          )}
+        </div>
+
+        <div className="min-w-[180px] flex-1">
           <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">Pedido</p>
           <Link
             to="/pedidos/$id"
             params={{ id: order.id }}
-            className="font-mono text-sm hover:text-[color:var(--gold)]"
+            className="font-mono text-sm transition-colors hover:text-[color:var(--gold)]"
           >
             {order.id}
           </Link>
-          <p className="mt-1 text-[11px] text-muted-foreground">{created}</p>
-          {order.trackingCode && (
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Rastreio: <span className="font-mono text-charcoal">{order.trackingCode}</span>
-            </p>
-          )}
+          <p className="mt-2 text-xs font-light text-muted-foreground">{created}</p>
+          <p className="mt-1 text-xs font-light text-muted-foreground">
+            {first?.name}
+            {extra > 0 ? ` e mais ${extra} ${extra === 1 ? "item" : "itens"}` : ""}
+          </p>
         </div>
-        <StatusBadge status={order.status} />
+
+        <div className="flex flex-col items-end gap-3">
+          <StatusBadge status={order.status} />
+          <span className="font-serif text-2xl tabular-nums">{formatBRL(order.total)}</span>
+          <button
+            onClick={() => setOpenDetails((v) => !v)}
+            className="text-[10px] tracking-luxe uppercase text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          >
+            {openDetails ? "Ocultar detalhes" : "Ver detalhes"}
+          </button>
+        </div>
       </div>
-      <div className="grid gap-4 px-6 py-4 sm:grid-cols-[1fr_auto]">
-        <ul className="space-y-3 text-sm">
-          {order.items.map((i) => (
-            <li key={`${i.id}-${i.size}`} className="flex items-center gap-3">
-              <img
-                src={i.image}
-                alt={i.name}
-                className="h-14 w-10 flex-none object-cover"
-              />
-              <span className="flex-1">
-                {i.name}{" "}
-                <span className="text-muted-foreground">
-                  · Tam. {i.size} · x{i.quantity}
+
+      {openDetails && (
+        <div className="animate-[fade-in_0.3s_ease-out_both] border-t border-border px-6 py-8 md:px-8">
+          <div className="grid gap-10 md:grid-cols-[1fr_260px]">
+            <div>
+              <p className="mb-4 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Itens
+              </p>
+              <ul className="space-y-4 text-sm font-light">
+                {order.items.map((i) => (
+                  <li key={`${i.id}-${i.size}`} className="flex items-center gap-4">
+                    <img src={i.image} alt={i.name} className="h-16 w-12 flex-none object-cover" />
+                    <span className="flex-1">
+                      {i.name}
+                      <span className="block text-xs text-muted-foreground">
+                        Tam. {i.size} · x{i.quantity}
+                      </span>
+                    </span>
+                    <span className="tabular-nums">{formatBRL(i.price * i.quantity)}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {addr?.logradouro && (
+                <div className="mt-8">
+                  <p className="mb-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    Entrega
+                  </p>
+                  <p className="text-sm font-light leading-relaxed text-muted-foreground">
+                    {addr.logradouro}, {addr.numero}
+                    {addr.complemento ? ` · ${addr.complemento}` : ""}
+                    <br />
+                    {addr.bairro} · {addr.cidade}/{addr.uf}
+                    <br />
+                    CEP {addr.cep}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 text-sm font-light md:border-l md:border-border md:pl-8">
+              <p className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="tabular-nums">{formatBRL(order.subtotal)}</span>
+              </p>
+              <p className="flex justify-between">
+                <span className="text-muted-foreground">Frete</span>
+                <span className="tabular-nums">
+                  {order.shippingCost === 0 ? "Grátis" : formatBRL(order.shippingCost)}
                 </span>
-              </span>
-              <span className="tabular-nums">{formatBRL(i.price * i.quantity)}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="border-t border-border pt-4 text-sm sm:min-w-[220px] sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
-          <p className="flex justify-between">
-            <span className="text-muted-foreground">Subtotal</span>
-            <span className="tabular-nums">{formatBRL(order.subtotal)}</span>
-          </p>
-          <p className="flex justify-between">
-            <span className="text-muted-foreground">Frete</span>
-            <span className="tabular-nums">
-              {order.shippingCost === 0 ? "Grátis" : formatBRL(order.shippingCost)}
-            </span>
-          </p>
-          <p className="mt-2 flex items-baseline justify-between border-t border-border pt-2">
-            <span className="text-[11px] tracking-luxe uppercase text-muted-foreground">
-              Total
-            </span>
-            <span className="font-serif text-lg tabular-nums">{formatBRL(order.total)}</span>
-          </p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            Pagamento: {paymentLabel(order.paymentMethod)}
-          </p>
+              </p>
+              <p className="flex items-baseline justify-between border-t border-border pt-3">
+                <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                  Total
+                </span>
+                <span className="font-serif text-lg tabular-nums">{formatBRL(order.total)}</span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Pagamento: {paymentLabel(order.paymentMethod)}
+              </p>
+              {order.trackingCode && (
+                <p className="text-xs text-muted-foreground">
+                  Rastreio:{" "}
+                  <span className="font-mono text-foreground">{order.trackingCode}</span>
+                </p>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </li>
   );
 }
