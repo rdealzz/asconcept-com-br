@@ -1246,7 +1246,7 @@ function AdminEditModal() {
     description: "",
     longDescription: "",
     price: 0,
-    image: "",
+    gallery: [] as string[],
     stock: emptyStock(),
     forceLastItem: false,
     category: (creatingCategory ?? tab) as ProductCategory,
@@ -1261,18 +1261,24 @@ function AdminEditModal() {
         description: "",
         longDescription: "",
         price: 0,
-        image: "",
+        gallery: [],
         stock: { P: 1, M: 1, G: 1, GG: 1 },
         forceLastItem: false,
         category: creatingCategory ?? tab,
       });
     } else if (product) {
+      const gal =
+        product.gallery && product.gallery.length
+          ? product.gallery.slice(0, MAX_PRODUCT_IMAGES)
+          : product.image
+            ? [product.image]
+            : [];
       setForm({
         name: product.name,
         description: product.description,
         longDescription: product.longDescription ?? "",
         price: product.price,
-        image: product.image,
+        gallery: gal,
         stock: coerceSizeStock(stock[product.id]),
         forceLastItem: product.forceLastItem === true,
         category: (product.category ?? "clothes") as ProductCategory,
@@ -1282,24 +1288,50 @@ function AdminEditModal() {
 
   if (!open) return null;
 
-  const onPickFile = async (file: File | undefined) => {
+  const onPickFiles = async (fileList: FileList | null) => {
     setUploadError(null);
-    if (!file) return;
-    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) {
-      setUploadError("Envie uma imagem JPG, PNG ou WEBP.");
+    const files = Array.from(fileList ?? []);
+    if (!files.length) return;
+
+    const remaining = MAX_PRODUCT_IMAGES - form.gallery.length;
+    if (remaining <= 0) {
+      setUploadError(`Máximo de ${MAX_PRODUCT_IMAGES} fotos por produto.`);
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setUploadError("Imagem muito grande. Use um arquivo de até 2 MB.");
-      return;
+
+    const accepted: string[] = [];
+    let ignored = files.length > remaining;
+
+    for (const file of files.slice(0, remaining)) {
+      if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) {
+        setUploadError("Envie imagens JPG, PNG ou WEBP.");
+        continue;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        setUploadError("Cada imagem deve ter até 2 MB.");
+        continue;
+      }
+      try {
+        accepted.push(await fileToBase64(file));
+      } catch {
+        setUploadError("Falha ao ler uma das imagens.");
+      }
     }
-    try {
-      const b64 = await fileToBase64(file);
-      setForm((f) => ({ ...f, image: b64 }));
-    } catch {
-      setUploadError("Falha ao ler a imagem.");
+
+    if (accepted.length) {
+      setForm((f) => ({
+        ...f,
+        gallery: [...f.gallery, ...accepted].slice(0, MAX_PRODUCT_IMAGES),
+      }));
+    }
+    if (ignored) {
+      setUploadError(`Máximo de ${MAX_PRODUCT_IMAGES} fotos — fotos extras foram ignoradas.`);
     }
   };
+
+  const removePhoto = (idx: number) =>
+    setForm((f) => ({ ...f, gallery: f.gallery.filter((_, i) => i !== idx) }));
+
 
   const setSizeQty = (s: Size, v: number) =>
     setForm((f) => ({
