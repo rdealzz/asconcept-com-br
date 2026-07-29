@@ -1401,21 +1401,56 @@ function AdminEditModal() {
           <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-[180px_1fr]">
             <div>
               <div className="aspect-[3/4] w-full overflow-hidden border border-border bg-secondary">
-                {form.image ? (
-                  <img src={form.image} alt="" className="h-full w-full object-cover" />
+                {form.gallery[0] ? (
+                  <img src={form.gallery[0]} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-[10px] uppercase tracking-luxe text-muted-foreground">
                     Sem foto
                   </div>
                 )}
               </div>
-              <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 border border-accent/50 bg-accent/5 px-3 py-2 text-[10px] tracking-luxe uppercase text-accent transition-colors hover:bg-accent hover:text-charcoal">
+
+              {form.gallery.length > 0 && (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {form.gallery.map((g, i) => (
+                    <div key={i} className="relative aspect-[3/4] overflow-hidden border border-border">
+                      <img src={g} alt="" className="h-full w-full object-cover" />
+                      {i === 0 && (
+                        <span className="absolute inset-x-0 bottom-0 bg-charcoal/80 py-0.5 text-center text-[8px] tracking-luxe uppercase text-ivory">
+                          Capa
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(i)}
+                        aria-label="Remover foto"
+                        className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center bg-background/90 text-destructive shadow-sm transition-colors hover:bg-destructive hover:text-ivory"
+                      >
+                        <X className="h-3 w-3" strokeWidth={2} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <label
+                className={`mt-3 flex items-center justify-center gap-2 border border-accent/50 bg-accent/5 px-3 py-2 text-[10px] tracking-luxe uppercase text-accent transition-colors ${
+                  form.gallery.length >= MAX_PRODUCT_IMAGES
+                    ? "cursor-not-allowed opacity-40"
+                    : "cursor-pointer hover:bg-accent hover:text-charcoal"
+                }`}
+              >
                 <Upload className="h-3.5 w-3.5" strokeWidth={1.5} />
-                Enviar Foto (JPG)
+                Enviar Fotos ({form.gallery.length}/{MAX_PRODUCT_IMAGES})
                 <input
                   type="file"
+                  multiple
+                  disabled={form.gallery.length >= MAX_PRODUCT_IMAGES}
                   accept="image/jpeg,image/jpg,image/png,image/webp"
-                  onChange={(e) => onPickFile(e.target.files?.[0])}
+                  onChange={(e) => {
+                    void onPickFiles(e.target.files);
+                    e.target.value = "";
+                  }}
                   className="hidden"
                 />
               </label>
@@ -1423,9 +1458,10 @@ function AdminEditModal() {
                 <p className="mt-2 text-[10px] text-destructive">{uploadError}</p>
               )}
               <p className="mt-2 text-[9px] tracking-luxe uppercase text-muted-foreground">
-                Até 2 MB · Salvo no dispositivo
+                Até {MAX_PRODUCT_IMAGES} fotos · JPG, PNG ou WEBP · 2 MB cada
               </p>
             </div>
+
 
             <div className="space-y-4">
               <Field label="Categoria">
