@@ -154,6 +154,7 @@ function OrdersPage() {
           </ul>
         )}
       </main>
+      <ContactStrip />
     </div>
   );
 }
