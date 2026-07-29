@@ -59,6 +59,9 @@ const hasLastSize = (s: SizeStock | undefined) =>
 
 const SNEAKERS_LAUNCH = new Date("2026-09-01T00:00:00-03:00").getTime();
 
+/** Máximo de fotos por produto no formulário do admin. */
+const MAX_PRODUCT_IMAGES = 5;
+
 function useIsAdmin() {
   const { user } = useAuth();
   return !!user?.isAdmin;
