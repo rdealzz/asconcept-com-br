@@ -1077,11 +1077,11 @@ function ProductModal() {
           </button>
           <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-2 md:overflow-visible md:pb-0">
             <div className="bg-secondary">
-              <div className="aspect-[3/4] w-full overflow-hidden">
+              <div className="flex aspect-[3/4] w-full items-center justify-center overflow-hidden bg-secondary">
                 <img
                   src={gallery[activeImg]}
                   alt={active.name}
-                  className="h-full w-full object-cover transition-transform duration-700 hover:scale-105"
+                  className="h-full w-full object-contain transition-transform duration-700 hover:scale-105"
                 />
               </div>
               {gallery.length > 1 && (
