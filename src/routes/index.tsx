@@ -35,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 import { AVAILABLE_COUPONS, findCoupon, hasUsedCoupon } from "@/lib/coupons";
+import { SUPPORT_EMAIL, WHATSAPP_DISPLAY, WHATSAPP_LINK } from "@/components/WhatsAppFab";
 
 import heroAsset from "@/assets/hero-amalfi-men.jpg.asset.json";
 const hero = heroAsset.url;
@@ -57,6 +58,9 @@ const hasLastSize = (s: SizeStock | undefined) =>
   !!s && (s.P === 1 || s.M === 1 || s.G === 1 || s.GG === 1);
 
 const SNEAKERS_LAUNCH = new Date("2026-09-01T00:00:00-03:00").getTime();
+
+/** Máximo de fotos por produto no formulário do admin. */
+const MAX_PRODUCT_IMAGES = 5;
 
 function useIsAdmin() {
   const { user } = useAuth();
@@ -722,13 +726,18 @@ function matchesSub(name: string, description: string, sub: SubFilter) {
 
 function Products() {
   const { query, setQuery, tab, subFilter, setSubFilter } = useSearch();
-  const { products, refresh: resetCatalog } = useCatalog();
+  const { products, stock, refresh: resetCatalog } = useCatalog();
   const { openCreate } = useProduct();
   const isAdmin = useIsAdmin();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let inTab = products.filter((p) => (p.category ?? "clothes") === tab);
+    // Produtos sem estoque em nenhum tamanho somem da vitrine pública,
+    // mas continuam visíveis para o admin (para repor estoque ou excluir).
+    if (!isAdmin) {
+      inTab = inTab.filter((p) => totalStock(stock[p.id]) > 0);
+    }
     if (tab === "clothes" && subFilter !== "todos") {
       inTab = inTab.filter((p) => matchesSub(p.name, p.description, subFilter));
     }
@@ -739,7 +748,7 @@ function Products() {
         p.description.toLowerCase().includes(q) ||
         (p.longDescription ?? "").toLowerCase().includes(q),
     );
-  }, [query, products, tab, subFilter]);
+  }, [query, products, tab, subFilter, isAdmin, stock]);
 
   const showSneakersComingSoon = tab === "sneakers" && !isAdmin && filtered.length === 0;
 
@@ -964,8 +973,24 @@ function ProductCard({ product }: { product: Product }) {
             <StockBadge qty={total} />
           )}
         </div>
+        {soldOut ? (
+          <>
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <span className="rotate-[-8deg] border-2 border-destructive/80 bg-charcoal/40 px-6 py-2 font-serif text-2xl tracking-widest text-destructive backdrop-blur">
+                SOLD OUT
+              </span>
+            </div>
+            <div className="pointer-events-none absolute inset-x-4 bottom-4 border border-ivory/40 bg-charcoal/80 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory/80 backdrop-blur-sm">
+              Produto Esgotado
+            </div>
+          </>
+        ) : (
+          <div className="pointer-events-none absolute inset-x-4 bottom-4 translate-y-6 border border-ivory/80 bg-charcoal/70 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory opacity-0 backdrop-blur-sm transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">
+            Ver Produto
+          </div>
+        )}
         {isAdmin && (
-          <div className="absolute right-3 top-3 flex flex-col gap-2">
+          <div className="pointer-events-auto absolute right-3 top-3 z-30 flex flex-col gap-2">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -986,22 +1011,6 @@ function ProductCard({ product }: { product: Product }) {
             >
               <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
             </button>
-          </div>
-        )}
-        {soldOut ? (
-          <>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="rotate-[-8deg] border-2 border-destructive/80 bg-charcoal/40 px-6 py-2 font-serif text-2xl tracking-widest text-destructive backdrop-blur">
-                SOLD OUT
-              </span>
-            </div>
-            <div className="absolute inset-x-4 bottom-4 border border-ivory/40 bg-charcoal/80 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory/80 backdrop-blur-sm">
-              Produto Esgotado
-            </div>
-          </>
-        ) : (
-          <div className="absolute inset-x-4 bottom-4 translate-y-6 border border-ivory/80 bg-charcoal/70 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory opacity-0 backdrop-blur-sm transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">
-            Ver Produto
           </div>
         )}
       </div>
@@ -1077,11 +1086,11 @@ function ProductModal() {
           </button>
           <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-2 md:overflow-visible md:pb-0">
             <div className="bg-secondary">
-              <div className="aspect-[3/4] w-full overflow-hidden">
+              <div className="flex aspect-[3/4] w-full items-center justify-center overflow-hidden bg-secondary">
                 <img
                   src={gallery[activeImg]}
                   alt={active.name}
-                  className="h-full w-full object-cover transition-transform duration-700 hover:scale-105"
+                  className="h-full w-full object-contain transition-transform duration-700 hover:scale-105"
                 />
               </div>
               {gallery.length > 1 && (
@@ -1187,7 +1196,6 @@ function ProductModal() {
 
               <div className="mt-8 space-y-2 border-t border-border pt-6 text-xs font-light text-muted-foreground">
                 <p>Frete grátis em pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}.</p>
-                <p>Trocas e ajustes cortesia em até 30 dias.</p>
               </div>
             </div>
           </div>
@@ -1241,7 +1249,7 @@ function AdminEditModal() {
     description: "",
     longDescription: "",
     price: 0,
-    image: "",
+    gallery: [] as string[],
     stock: emptyStock(),
     forceLastItem: false,
     category: (creatingCategory ?? tab) as ProductCategory,
@@ -1256,18 +1264,24 @@ function AdminEditModal() {
         description: "",
         longDescription: "",
         price: 0,
-        image: "",
+        gallery: [],
         stock: { P: 1, M: 1, G: 1, GG: 1 },
         forceLastItem: false,
         category: creatingCategory ?? tab,
       });
     } else if (product) {
+      const gal =
+        product.gallery && product.gallery.length
+          ? product.gallery.slice(0, MAX_PRODUCT_IMAGES)
+          : product.image
+            ? [product.image]
+            : [];
       setForm({
         name: product.name,
         description: product.description,
         longDescription: product.longDescription ?? "",
         price: product.price,
-        image: product.image,
+        gallery: gal,
         stock: coerceSizeStock(stock[product.id]),
         forceLastItem: product.forceLastItem === true,
         category: (product.category ?? "clothes") as ProductCategory,
@@ -1277,24 +1291,50 @@ function AdminEditModal() {
 
   if (!open) return null;
 
-  const onPickFile = async (file: File | undefined) => {
+  const onPickFiles = async (fileList: FileList | null) => {
     setUploadError(null);
-    if (!file) return;
-    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) {
-      setUploadError("Envie uma imagem JPG, PNG ou WEBP.");
+    const files = Array.from(fileList ?? []);
+    if (!files.length) return;
+
+    const remaining = MAX_PRODUCT_IMAGES - form.gallery.length;
+    if (remaining <= 0) {
+      setUploadError(`Máximo de ${MAX_PRODUCT_IMAGES} fotos por produto.`);
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setUploadError("Imagem muito grande. Use um arquivo de até 2 MB.");
-      return;
+
+    const accepted: string[] = [];
+    let ignored = files.length > remaining;
+
+    for (const file of files.slice(0, remaining)) {
+      if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) {
+        setUploadError("Envie imagens JPG, PNG ou WEBP.");
+        continue;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        setUploadError("Cada imagem deve ter até 2 MB.");
+        continue;
+      }
+      try {
+        accepted.push(await fileToBase64(file));
+      } catch {
+        setUploadError("Falha ao ler uma das imagens.");
+      }
     }
-    try {
-      const b64 = await fileToBase64(file);
-      setForm((f) => ({ ...f, image: b64 }));
-    } catch {
-      setUploadError("Falha ao ler a imagem.");
+
+    if (accepted.length) {
+      setForm((f) => ({
+        ...f,
+        gallery: [...f.gallery, ...accepted].slice(0, MAX_PRODUCT_IMAGES),
+      }));
+    }
+    if (ignored) {
+      setUploadError(`Máximo de ${MAX_PRODUCT_IMAGES} fotos — fotos extras foram ignoradas.`);
     }
   };
+
+  const removePhoto = (idx: number) =>
+    setForm((f) => ({ ...f, gallery: f.gallery.filter((_, i) => i !== idx) }));
+
 
   const setSizeQty = (s: Size, v: number) =>
     setForm((f) => ({
@@ -1305,7 +1345,9 @@ function AdminEditModal() {
   const onSave = () => {
     const name = form.name.trim();
     if (!name) return alert("Informe o nome do produto.");
-    if (!form.image) return alert("Envie uma foto do produto.");
+    const gallery = form.gallery.slice(0, MAX_PRODUCT_IMAGES);
+    if (!gallery.length) return alert("Envie ao menos uma foto do produto.");
+    const cover = gallery[0];
     const price = Math.max(0, Number(form.price) || 0);
     const stockObj = coerceSizeStock(form.stock);
 
@@ -1316,8 +1358,8 @@ function AdminEditModal() {
           description: form.description.trim() || name,
           longDescription: form.longDescription.trim() || undefined,
           price,
-          image: form.image,
-          gallery: [form.image],
+          image: cover,
+          gallery,
           category: form.category,
           forceLastItem: form.forceLastItem || undefined,
         },
@@ -1329,8 +1371,8 @@ function AdminEditModal() {
         description: form.description.trim(),
         longDescription: form.longDescription.trim() || undefined,
         price,
-        image: form.image,
-        gallery: [form.image],
+        image: cover,
+        gallery,
         category: form.category,
         forceLastItem: form.forceLastItem || undefined,
       });
@@ -1362,21 +1404,56 @@ function AdminEditModal() {
           <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-[180px_1fr]">
             <div>
               <div className="aspect-[3/4] w-full overflow-hidden border border-border bg-secondary">
-                {form.image ? (
-                  <img src={form.image} alt="" className="h-full w-full object-cover" />
+                {form.gallery[0] ? (
+                  <img src={form.gallery[0]} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-[10px] uppercase tracking-luxe text-muted-foreground">
                     Sem foto
                   </div>
                 )}
               </div>
-              <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 border border-accent/50 bg-accent/5 px-3 py-2 text-[10px] tracking-luxe uppercase text-accent transition-colors hover:bg-accent hover:text-charcoal">
+
+              {form.gallery.length > 0 && (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {form.gallery.map((g, i) => (
+                    <div key={i} className="relative aspect-[3/4] overflow-hidden border border-border">
+                      <img src={g} alt="" className="h-full w-full object-cover" />
+                      {i === 0 && (
+                        <span className="absolute inset-x-0 bottom-0 bg-charcoal/80 py-0.5 text-center text-[8px] tracking-luxe uppercase text-ivory">
+                          Capa
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(i)}
+                        aria-label="Remover foto"
+                        className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center bg-background/90 text-destructive shadow-sm transition-colors hover:bg-destructive hover:text-ivory"
+                      >
+                        <X className="h-3 w-3" strokeWidth={2} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <label
+                className={`mt-3 flex items-center justify-center gap-2 border border-accent/50 bg-accent/5 px-3 py-2 text-[10px] tracking-luxe uppercase text-accent transition-colors ${
+                  form.gallery.length >= MAX_PRODUCT_IMAGES
+                    ? "cursor-not-allowed opacity-40"
+                    : "cursor-pointer hover:bg-accent hover:text-charcoal"
+                }`}
+              >
                 <Upload className="h-3.5 w-3.5" strokeWidth={1.5} />
-                Enviar Foto (JPG)
+                Enviar Fotos ({form.gallery.length}/{MAX_PRODUCT_IMAGES})
                 <input
                   type="file"
+                  multiple
+                  disabled={form.gallery.length >= MAX_PRODUCT_IMAGES}
                   accept="image/jpeg,image/jpg,image/png,image/webp"
-                  onChange={(e) => onPickFile(e.target.files?.[0])}
+                  onChange={(e) => {
+                    void onPickFiles(e.target.files);
+                    e.target.value = "";
+                  }}
                   className="hidden"
                 />
               </label>
@@ -1384,9 +1461,10 @@ function AdminEditModal() {
                 <p className="mt-2 text-[10px] text-destructive">{uploadError}</p>
               )}
               <p className="mt-2 text-[9px] tracking-luxe uppercase text-muted-foreground">
-                Até 2 MB · Salvo no dispositivo
+                Até {MAX_PRODUCT_IMAGES} fotos · JPG, PNG ou WEBP · 2 MB cada
               </p>
             </div>
+
 
             <div className="space-y-4">
               <Field label="Categoria">
@@ -1823,7 +1901,29 @@ function Footer() {
             </ul>
           </div>
         </div>
-        <div className="mt-16 flex flex-col justify-between gap-4 border-t border-ivory/10 pt-8 text-[11px] text-ivory/50 md:flex-row">
+        <div className="mt-16 flex flex-col gap-3 border-t border-ivory/10 pt-8 text-xs font-light text-ivory/70 md:flex-row md:items-center md:justify-between">
+          <p>
+            Dúvidas ou problemas com seu pedido? Fale conosco:{" "}
+            <a
+              href={`mailto:${SUPPORT_EMAIL}`}
+              className="text-[color:var(--gold)] underline-offset-4 transition-colors hover:underline"
+            >
+              {SUPPORT_EMAIL}
+            </a>
+          </p>
+          <p>
+            Suporte via WhatsApp:{" "}
+            <a
+              href={WHATSAPP_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[color:var(--gold)] underline-offset-4 transition-colors hover:underline"
+            >
+              {WHATSAPP_DISPLAY}
+            </a>
+          </p>
+        </div>
+        <div className="mt-8 flex flex-col justify-between gap-4 border-t border-ivory/10 pt-8 text-[11px] text-ivory/50 md:flex-row">
           <p>© {new Date().getFullYear()} A&amp;S Conccept. Todos os direitos reservados.</p>
           <p className="tracking-luxe uppercase">Feito com propósito · Preços em BRL</p>
         </div>

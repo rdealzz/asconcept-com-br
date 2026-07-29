@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useOrders } from "@/lib/orders-context";
 import { formatBRL } from "@/lib/cart-context";
 import { StatusBadge, paymentLabel } from "./pedidos.index";
+import { ContactStrip } from "@/components/ContactStrip";
 
 export const Route = createFileRoute("/pedidos/$id")({
   ssr: false,
@@ -134,6 +135,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className="px-6">{children}</main>
+      <ContactStrip />
     </div>
   );
 }

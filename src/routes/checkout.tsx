@@ -14,6 +14,7 @@ import { formatCpf, isValidCpf } from "@/lib/mercadopago";
 import { CardBrick, type CardFormData } from "@/components/CardBrick";
 import { PixPanel, type PixCharge } from "@/components/PixPanel";
 import { quoteShipping, formatCep, normalizeCep } from "@/lib/shipping";
+import { ContactStrip } from "@/components/ContactStrip";
 
 export const Route = createFileRoute("/checkout")({
   ssr: false,
@@ -416,24 +417,27 @@ function CheckoutPage() {
                 )}
               </section>
 
-              <aside className="h-fit border border-border bg-card/40 p-6">
-                <h2 className="text-[11px] uppercase tracking-luxe text-muted-foreground">
+              <aside className="h-fit border border-border bg-card/40 p-8 md:sticky md:top-28">
+                <h2 className="border-b border-border pb-4 text-[10px] uppercase tracking-[0.35em] text-muted-foreground">
                   Resumo · {count} {count === 1 ? "peça" : "peças"}
                 </h2>
-                <ul className="mt-4 divide-y divide-border">
+                <ul className="mt-2 divide-y divide-border">
                   {items.map((i) => (
-                    <li key={`${i.id}-${i.size}`} className="flex gap-3 py-3">
-                      <img src={i.image} alt={i.name} className="h-16 w-12 object-cover" />
+                    <li key={`${i.id}-${i.size}`} className="flex gap-4 py-5">
+                      <img src={i.image} alt={i.name} className="h-20 w-14 flex-none object-cover" />
                       <div className="flex-1 text-sm">
-                        <p className="font-serif">{i.name}</p>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="font-serif text-base leading-snug">{i.name}</p>
+                        <p className="mt-1 text-[11px] font-light tracking-wide text-muted-foreground">
                           Tam. {i.size} · {i.qty}×
                         </p>
                       </div>
-                      <span className="text-sm tabular-nums">{formatBRL(i.price * i.qty)}</span>
+                      <span className="text-sm font-light tabular-nums">
+                        {formatBRL(i.price * i.qty)}
+                      </span>
                     </li>
                   ))}
                 </ul>
+
                 <dl className="mt-4 space-y-1.5 border-t border-border pt-4 text-sm">
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">Subtotal</dt>
@@ -472,6 +476,7 @@ function CheckoutPage() {
                 </p>
               </aside>
             </div>
+            <ContactStrip />
           </>
         )}
       </div>
