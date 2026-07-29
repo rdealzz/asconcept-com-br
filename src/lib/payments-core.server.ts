@@ -88,7 +88,7 @@ async function persistPayment(
   if (status === "Preparando pedido") {
     const { data: row } = await supabaseAdmin
       .from("orders")
-      .select("stock_decremented")
+      .select("stock_decremented, customer_email, total, items, mail_sent")
       .eq("order_number", orderNumber)
       .maybeSingle();
     if (row && !(row as { stock_decremented: boolean }).stock_decremented) {
@@ -101,6 +101,57 @@ async function persistPayment(
         )("consume_order_stock", { _order_number: orderNumber });
       } catch (e) {
         console.error("[mp] consume_order_stock failed", e);
+      }
+    }
+
+    // Dispara o e-mail de "pedido confirmado" uma única vez por pedido.
+    // Evita reenvio caso a webhook do Mercado Pago confirme o mesmo
+    // pagamento novamente depois (é comum receber a notificação mais de
+    // uma vez).
+    const mailRow = row as {
+      customer_email?: string;
+      total?: number | string;
+      items?: unknown;
+      mail_sent?: boolean;
+    } | null;
+    if (mailRow && !mailRow.mail_sent && mailRow.customer_email) {
+      try {
+        const apiKey = process.env.RESEND_API_KEY;
+        if (!apiKey) {
+          console.error("[mail] RESEND_API_KEY ausente — e-mail de pedido não enviado.");
+        } else {
+          const { orderCreatedTemplate } = await import("@/lib/mailTemplates");
+          const from = process.env.MAIL_FROM || "A&S Conccept <onboarding@resend.dev>";
+          const rendered = orderCreatedTemplate(
+            mailRow.customer_email,
+            orderNumber,
+            Number(mailRow.total ?? 0),
+            (mailRow.items as never) ?? [],
+          );
+          const res = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              from,
+              to: [mailRow.customer_email],
+              subject: rendered.subject,
+              html: rendered.html,
+            }),
+          });
+          if (!res.ok) {
+            console.error(`[mail] Resend falhou [${res.status}]: ${await res.text()}`);
+          } else {
+            await supabaseAdmin
+              .from("orders")
+              .update({ mail_sent: true } as never)
+              .eq("order_number", orderNumber);
+          }
+        }
+      } catch (e) {
+        console.error("[mail] falha ao enviar e-mail de pedido confirmado", e);
       }
     }
   }
