@@ -14,6 +14,7 @@ import { useOrders } from "@/lib/orders-context";
 import { formatBRL } from "@/lib/cart-context";
 import { supabase } from "@/integrations/supabase/client";
 import type { Order, OrderStatus } from "@/lib/types";
+import { ContactStrip } from "@/components/ContactStrip";
 
 export const Route = createFileRoute("/pedidos/")({
   ssr: false,
