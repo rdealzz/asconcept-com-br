@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "../lib/auth-context";
 import { CartProvider } from "../lib/cart-context";
 import { OrdersProvider } from "../lib/orders-context";
+import { WhatsAppFab } from "../components/WhatsAppFab";
 
 
 function NotFoundComponent() {
