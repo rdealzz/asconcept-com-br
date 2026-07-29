@@ -1187,7 +1187,6 @@ function ProductModal() {
 
               <div className="mt-8 space-y-2 border-t border-border pt-6 text-xs font-light text-muted-foreground">
                 <p>Frete grátis em pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}.</p>
-                <p>Trocas e ajustes cortesia em até 30 dias.</p>
               </div>
             </div>
           </div>
