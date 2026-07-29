@@ -1827,7 +1827,29 @@ function Footer() {
             </ul>
           </div>
         </div>
-        <div className="mt-16 flex flex-col justify-between gap-4 border-t border-ivory/10 pt-8 text-[11px] text-ivory/50 md:flex-row">
+        <div className="mt-16 flex flex-col gap-3 border-t border-ivory/10 pt-8 text-xs font-light text-ivory/70 md:flex-row md:items-center md:justify-between">
+          <p>
+            Dúvidas ou problemas com seu pedido? Fale conosco:{" "}
+            <a
+              href={`mailto:${SUPPORT_EMAIL}`}
+              className="text-[color:var(--gold)] underline-offset-4 transition-colors hover:underline"
+            >
+              {SUPPORT_EMAIL}
+            </a>
+          </p>
+          <p>
+            Suporte via WhatsApp:{" "}
+            <a
+              href={WHATSAPP_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[color:var(--gold)] underline-offset-4 transition-colors hover:underline"
+            >
+              {WHATSAPP_DISPLAY}
+            </a>
+          </p>
+        </div>
+        <div className="mt-8 flex flex-col justify-between gap-4 border-t border-ivory/10 pt-8 text-[11px] text-ivory/50 md:flex-row">
           <p>© {new Date().getFullYear()} A&amp;S Conccept. Todos os direitos reservados.</p>
           <p className="tracking-luxe uppercase">Feito com propósito · Preços em BRL</p>
         </div>
