@@ -92,6 +92,7 @@ export type Database = {
           id: string
           installments: number | null
           items: Json
+          mail_sent: boolean
           mp_payment_id: string | null
           mp_status: string | null
           order_number: string
@@ -117,6 +118,7 @@ export type Database = {
           id?: string
           installments?: number | null
           items?: Json
+          mail_sent?: boolean
           mp_payment_id?: string | null
           mp_status?: string | null
           order_number: string
@@ -142,6 +144,7 @@ export type Database = {
           id?: string
           installments?: number | null
           items?: Json
+          mail_sent?: boolean
           mp_payment_id?: string | null
           mp_status?: string | null
           order_number?: string
