@@ -60,10 +60,11 @@ const SAMPLE_DATA: Record<string, object> = {
   },
 }
 
-export const Route = createFileRoute("/lovable/email/auth/preview")({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const Route = (createFileRoute("/lovable/email/auth/preview") as any)({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: async ({ request }: { request: Request }) => {
         const apiKey = process.env.LOVABLE_API_KEY
 
         if (!apiKey) {

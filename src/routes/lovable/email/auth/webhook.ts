@@ -43,10 +43,11 @@ function redactEmail(email: string | null | undefined): string {
   return `${localPart[0]}***@${domain}`
 }
 
-export const Route = createFileRoute("/lovable/email/auth/webhook")({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const Route = (createFileRoute("/lovable/email/auth/webhook") as any)({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: async ({ request }: { request: Request }) => {
         const apiKey = process.env.LOVABLE_API_KEY
 
         if (!apiKey) {
