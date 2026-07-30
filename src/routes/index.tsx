@@ -1452,11 +1452,20 @@ function AdminEditModal() {
                   {form.gallery.map((g, i) => (
                     <div key={i} className="relative aspect-[3/4] overflow-hidden border border-border">
                       <img src={g} alt="" className="h-full w-full object-cover" />
-                      {i === 0 && (
+                      {i === 0 ? (
                         <span className="absolute inset-x-0 bottom-0 bg-charcoal/80 py-0.5 text-center text-[8px] tracking-luxe uppercase text-ivory">
                           Capa
                         </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setCoverPhoto(i)}
+                          className="absolute inset-x-0 bottom-0 bg-background/85 py-0.5 text-center text-[8px] tracking-luxe uppercase text-accent transition-colors hover:bg-accent hover:text-ivory"
+                        >
+                          Definir capa
+                        </button>
                       )}
+
                       <button
                         type="button"
                         onClick={() => removePhoto(i)}
