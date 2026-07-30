@@ -5,8 +5,11 @@ import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 
 const errorMiddleware = createMiddleware().server(async ({ next, request }) => {
   // Lovable email/webhook routes authenticate themselves — never intercept them.
-  if (request && new URL(request.url).pathname.startsWith("/lovable/")) {
-    return next();
+  if (request) {
+    const pathname = new URL(request.url).pathname;
+    if (pathname.startsWith("/lovable/") || pathname === "/email/unsubscribe") {
+      return next();
+    }
   }
   try {
     return await next();
