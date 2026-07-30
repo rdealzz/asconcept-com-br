@@ -51,10 +51,11 @@ function mapReasonToMessage(reason: string): string {
   }
 }
 
-export const Route = createFileRoute("/lovable/email/suppression")({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const Route = (createFileRoute("/lovable/email/suppression") as any)({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: async ({ request }: { request: Request }) => {
         const apiKey = process.env.LOVABLE_API_KEY
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
         const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
