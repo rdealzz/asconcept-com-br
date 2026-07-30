@@ -1084,14 +1084,37 @@ function ProductModal() {
           >
             <X className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.5} />
           </button>
-          <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-2 md:overflow-visible md:pb-0">
-            <div className="bg-secondary">
-              <div className="flex aspect-[3/4] w-full items-center justify-center overflow-hidden bg-secondary">
+          <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-2 md:pb-0">
+            <div className="bg-secondary md:sticky md:top-0 md:self-start">
+              <div className="relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden bg-secondary">
                 <img
                   src={gallery[activeImg]}
                   alt={active.name}
                   className="h-full w-full object-contain transition-transform duration-700 hover:scale-105"
                 />
+                {gallery.length > 1 && (
+                  <>
+                    <button
+                      onClick={() =>
+                        setActiveImg((i) => (i - 1 + gallery.length) % gallery.length)
+                      }
+                      aria-label="Foto anterior"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-background/85 p-2 shadow-sm backdrop-blur transition-colors hover:text-accent"
+                    >
+                      <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
+                    </button>
+                    <button
+                      onClick={() => setActiveImg((i) => (i + 1) % gallery.length)}
+                      aria-label="Próxima foto"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-background/85 p-2 shadow-sm backdrop-blur transition-colors hover:text-accent"
+                    >
+                      <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
+                    </button>
+                    <span className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-charcoal/70 px-2 py-0.5 text-[10px] tracking-luxe text-ivory tabular-nums">
+                      {activeImg + 1}/{gallery.length}
+                    </span>
+                  </>
+                )}
               </div>
               {gallery.length > 1 && (
                 <div className="flex gap-2 overflow-x-auto p-3">
@@ -1109,6 +1132,7 @@ function ProductModal() {
                 </div>
               )}
             </div>
+
 
             <div className="flex flex-col p-6 md:p-12">
               <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Conccept</p>
