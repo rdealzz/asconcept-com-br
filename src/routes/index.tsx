@@ -1361,6 +1361,14 @@ function AdminEditModal() {
   const removePhoto = (idx: number) =>
     setForm((f) => ({ ...f, gallery: f.gallery.filter((_, i) => i !== idx) }));
 
+  const setCoverPhoto = (idx: number) =>
+    setForm((f) => ({
+      ...f,
+      gallery: [f.gallery[idx], ...f.gallery.filter((_, i) => i !== idx)],
+    }));
+
+
+
 
   const setSizeQty = (s: Size, v: number) =>
     setForm((f) => ({
