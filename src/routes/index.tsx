@@ -19,6 +19,8 @@ import {
   Settings,
   MapPin,
   Package,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useOrders } from "@/lib/orders-context";
 import type { OrderStatus } from "@/lib/types";
