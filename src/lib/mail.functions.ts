@@ -113,26 +113,48 @@ export const sendTransactionalMail = createServerFn({ method: "POST" })
       );
     }
 
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        from,
-        to: [recipient],
-        subject: rendered.subject,
-        html: rendered.html,
-      }),
+    // Entrega via infraestrutura de e-mails do Cloud (domínio verificado
+    // notify.asconccept.com.br). A mensagem é enfileirada e processada com
+    // retentativas automáticas pelo processador de fila.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const messageId = crypto.randomUUID();
+
+    await supabaseAdmin.from("email_send_log").insert({
+      message_id: messageId,
+      template_name: data.kind,
+      recipient_email: recipient,
+      status: "pending",
     });
 
-    if (!res.ok) {
-      const body = await res.text();
-      console.error(`[mail] Resend falhou [${res.status}]: ${body}`);
-      throw new Error(`Envio de e-mail falhou (${res.status}).`);
+    const { error: enqueueError } = await supabaseAdmin.rpc("enqueue_email", {
+      queue_name: "transactional_emails",
+      payload: {
+        message_id: messageId,
+        to: recipient,
+        from: "A&S Conccept <noreply@asconccept.com.br>",
+        sender_domain: "notify.asconccept.com.br",
+        subject: rendered.subject,
+        html: rendered.html,
+        purpose: "transactional",
+        label: data.kind,
+        idempotency_key: `${data.kind}:${recipient}:${
+          data.kind === "welcome" ? "welcome" : data.orderId
+        }`,
+        queued_at: new Date().toISOString(),
+      },
+    });
+
+    if (enqueueError) {
+      console.error("[mail] falha ao enfileirar e-mail");
+      await supabaseAdmin.from("email_send_log").insert({
+        message_id: messageId,
+        template_name: data.kind,
+        recipient_email: recipient,
+        status: "failed",
+        error_message: "Failed to enqueue email",
+      });
+      throw new Error("Envio de e-mail falhou.");
     }
 
-    const json = (await res.json()) as { id?: string };
-    return { id: json.id ?? null };
+    return { id: messageId };
   });
