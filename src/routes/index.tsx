@@ -19,6 +19,8 @@ import {
   Settings,
   MapPin,
   Package,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useOrders } from "@/lib/orders-context";
 import type { OrderStatus } from "@/lib/types";
@@ -1084,14 +1086,37 @@ function ProductModal() {
           >
             <X className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.5} />
           </button>
-          <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-2 md:overflow-visible md:pb-0">
-            <div className="bg-secondary">
-              <div className="flex aspect-[3/4] w-full items-center justify-center overflow-hidden bg-secondary">
+          <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-2 md:pb-0">
+            <div className="bg-secondary md:sticky md:top-0 md:self-start">
+              <div className="relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden bg-secondary">
                 <img
                   src={gallery[activeImg]}
                   alt={active.name}
                   className="h-full w-full object-contain transition-transform duration-700 hover:scale-105"
                 />
+                {gallery.length > 1 && (
+                  <>
+                    <button
+                      onClick={() =>
+                        setActiveImg((i) => (i - 1 + gallery.length) % gallery.length)
+                      }
+                      aria-label="Foto anterior"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-background/85 p-2 shadow-sm backdrop-blur transition-colors hover:text-accent"
+                    >
+                      <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
+                    </button>
+                    <button
+                      onClick={() => setActiveImg((i) => (i + 1) % gallery.length)}
+                      aria-label="Próxima foto"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-background/85 p-2 shadow-sm backdrop-blur transition-colors hover:text-accent"
+                    >
+                      <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
+                    </button>
+                    <span className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-charcoal/70 px-2 py-0.5 text-[10px] tracking-luxe text-ivory tabular-nums">
+                      {activeImg + 1}/{gallery.length}
+                    </span>
+                  </>
+                )}
               </div>
               {gallery.length > 1 && (
                 <div className="flex gap-2 overflow-x-auto p-3">
@@ -1109,6 +1134,7 @@ function ProductModal() {
                 </div>
               )}
             </div>
+
 
             <div className="flex flex-col p-6 md:p-12">
               <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Conccept</p>
@@ -1335,6 +1361,14 @@ function AdminEditModal() {
   const removePhoto = (idx: number) =>
     setForm((f) => ({ ...f, gallery: f.gallery.filter((_, i) => i !== idx) }));
 
+  const setCoverPhoto = (idx: number) =>
+    setForm((f) => ({
+      ...f,
+      gallery: [f.gallery[idx], ...f.gallery.filter((_, i) => i !== idx)],
+    }));
+
+
+
 
   const setSizeQty = (s: Size, v: number) =>
     setForm((f) => ({
@@ -1418,11 +1452,20 @@ function AdminEditModal() {
                   {form.gallery.map((g, i) => (
                     <div key={i} className="relative aspect-[3/4] overflow-hidden border border-border">
                       <img src={g} alt="" className="h-full w-full object-cover" />
-                      {i === 0 && (
+                      {i === 0 ? (
                         <span className="absolute inset-x-0 bottom-0 bg-charcoal/80 py-0.5 text-center text-[8px] tracking-luxe uppercase text-ivory">
                           Capa
                         </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setCoverPhoto(i)}
+                          className="absolute inset-x-0 bottom-0 bg-background/85 py-0.5 text-center text-[8px] tracking-luxe uppercase text-accent transition-colors hover:bg-accent hover:text-ivory"
+                        >
+                          Definir capa
+                        </button>
                       )}
+
                       <button
                         type="button"
                         onClick={() => removePhoto(i)}

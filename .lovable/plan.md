@@ -1,35 +1,46 @@
-## Objetivo
+## 1. Rolagem do modal de produto no desktop
 
-1. Adicionar a coluna `mail_sent` em `orders`.
-2. Atualizar `src/lib/payments-core.server.ts` com o envio único do e-mail de "pedido confirmado".
-3. Publicar o site.
+O painel interno do modal está com rolagem desativada no desktop, então tudo que passa da altura da tela (tamanhos, calculadora de frete, botões) é cortado sem barra de rolagem.
 
-## Ponto de atenção (importante)
+- Ativar rolagem vertical no desktop, mantendo o comportamento atual do celular.
+- Coluna da foto fica fixa (sticky) e a coluna de detalhes rola, para a imagem não sumir enquanto o cliente lê.
+- Garantir que o botão de fechar continue sempre visível e que a calculadora de frete seja alcançável.
 
-O arquivo que você anexou é uma versão **anterior** do `payments-core.server.ts`: ele não contém a proteção contra reuso de cupom que já está no projeto hoje (reserva do cupom antes de gravar o pedido, liberação se a gravação falhar ou se o cartão for recusado, e reconfirmação quando o pagamento é aprovado). Essa proteção veio de uma correção de segurança ("coupon_reuse").
+## 2. Galeria de múltiplas fotos
 
-Se eu substituir o arquivo literalmente, o cupom de boas-vindas volta a poder ser usado várias vezes pelo mesmo cliente.
+O editor do admin já acumula até 5 fotos (não substitui) e o banco já tem o campo de galeria. O que falta:
 
-**Proposta:** aplicar exatamente a novidade do seu arquivo (o e-mail único) e manter a proteção de cupom que já existe. O resultado é o seu código + as 4 partes de cupom preservadas. Se preferir a substituição literal, é só dizer.
+- **Escolher a capa:** botão "Definir como capa" em cada miniatura do admin, movendo a foto para a primeira posição (a capa continua sendo a primeira da lista, mas agora escolhível). Também permitir reordenar por setas.
+- **Setas no modal do cliente:** botões ◀ ▶ sobrepostos à foto principal (aparecendo só quando há mais de uma foto), com contador "2/5", suporte a arrastar o dedo no celular e navegação por teclado no desktop. As miniaturas de baixo continuam.
+- **Verificação:** conferir, com um produto real, que enviar uma segunda foto realmente adiciona e persiste após recarregar — se algo estiver sendo perdido no salvamento, corrigir junto.
 
-## Passos
+## 3. Erro ao criar conta
 
-### 1. Migração no banco
-```sql
-alter table public.orders
-  add column if not exists mail_sent boolean not null default false;
-```
-Sem mudança de permissões: `mail_sent` é escrita apenas pelo servidor e a tabela já é lida por dono/admin.
+Hoje qualquer falha de cadastro vira a mesma mensagem genérica ("Não foi possível concluir o cadastro"), o que esconde a causa. Estrutura do banco (perfis, papéis, gatilho de criação de conta, permissões) foi verificada e está correta.
 
-### 2. `src/lib/payments-core.server.ts`
-- Em `persistPayment`, ao mudar o status para "Preparando pedido": ler também `customer_email`, `total`, `items`, `mail_sent`; se ainda não enviado, disparar o e-mail via Resend (`orderCreatedTemplate`, `MAIL_FROM`) e marcar `mail_sent = true` só em caso de sucesso. Falhas são apenas logadas.
-- Manter, sem alteração, o bloco de cupom existente: `claimCouponUse` antes do insert do pedido, `releaseCouponUse` se o insert falhar, `claimCouponUse` quando o cartão é aprovado e `releaseCouponUse` quando é recusado (inclui o campo `coupon_code` no `loadOwnOrder`).
+- Reproduzir um cadastro real contra o servidor de autenticação para capturar o erro exato nos registros do sistema.
+- Corrigir a causa encontrada. As hipóteses mais prováveis, todas tratáveis: limite horário de e-mails de autenticação (padrão baixíssimo, gera erro no cadastro), confirmação de e-mail exigida sem remetente ativo, ou validação de senha vazada.
+- Ajustar o limite de envio de e-mails de autenticação para um valor compatível com o volume real.
+- Passar a exibir mensagens específicas ao usuário (e-mail já cadastrado, senha fraca, limite temporário atingido, etc.) em vez da mensagem única.
+- Resultado esperado: cadastro funcionando com qualquer e-mail válido.
 
-### 3. Verificação e publicação
-- Rodar o typecheck.
-- Publicar o site.
+## 4. E-mails do Cloud (a parte que realmente falta)
+
+O domínio remetente `notify.asconccept.com.br` está **verificado** e a fila de envio está saudável, mas o projeto nunca teve os modelos de e-mail criados — por isso nada chega.
+
+- **E-mails de autenticação:** criar os modelos de confirmação de cadastro, recuperação de senha, link mágico, convite, troca de e-mail e reautenticação, com a identidade da marca (Ivory, Navy, Charcoal, Gold, tipografia serifada).
+- **E-mails do app:** criar a estrutura de envio e os modelos para:
+  - Boas-vindas após criar conta
+  - Pedido confirmado (pagamento aprovado)
+  - Atualização de status do pedido (Preparando, Em trânsito, Entregue)
+  - Confirmação de inscrição na newsletter
+- **Ligar aos eventos reais:** disparar automaticamente na confirmação de pagamento e na mudança de status feita pelo painel admin, com chave de idempotência para nunca enviar duplicado.
+- **Migração do envio atual:** o site hoje envia pedidos por um serviço externo com chave própria; passar esses envios para a infraestrutura de e-mail do Cloud, mantendo o mesmo conteúdo, para tudo sair do domínio verificado da marca.
+- Página de descadastro com a identidade visual da marca, exigida pelos rodapés dos e-mails.
 
 ## Detalhes técnicos
 
-- O e-mail é enviado dentro de `persistPayment`, então cobre tanto o retorno direto do cartão quanto o webhook e o polling do Pix — daí a necessidade do `mail_sent` como trava de idempotência.
-- `RESEND_API_KEY` e `MAIL_FROM` já estão cadastrados nos secrets.
+- `src/routes/index.tsx`: remover `md:overflow-visible` do grid interno do `ProductModal`, tornar a coluna direita rolável (`md:overflow-y-auto`) com a coluna da imagem em `md:sticky`; adicionar controles de navegação da galeria com estado `activeImg`, gesto de swipe e teclas ◀/▶; no `AdminEditModal`, adicionar ação "definir como capa"/reordenar sobre `form.gallery`.
+- Autenticação: reprodução do `POST /signup` + leitura dos registros de auth; ajuste de `rate_limit_email_sent` e, se necessário, de confirmação de e-mail; mapeamento de erros em `signUp` de `src/lib/auth-context.tsx`.
+- E-mail: modelos React Email em `src/lib/email-templates/` com registro central, rotas de envio/preview/descadastro sob `/lovable/email/*`, envio enfileirado (pgmq) já existente em `src/routes/lovable/email/queue/process.ts`; gatilhos em `src/lib/payments-core.server.ts` (pagamento aprovado) e no fluxo de atualização de status do painel.
+- Publicar ao final: a fila de e-mails do ambiente Live só é provisionada no publish.
