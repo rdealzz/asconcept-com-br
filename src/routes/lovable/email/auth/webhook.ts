@@ -12,12 +12,12 @@ import { EmailChangeEmail } from '@/lib/email-templates/email-change'
 import { ReauthenticationEmail } from '@/lib/email-templates/reauthentication'
 
 const EMAIL_SUBJECTS: Record<string, string> = {
-  signup: 'Confirm your email',
-  invite: "You've been invited",
-  magiclink: 'Your login link',
-  recovery: 'Reset your password',
-  email_change: 'Confirm your new email',
-  reauthentication: 'Your verification code',
+  signup: 'Confirme seu e-mail · A&S Conccept',
+  invite: 'Você foi convidado · A&S Conccept',
+  magiclink: 'Seu link de acesso · A&S Conccept',
+  recovery: 'Redefinição de senha · A&S Conccept',
+  email_change: 'Confirme seu novo e-mail · A&S Conccept',
+  reauthentication: 'Seu código de verificação · A&S Conccept',
 }
 
 // Template mapping
@@ -31,7 +31,7 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
 }
 
 // Configuration
-const SITE_NAME = "asconcept-com-br"
+const SITE_NAME = "A&S Conccept"
 const SENDER_DOMAIN = "notify.asconccept.com.br"
 const ROOT_DOMAIN = "asconccept.com.br"
 const FROM_DOMAIN = "asconccept.com.br"
