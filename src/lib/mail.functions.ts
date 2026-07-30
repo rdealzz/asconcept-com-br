@@ -45,12 +45,8 @@ export const sendTransactionalMail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
   .handler(async ({ data, context }) => {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-      console.error("[mail] RESEND_API_KEY ausente — envio ignorado.");
-      throw new Error("Serviço de e-mail não configurado.");
-    }
-    const from = process.env.MAIL_FROM || "A&S Conccept <onboarding@resend.dev>";
+
+
 
     // Resolve caller identity server-side. Never trust client-supplied `to`
     // as authorization; it is only used for cross-check with the caller.
