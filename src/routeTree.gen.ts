@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
 import { Route as SucessoRouteImport } from './routes/sucesso'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as CheckoutRouteImport } from './routes/checkout'
@@ -25,6 +26,11 @@ import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/em
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicPaymentsMercadopagoRouteImport } from './routes/api/public/payments/mercadopago'
 
+const UnsubscribeRoute = UnsubscribeRouteImport.update({
+  id: '/unsubscribe',
+  path: '/unsubscribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SucessoRoute = SucessoRouteImport.update({
   id: '/sucesso',
   path: '/sucesso',
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sucesso': typeof SucessoRoute
+  '/unsubscribe': typeof UnsubscribeRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/pedidos/$id': typeof PedidosIdRoute
   '/pedidos/': typeof PedidosIndexRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sucesso': typeof SucessoRoute
+  '/unsubscribe': typeof UnsubscribeRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/pedidos/$id': typeof PedidosIdRoute
   '/pedidos': typeof PedidosIndexRoute
@@ -146,6 +154,7 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sucesso': typeof SucessoRoute
+  '/unsubscribe': typeof UnsubscribeRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/pedidos/$id': typeof PedidosIdRoute
   '/pedidos/': typeof PedidosIndexRoute
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/reset-password'
     | '/sucesso'
+    | '/unsubscribe'
     | '/email/unsubscribe'
     | '/pedidos/$id'
     | '/pedidos/'
@@ -182,6 +192,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/reset-password'
     | '/sucesso'
+    | '/unsubscribe'
     | '/email/unsubscribe'
     | '/pedidos/$id'
     | '/pedidos'
@@ -199,6 +210,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/reset-password'
     | '/sucesso'
+    | '/unsubscribe'
     | '/email/unsubscribe'
     | '/pedidos/$id'
     | '/pedidos/'
@@ -217,6 +229,7 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SucessoRoute: typeof SucessoRoute
+  UnsubscribeRoute: typeof UnsubscribeRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
   PedidosIdRoute: typeof PedidosIdRoute
   PedidosIndexRoute: typeof PedidosIndexRoute
@@ -232,6 +245,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/unsubscribe': {
+      id: '/unsubscribe'
+      path: '/unsubscribe'
+      fullPath: '/unsubscribe'
+      preLoaderRoute: typeof UnsubscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sucesso': {
       id: '/sucesso'
       path: '/sucesso'
@@ -345,6 +365,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SucessoRoute: SucessoRoute,
+  UnsubscribeRoute: UnsubscribeRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
   PedidosIdRoute: PedidosIdRoute,
   PedidosIndexRoute: PedidosIndexRoute,
@@ -360,3 +381,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
