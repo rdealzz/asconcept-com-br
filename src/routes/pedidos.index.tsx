@@ -719,7 +719,7 @@ function AdminOrderCard({ order }: { order: Order }) {
           <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
             Pagamento: <span className="text-charcoal">{paymentLabel(order.paymentMethod)}</span>
             <br />
-            Toda alteração dispara e-mail transacional para {order.customerEmail}.
+            Toda alteração dispara e-mail transacional para {order.customerEmail}
           </p>
         </section>
       </div>
