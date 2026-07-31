@@ -241,7 +241,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     });
     if (error) {
-      if (error.message.toLowerCase().includes("already"))
+      const message = error.message.toLowerCase();
+      if (error.status === 429 || message.includes("rate limit") || message.includes("rate_limit"))
+        return { error: "Muitas tentativas de cadastro. Aguarde alguns minutos e tente novamente." };
+      if (message.includes("already"))
         return { error: "Já existe uma conta com este e-mail." };
       return { error: "Não foi possível concluir o cadastro." };
     }

@@ -1,9 +1,8 @@
 /**
  * A&S Conccept — Disparo real de e-mails transacionais.
  *
- * O envio ocorre no servidor via `sendTransactionalMail` (server function
- * TanStack) que se conecta à API da Resend usando `RESEND_API_KEY`. Falhas
- * são registradas em console mas nunca interrompem a experiência do cliente.
+ * O envio ocorre no servidor via `sendTransactionalMail` e a fila nativa de
+ * e-mails do Lovable Cloud. Falhas não interrompem a experiência do cliente.
  */
 import { sendTransactionalMail } from "./mail.functions";
 import type { OrderItem, OrderStatus } from "./types";

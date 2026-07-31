@@ -88,7 +88,7 @@ async function persistPayment(
   if (status === "Preparando pedido") {
     const { data: row } = await supabaseAdmin
       .from("orders")
-      .select("stock_decremented, customer_email, total, items, mail_sent")
+      .select("stock_decremented, customer_email, customer_name, total, items, mail_sent, preparation_mail_sent")
       .eq("order_number", orderNumber)
       .maybeSingle();
     if (row && !(row as { stock_decremented: boolean }).stock_decremented) {
@@ -110,48 +110,47 @@ async function persistPayment(
     // uma vez).
     const mailRow = row as {
       customer_email?: string;
+      customer_name?: string | null;
       total?: number | string;
       items?: unknown;
       mail_sent?: boolean;
+      preparation_mail_sent?: boolean;
     } | null;
     if (mailRow && !mailRow.mail_sent && mailRow.customer_email) {
       try {
-        const apiKey = process.env.RESEND_API_KEY;
-        if (!apiKey) {
-          console.error("[mail] RESEND_API_KEY ausente — e-mail de pedido não enviado.");
-        } else {
-          const { orderCreatedTemplate } = await import("@/lib/mailTemplates");
-          const from = process.env.MAIL_FROM || "A&S Conccept <onboarding@resend.dev>";
-          const rendered = orderCreatedTemplate(
-            mailRow.customer_email,
-            orderNumber,
-            Number(mailRow.total ?? 0),
-            (mailRow.items as never) ?? [],
-          );
-          const res = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-              from,
-              to: [mailRow.customer_email],
-              subject: rendered.subject,
-              html: rendered.html,
-            }),
-          });
-          if (!res.ok) {
-            console.error(`[mail] Resend falhou [${res.status}]: ${await res.text()}`);
-          } else {
-            await supabaseAdmin
-              .from("orders")
-              .update({ mail_sent: true } as never)
-              .eq("order_number", orderNumber);
-          }
-        }
+        const { enqueueOrderEmail } = await import("@/lib/order-email.server");
+        await enqueueOrderEmail(supabaseAdmin, "pedido-confirmado", mailRow.customer_email, {
+          orderNumber,
+          customerName: mailRow.customer_name ?? undefined,
+          total: Number(mailRow.total ?? 0),
+          items: Array.isArray(mailRow.items) ? mailRow.items : [],
+        });
+        await supabaseAdmin
+          .from("orders")
+          .update({ mail_sent: true } as never)
+          .eq("order_number", orderNumber);
       } catch (e) {
         console.error("[mail] falha ao enviar e-mail de pedido confirmado", e);
+      }
+    }
+    if (mailRow && !mailRow.preparation_mail_sent && mailRow.customer_email) {
+      try {
+        const { enqueueOrderEmail } = await import("@/lib/order-email.server");
+        await enqueueOrderEmail(
+          supabaseAdmin,
+          "pedido-em-preparacao",
+          mailRow.customer_email,
+          {
+            orderNumber,
+            customerName: mailRow.customer_name ?? undefined,
+          },
+        );
+        await supabaseAdmin
+          .from("orders")
+          .update({ preparation_mail_sent: true } as never)
+          .eq("order_number", orderNumber);
+      } catch (e) {
+        console.error("[mail] falha ao enviar e-mail de preparação", e);
       }
     }
   }
@@ -249,7 +248,7 @@ export async function createPendingOrderCore(
   const { error: insertErr } = await supabaseAdmin.from("orders").insert({
     order_number: orderNumber,
     user_id: userId,
-    customer_email: data.customer.email,
+    customer_email: data.customer.email.trim().toLowerCase(),
     customer_name: data.customer.name,
     customer_phone: data.customer.phone,
     items: orderItems,

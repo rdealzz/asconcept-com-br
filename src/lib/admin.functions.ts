@@ -1,5 +1,32 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { OrderStatus } from "@/lib/types";
+
+export const adminUpdateOrderStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { orderNumber: string; status: OrderStatus; trackingCode?: string }) => {
+    if (!/^AS-\d{6}$/.test(input?.orderNumber ?? "")) throw new Error("Pedido inválido.");
+    if (!["Aguardando Aprovação", "Preparando pedido", "Em trânsito", "Entregue"].includes(input?.status)) {
+      throw new Error("Status inválido.");
+    }
+    return {
+      orderNumber: input.orderNumber,
+      status: input.status,
+      trackingCode: typeof input.trackingCode === "string" ? input.trackingCode.slice(0, 80) : undefined,
+    };
+  })
+  .handler(async ({ data, context }) => {
+    const { data: roleRow } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!roleRow) throw new Error("Acesso negado.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { updateAdminOrderStatusCore } = await import("@/lib/admin-orders.server");
+    return updateAdminOrderStatusCore(supabaseAdmin, data);
+  });
 
 /**
  * Exclui um pedido pelo order_number. Requer que o chamador tenha role 'admin'.
