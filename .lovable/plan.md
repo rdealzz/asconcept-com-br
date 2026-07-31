@@ -1,46 +1,57 @@
-## 1. Rolagem do modal de produto no desktop
+## Objetivo
+Entregar os quatro e-mails de pedido pela infraestrutura nativa do Lovable Cloud, corrigir o cadastro que retorna 429 e remover a pontuação ambígua após o endereço do cliente.
 
-O painel interno do modal está com rolagem desativada no desktop, então tudo que passa da altura da tela (tamanhos, calculadora de frete, botões) é cortado sem barra de rolagem.
+## Diagnóstico confirmado
+- O domínio `notify.asconccept.com.br` está verificado, os e-mails de autenticação estão ativos e a fila de produção está saudável.
+- E-mails recentes de confirmação de cadastro foram efetivamente enviados pela fila.
+- O pagamento aprovado ainda chama diretamente a API antiga do Resend em `payments-core.server.ts`; essa dependência será removida.
+- O registro nativo de templates de App emails está vazio, portanto os quatro templates de pedido ainda não aparecem como templates próprios.
+- As três atualizações de pedido que falharam chegaram à fila sem versão em texto simples; o provedor respondeu `missing_parameter: text` até esgotar as tentativas.
+- O painel altera o status diretamente no navegador e depois tenta disparar um e-mail separado. Isso permite falhas parciais entre atualização e notificação.
+- A frase do painel acrescenta um ponto depois do componente que exibe o e-mail. A consulta atual não encontrou pedidos persistidos com ponto final ou espaços no endereço; é pontuação da interface, não corrupção confirmada no banco.
+- Os logs de autenticação consultados não preservaram um evento 429 recente. A correção do limite será aplicada de forma preventiva e a interface passará a mostrar a mensagem específica retornada pelo serviço em vez do erro genérico.
 
-- Ativar rolagem vertical no desktop, mantendo o comportamento atual do celular.
-- Coluna da foto fica fixa (sticky) e a coluna de detalhes rola, para a imagem não sumir enquanto o cliente lê.
-- Garantir que o botão de fechar continue sempre visível e que a calculadora de frete seja alcançável.
+## Implementação
 
-## 2. Galeria de múltiplas fotos
+### 1. Templates nativos de App emails
+- Criar quatro templates React Email em português do Brasil:
+  - `pedido-confirmado`: número, itens, total e agradecimento.
+  - `pedido-em-preparacao`: confirmação de que o ateliê iniciou o preparo.
+  - `pedido-enviado`: informação de envio e código de rastreio quando disponível.
+  - `pedido-entregue`: confirmação de entrega e agradecimento final.
+- Reutilizar o layout visual já usado nos e-mails de autenticação: banner A&S CONCCEPT, Ivory, Navy, Charcoal e Gold.
+- Registrar os quatro templates para que sejam reconhecidos pela área App emails.
+- Sempre renderizar HTML e texto simples antes de enfileirar, eliminando a causa `missing_parameter: text`.
 
-O editor do admin já acumula até 5 fotos (não substitui) e o banco já tem o campo de galeria. O que falta:
+### 2. Disparo confiável e idempotente
+- Criar um helper server-only para renderizar, registrar e enfileirar e-mails de pedido pelo Lovable Cloud, com destinatário normalizado e chaves de idempotência por `pedido + evento`.
+- Remover de `persistPayment` toda chamada direta ao Resend e qualquer dependência de `RESEND_API_KEY`/`MAIL_FROM`.
+- Ao Mercado Pago aprovar cartão ou PIX, enfileirar `pedido-confirmado` exatamente uma vez, preservando o controle atual de `mail_sent`.
+- Acrescentar controles persistentes para impedir duplicação dos e-mails de preparação, envio e entrega quando webhooks ou ações administrativas forem repetidos.
 
-- **Escolher a capa:** botão "Definir como capa" em cada miniatura do admin, movendo a foto para a primeira posição (a capa continua sendo a primeira da lista, mas agora escolhível). Também permitir reordenar por setas.
-- **Setas no modal do cliente:** botões ◀ ▶ sobrepostos à foto principal (aparecendo só quando há mais de uma foto), com contador "2/5", suporte a arrastar o dedo no celular e navegação por teclado no desktop. As miniaturas de baixo continuam.
-- **Verificação:** conferir, com um produto real, que enviar uma segunda foto realmente adiciona e persiste após recarregar — se algo estiver sendo perdido no salvamento, corrigir junto.
+### 3. Atualização administrativa atômica
+- Mover a alteração manual de status para uma função de servidor protegida por autenticação e validação real de administrador.
+- Nessa mesma operação, carregar o pedido do banco, atualizar status/rastreio e disparar somente o template correspondente à transição real:
+  - `Preparando pedido` → preparação.
+  - `Em trânsito`/equivalente → enviado.
+  - `Entregue` → entregue.
+- Atualizar o contexto e o painel para usar essa função, aguardar sucesso e só então mostrar a confirmação visual.
+- Remover o disparo antigo separado de `status_update`, evitando atualização salva sem e-mail ou e-mail com dados desatualizados.
 
-## 3. Erro ao criar conta
+### 4. Cadastro e recuperação de senha
+- Elevar o limite horário de e-mails de autenticação para um valor adequado ao volume real, mantendo confirmação de e-mail obrigatória e cadastro público habilitado.
+- Preservar os templates nativos já ativos para confirmação e recuperação.
+- Mapear explicitamente respostas 429 para uma mensagem clara de limite temporário, mantendo mensagens próprias para conta existente e demais falhas.
+- Validar um novo cadastro com e-mail válido e confirmar no registro da fila que o e-mail foi aceito.
 
-Hoje qualquer falha de cadastro vira a mesma mensagem genérica ("Não foi possível concluir o cadastro"), o que esconde a causa. Estrutura do banco (perfis, papéis, gatilho de criação de conta, permissões) foi verificada e está correta.
+### 5. Correção visual do e-mail do cliente
+- Remover o ponto imediatamente após `{order.customerEmail}` na frase do painel ou reescrever a frase para não parecer parte do endereço.
+- Normalizar e-mails com `trim().toLowerCase()` antes de persistir novos pedidos e antes de qualquer envio.
 
-- Reproduzir um cadastro real contra o servidor de autenticação para capturar o erro exato nos registros do sistema.
-- Corrigir a causa encontrada. As hipóteses mais prováveis, todas tratáveis: limite horário de e-mails de autenticação (padrão baixíssimo, gera erro no cadastro), confirmação de e-mail exigida sem remetente ativo, ou validação de senha vazada.
-- Ajustar o limite de envio de e-mails de autenticação para um valor compatível com o volume real.
-- Passar a exibir mensagens específicas ao usuário (e-mail já cadastrado, senha fraca, limite temporário atingido, etc.) em vez da mensagem única.
-- Resultado esperado: cadastro funcionando com qualquer e-mail válido.
-
-## 4. E-mails do Cloud (a parte que realmente falta)
-
-O domínio remetente `notify.asconccept.com.br` está **verificado** e a fila de envio está saudável, mas o projeto nunca teve os modelos de e-mail criados — por isso nada chega.
-
-- **E-mails de autenticação:** criar os modelos de confirmação de cadastro, recuperação de senha, link mágico, convite, troca de e-mail e reautenticação, com a identidade da marca (Ivory, Navy, Charcoal, Gold, tipografia serifada).
-- **E-mails do app:** criar a estrutura de envio e os modelos para:
-  - Boas-vindas após criar conta
-  - Pedido confirmado (pagamento aprovado)
-  - Atualização de status do pedido (Preparando, Em trânsito, Entregue)
-  - Confirmação de inscrição na newsletter
-- **Ligar aos eventos reais:** disparar automaticamente na confirmação de pagamento e na mudança de status feita pelo painel admin, com chave de idempotência para nunca enviar duplicado.
-- **Migração do envio atual:** o site hoje envia pedidos por um serviço externo com chave própria; passar esses envios para a infraestrutura de e-mail do Cloud, mantendo o mesmo conteúdo, para tudo sair do domínio verificado da marca.
-- Página de descadastro com a identidade visual da marca, exigida pelos rodapés dos e-mails.
-
-## Detalhes técnicos
-
-- `src/routes/index.tsx`: remover `md:overflow-visible` do grid interno do `ProductModal`, tornar a coluna direita rolável (`md:overflow-y-auto`) com a coluna da imagem em `md:sticky`; adicionar controles de navegação da galeria com estado `activeImg`, gesto de swipe e teclas ◀/▶; no `AdminEditModal`, adicionar ação "definir como capa"/reordenar sobre `form.gallery`.
-- Autenticação: reprodução do `POST /signup` + leitura dos registros de auth; ajuste de `rate_limit_email_sent` e, se necessário, de confirmação de e-mail; mapeamento de erros em `signUp` de `src/lib/auth-context.tsx`.
-- E-mail: modelos React Email em `src/lib/email-templates/` com registro central, rotas de envio/preview/descadastro sob `/lovable/email/*`, envio enfileirado (pgmq) já existente em `src/routes/lovable/email/queue/process.ts`; gatilhos em `src/lib/payments-core.server.ts` (pagamento aprovado) e no fluxo de atualização de status do painel.
-- Publicar ao final: a fila de e-mails do ambiente Live só é provisionada no publish.
+## Validação
+- Confirmar que não restam chamadas a `api.resend.com` nem referências usadas a chaves do Resend no fluxo de pedidos.
+- Pré-visualizar os quatro templates e verificar conteúdo, banner e texto simples.
+- Simular as quatro transições e confirmar uma única linha final por evento no registro de envio, deduplicada por mensagem.
+- Verificar cartão e PIX aprovados, alteração manual de status e rastreio.
+- Testar cadastro e recuperação, confirmando que o e-mail entra na fila e que erros 429 recebem mensagem específica.
+- Conferir no painel que o endereço do cliente aparece sem pontuação anexada.
