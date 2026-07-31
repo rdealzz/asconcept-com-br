@@ -175,6 +175,7 @@ export type Database = {
           customer_email: string
           customer_name: string | null
           customer_phone: string | null
+          delivered_mail_sent: boolean
           discount: number
           id: string
           installments: number | null
@@ -184,6 +185,8 @@ export type Database = {
           mp_status: string | null
           order_number: string
           payment_method: string
+          preparation_mail_sent: boolean
+          shipped_mail_sent: boolean
           shipping_cost: number
           status: string
           stock_decremented: boolean
@@ -201,6 +204,7 @@ export type Database = {
           customer_email: string
           customer_name?: string | null
           customer_phone?: string | null
+          delivered_mail_sent?: boolean
           discount?: number
           id?: string
           installments?: number | null
@@ -210,6 +214,8 @@ export type Database = {
           mp_status?: string | null
           order_number: string
           payment_method: string
+          preparation_mail_sent?: boolean
+          shipped_mail_sent?: boolean
           shipping_cost?: number
           status?: string
           stock_decremented?: boolean
@@ -227,6 +233,7 @@ export type Database = {
           customer_email?: string
           customer_name?: string | null
           customer_phone?: string | null
+          delivered_mail_sent?: boolean
           discount?: number
           id?: string
           installments?: number | null
@@ -236,6 +243,8 @@ export type Database = {
           mp_status?: string | null
           order_number?: string
           payment_method?: string
+          preparation_mail_sent?: boolean
+          shipped_mail_sent?: boolean
           shipping_cost?: number
           status?: string
           stock_decremented?: boolean
