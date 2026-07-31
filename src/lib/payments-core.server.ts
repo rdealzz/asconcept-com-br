@@ -88,7 +88,7 @@ async function persistPayment(
   if (status === "Preparando pedido") {
     const { data: row } = await supabaseAdmin
       .from("orders")
-      .select("stock_decremented, customer_email, customer_name, total, items, mail_sent")
+      .select("stock_decremented, customer_email, customer_name, total, items, mail_sent, preparation_mail_sent")
       .eq("order_number", orderNumber)
       .maybeSingle();
     if (row && !(row as { stock_decremented: boolean }).stock_decremented) {
@@ -114,6 +114,7 @@ async function persistPayment(
       total?: number | string;
       items?: unknown;
       mail_sent?: boolean;
+      preparation_mail_sent?: boolean;
     } | null;
     if (mailRow && !mailRow.mail_sent && mailRow.customer_email) {
       try {
@@ -130,6 +131,26 @@ async function persistPayment(
           .eq("order_number", orderNumber);
       } catch (e) {
         console.error("[mail] falha ao enviar e-mail de pedido confirmado", e);
+      }
+    }
+    if (mailRow && !mailRow.preparation_mail_sent && mailRow.customer_email) {
+      try {
+        const { enqueueOrderEmail } = await import("@/lib/order-email.server");
+        await enqueueOrderEmail(
+          supabaseAdmin,
+          "pedido-em-preparacao",
+          mailRow.customer_email,
+          {
+            orderNumber,
+            customerName: mailRow.customer_name ?? undefined,
+          },
+        );
+        await supabaseAdmin
+          .from("orders")
+          .update({ preparation_mail_sent: true } as never)
+          .eq("order_number", orderNumber);
+      } catch (e) {
+        console.error("[mail] falha ao enviar e-mail de preparação", e);
       }
     }
   }
