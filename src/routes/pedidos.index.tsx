@@ -554,17 +554,25 @@ function AdminOrderCard({ order }: { order: Order }) {
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
   const showTracking = order.status === "Em trânsito" || !!order.trackingCode;
 
-  const changeStatus = (next: OrderStatus) => {
+  const changeStatus = async (next: OrderStatus) => {
     if (next === order.status) return;
-    updateStatus(order.id, next, next === "Em trânsito" ? tracking || undefined : order.trackingCode);
-    setSavedFlash(`Status atualizado para "${STATUS_META[next].label}"`);
-    setTimeout(() => setSavedFlash(null), 2400);
+    try {
+      await updateStatus(order.id, next, next === "Em trânsito" ? tracking || undefined : order.trackingCode);
+      setSavedFlash(`Status atualizado para "${STATUS_META[next].label}"`);
+      setTimeout(() => setSavedFlash(null), 2400);
+    } catch {
+      setSavedFlash("Não foi possível atualizar o pedido.");
+    }
   };
 
-  const saveTracking = () => {
-    updateStatus(order.id, "Em trânsito", tracking.trim() || undefined);
-    setSavedFlash("Código de rastreio enviado ao cliente.");
-    setTimeout(() => setSavedFlash(null), 2400);
+  const saveTracking = async () => {
+    try {
+      await updateStatus(order.id, "Em trânsito", tracking.trim() || undefined);
+      setSavedFlash("Código de rastreio salvo.");
+      setTimeout(() => setSavedFlash(null), 2400);
+    } catch {
+      setSavedFlash("Não foi possível salvar o rastreio.");
+    }
   };
 
   const customerName =

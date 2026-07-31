@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./auth-context";
-import { triggerStatusUpdateMail } from "./mail";
+import { adminUpdateOrderStatus } from "./admin.functions";
 import type { CheckoutAddress, Order, OrderItem, OrderStatus, PaymentMethod } from "./types";
 
 type OrdersCtx = {
@@ -129,23 +129,16 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
   const updateStatus: OrdersCtx["updateStatus"] = async (id, status, trackingCode) => {
     const target = orders.find((o) => o.id === id);
     if (!target) return;
-    const patch: Record<string, unknown> = { status };
-    if (trackingCode !== undefined) patch.tracking_code = trackingCode || null;
-    const { error } = await supabase
-      .from("orders")
-      .update(patch as never)
-      .eq("order_number", id);
-    if (error) {
-      console.error("[orders] updateStatus failed", error);
-      return;
-    }
+    const result = await adminUpdateOrderStatus({
+      data: { orderNumber: id, status, trackingCode },
+    });
+    if (!result.ok) throw new Error("Não foi possível atualizar o pedido.");
     const updated: Order = {
       ...target,
       status,
-      trackingCode: trackingCode ?? target.trackingCode,
+      trackingCode: result.trackingCode ?? target.trackingCode,
     };
     setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
-    void triggerStatusUpdateMail(updated.customerEmail, updated.id, status, updated.trackingCode);
   };
 
   const setTrackingCode: OrdersCtx["setTrackingCode"] = async (id, trackingCode) => {
