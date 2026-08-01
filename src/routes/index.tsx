@@ -1151,9 +1151,8 @@ function ProductModal() {
                   )}
                 </div>
               )}
-              <p className="mt-6 text-sm leading-relaxed text-muted-foreground font-light">
-                {active.longDescription ?? active.description}
-              </p>
+
+
 
               <div className="mt-8">
                 <p className="mb-3 text-[11px] tracking-luxe uppercase text-muted-foreground">
