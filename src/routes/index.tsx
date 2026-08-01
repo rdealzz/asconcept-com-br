@@ -35,6 +35,8 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
+import { ProductInfoAccordion } from "@/components/ProductInfoAccordion";
+
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 import { AVAILABLE_COUPONS, findCoupon, hasUsedCoupon } from "@/lib/coupons";
 import { SUPPORT_EMAIL, WHATSAPP_DISPLAY, WHATSAPP_LINK } from "@/components/WhatsAppFab";
@@ -1151,9 +1153,8 @@ function ProductModal() {
                   )}
                 </div>
               )}
-              <p className="mt-6 text-sm leading-relaxed text-muted-foreground font-light">
-                {active.longDescription ?? active.description}
-              </p>
+
+
 
               <div className="mt-8">
                 <p className="mb-3 text-[11px] tracking-luxe uppercase text-muted-foreground">
@@ -1216,9 +1217,16 @@ function ProductModal() {
                     : "Adicionar à Sacola"}
               </button>
 
+              <ProductInfoAccordion
+                productId={active.id}
+                productName={active.name}
+                description={active.longDescription ?? active.description}
+              />
+
               <div className="mt-8">
                 <ShippingCalculator subtotal={active.price} />
               </div>
+
 
               <div className="mt-8 space-y-2 border-t border-border pt-6 text-xs font-light text-muted-foreground">
                 <p>Frete grátis em pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}.</p>
@@ -2212,11 +2220,13 @@ function AuthModal() {
   const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && isOpen) closeAuth();
@@ -2226,6 +2236,8 @@ function AuthModal() {
     if (!isOpen) {
       setError(null);
       setInfo(null);
+      setSignedUpEmail(null);
+      setConfirmPassword("");
     }
   }, [isOpen]);
 
@@ -2235,12 +2247,20 @@ function AuthModal() {
     setMode(m);
     setError(null);
     setInfo(null);
+    setConfirmPassword("");
   };
+
+  const passwordsMismatch =
+    mode === "signup" && confirmPassword.length > 0 && confirmPassword !== password;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setInfo(null);
+    if (mode === "signup" && password !== confirmPassword) {
+      setError("As senhas não coincidem.");
+      return;
+    }
     setLoading(true);
     if (mode === "login") {
       const { error } = await signIn(email, password);
@@ -2248,6 +2268,7 @@ function AuthModal() {
     } else if (mode === "signup") {
       const { error } = await signUp(email, password, name, phone);
       if (error) setError(error);
+      else setSignedUpEmail(email.trim());
     } else {
       const { error } = await resetPassword(email);
       if (error) setError(error);
@@ -2255,6 +2276,42 @@ function AuthModal() {
     }
     setLoading(false);
   };
+
+  if (signedUpEmail) {
+    return (
+      <>
+        <div
+          onClick={closeAuth}
+          className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
+        />
+        <div className="fixed inset-0 z-[90] flex items-end justify-center pointer-events-none sm:items-center sm:p-4">
+          <div className="pointer-events-auto relative max-h-[95svh] w-full max-w-md overflow-y-auto bg-background p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-500 sm:p-8 md:p-10">
+            <button
+              onClick={closeAuth}
+              aria-label="Fechar"
+              className="absolute right-4 top-4 hover:text-accent"
+            >
+              <X className="h-4 w-4" strokeWidth={1.5} />
+            </button>
+            <p className="text-[11px] tracking-luxe uppercase text-accent">Conta criada</p>
+            <h2 className="mt-2 font-serif text-3xl">Confirme seu e-mail</h2>
+            <p className="mt-4 text-sm font-light leading-relaxed text-muted-foreground">
+              Enviamos um e-mail de confirmação para{" "}
+              <span className="text-foreground">{signedUpEmail}</span>. Verifique sua caixa de
+              entrada (e o spam) e confirme para acessar sua conta.
+            </p>
+            <button
+              onClick={closeAuth}
+              className="mt-8 w-full bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
+            >
+              Entendi
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
 
   const title =
     mode === "login" ? "Entrar" : mode === "signup" ? "Criar Conta" : "Recuperar acesso";
@@ -2374,15 +2431,37 @@ function AuthModal() {
                 />
               </div>
             )}
+            {mode === "signup" && (
+              <div>
+                <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                  Confirmar senha
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className={`mt-1 w-full border-b bg-transparent py-2 text-sm outline-none transition-colors focus:border-accent ${
+                    passwordsMismatch ? "border-destructive" : "border-foreground/30"
+                  }`}
+                />
+                {passwordsMismatch && (
+                  <p className="mt-1 text-[10px] text-destructive">As senhas não coincidem.</p>
+                )}
+              </div>
+            )}
 
             {error && <p className="text-xs text-destructive">{error}</p>}
             {info && <p className="text-xs text-accent">{info}</p>}
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || passwordsMismatch}
               className="w-full bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:opacity-50"
             >
+
               {loading
                 ? "Aguarde..."
                 : mode === "login"
