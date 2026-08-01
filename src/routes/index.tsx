@@ -2212,11 +2212,13 @@ function AuthModal() {
   const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && isOpen) closeAuth();
@@ -2226,6 +2228,8 @@ function AuthModal() {
     if (!isOpen) {
       setError(null);
       setInfo(null);
+      setSignedUpEmail(null);
+      setConfirmPassword("");
     }
   }, [isOpen]);
 
@@ -2235,12 +2239,20 @@ function AuthModal() {
     setMode(m);
     setError(null);
     setInfo(null);
+    setConfirmPassword("");
   };
+
+  const passwordsMismatch =
+    mode === "signup" && confirmPassword.length > 0 && confirmPassword !== password;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setInfo(null);
+    if (mode === "signup" && password !== confirmPassword) {
+      setError("As senhas não coincidem.");
+      return;
+    }
     setLoading(true);
     if (mode === "login") {
       const { error } = await signIn(email, password);
@@ -2248,6 +2260,7 @@ function AuthModal() {
     } else if (mode === "signup") {
       const { error } = await signUp(email, password, name, phone);
       if (error) setError(error);
+      else setSignedUpEmail(email.trim());
     } else {
       const { error } = await resetPassword(email);
       if (error) setError(error);
@@ -2255,6 +2268,7 @@ function AuthModal() {
     }
     setLoading(false);
   };
+
 
   const title =
     mode === "login" ? "Entrar" : mode === "signup" ? "Criar Conta" : "Recuperar acesso";
