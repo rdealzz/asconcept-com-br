@@ -2269,6 +2269,41 @@ function AuthModal() {
     setLoading(false);
   };
 
+  if (signedUpEmail) {
+    return (
+      <>
+        <div
+          onClick={closeAuth}
+          className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
+        />
+        <div className="fixed inset-0 z-[90] flex items-end justify-center pointer-events-none sm:items-center sm:p-4">
+          <div className="pointer-events-auto relative max-h-[95svh] w-full max-w-md overflow-y-auto bg-background p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-500 sm:p-8 md:p-10">
+            <button
+              onClick={closeAuth}
+              aria-label="Fechar"
+              className="absolute right-4 top-4 hover:text-accent"
+            >
+              <X className="h-4 w-4" strokeWidth={1.5} />
+            </button>
+            <p className="text-[11px] tracking-luxe uppercase text-accent">Conta criada</p>
+            <h2 className="mt-2 font-serif text-3xl">Confirme seu e-mail</h2>
+            <p className="mt-4 text-sm font-light leading-relaxed text-muted-foreground">
+              Enviamos um e-mail de confirmação para{" "}
+              <span className="text-foreground">{signedUpEmail}</span>. Verifique sua caixa de
+              entrada (e o spam) e confirme para acessar sua conta.
+            </p>
+            <button
+              onClick={closeAuth}
+              className="mt-8 w-full bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
+            >
+              Entendi
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
 
   const title =
     mode === "login" ? "Entrar" : mode === "signup" ? "Criar Conta" : "Recuperar acesso";
