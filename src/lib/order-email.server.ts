@@ -20,6 +20,38 @@ type OrderEmailData = {
 const SENDER_DOMAIN = 'notify.asconccept.com.br'
 const FROM = 'A&S Conccept <noreply@asconccept.com.br>'
 
+function generateToken(): string {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+/** Um token de descadastro por endereço, reaproveitado entre envios. */
+async function ensureUnsubscribeToken(supabase: SupabaseClient, email: string) {
+  const { data: existing } = await supabase
+    .from('email_unsubscribe_tokens')
+    .select('token')
+    .eq('email', email)
+    .maybeSingle()
+  if (existing?.token) return existing.token as string
+
+  const token = generateToken()
+  await supabase
+    .from('email_unsubscribe_tokens')
+    .upsert({ token, email }, { onConflict: 'email', ignoreDuplicates: true })
+
+  const { data: stored } = await supabase
+    .from('email_unsubscribe_tokens')
+    .select('token')
+    .eq('email', email)
+    .maybeSingle()
+  if (!stored?.token) throw new Error('Não foi possível preparar o e-mail do pedido.')
+  return stored.token as string
+}
+
+
 export async function enqueueOrderEmail(
   supabase: SupabaseClient,
   kind: OrderEmailKind,
