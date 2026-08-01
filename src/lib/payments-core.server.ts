@@ -125,34 +125,18 @@ async function persistPayment(
           total: Number(mailRow.total ?? 0),
           items: Array.isArray(mailRow.items) ? mailRow.items : [],
         });
+        // O e-mail de confirmação já anuncia o início da preparação, então
+        // marcamos a etapa de preparação como notificada para não enviar
+        // duas mensagens quase idênticas em sequência ao cliente.
         await supabaseAdmin
           .from("orders")
-          .update({ mail_sent: true } as never)
+          .update({ mail_sent: true, preparation_mail_sent: true } as never)
           .eq("order_number", orderNumber);
       } catch (e) {
         console.error("[mail] falha ao enviar e-mail de pedido confirmado", e);
       }
     }
-    if (mailRow && !mailRow.preparation_mail_sent && mailRow.customer_email) {
-      try {
-        const { enqueueOrderEmail } = await import("@/lib/order-email.server");
-        await enqueueOrderEmail(
-          supabaseAdmin,
-          "pedido-em-preparacao",
-          mailRow.customer_email,
-          {
-            orderNumber,
-            customerName: mailRow.customer_name ?? undefined,
-          },
-        );
-        await supabaseAdmin
-          .from("orders")
-          .update({ preparation_mail_sent: true } as never)
-          .eq("order_number", orderNumber);
-      } catch (e) {
-        console.error("[mail] falha ao enviar e-mail de preparação", e);
-      }
-    }
+
   }
 }
 
