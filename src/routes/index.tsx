@@ -2423,15 +2423,37 @@ function AuthModal() {
                 />
               </div>
             )}
+            {mode === "signup" && (
+              <div>
+                <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                  Confirmar senha
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className={`mt-1 w-full border-b bg-transparent py-2 text-sm outline-none transition-colors focus:border-accent ${
+                    passwordsMismatch ? "border-destructive" : "border-foreground/30"
+                  }`}
+                />
+                {passwordsMismatch && (
+                  <p className="mt-1 text-[10px] text-destructive">As senhas não coincidem.</p>
+                )}
+              </div>
+            )}
 
             {error && <p className="text-xs text-destructive">{error}</p>}
             {info && <p className="text-xs text-accent">{info}</p>}
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || passwordsMismatch}
               className="w-full bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:opacity-50"
             >
+
               {loading
                 ? "Aguarde..."
                 : mode === "login"
