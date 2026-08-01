@@ -240,23 +240,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: { name: cleanName, full_name: cleanName, phone: cleanPhone },
       },
     });
+    const finishSignUp = () => {
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(PENDING_WELCOME_KEY, cleanEmail);
+        } catch {
+          /* localStorage indisponível — envio será tentado no próximo login */
+        }
+      }
+      setJustSignedUp(true);
+      return { error: null, justSignedUp: true };
+    };
+
     if (error) {
       const message = error.message.toLowerCase();
-      if (error.status === 429 || message.includes("rate limit") || message.includes("rate_limit"))
+      const isRateLimit =
+        error.status === 429 || message.includes("rate limit") || message.includes("rate_limit");
+      if (isRateLimit) {
+        // O limite costuma ser do ENVIO de e-mail, não da criação da conta:
+        // o usuário pode ter sido criado mesmo com o 429. Sondamos com as
+        // credenciais que o próprio visitante acabou de digitar para decidir
+        // qual tela mostrar (nenhum dado de terceiros é exposto).
+        const probe = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+        const probeMsg = (probe.error?.message ?? "").toLowerCase();
+        const accountExists =
+          !probe.error ||
+          probeMsg.includes("not confirmed") ||
+          probeMsg.includes("não confirmado");
+        if (accountExists) return finishSignUp();
         return { error: "Muitas tentativas de cadastro. Aguarde alguns minutos e tente novamente." };
+      }
       if (message.includes("already"))
         return { error: "Já existe uma conta com este e-mail." };
       return { error: "Não foi possível concluir o cadastro." };
     }
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.setItem(PENDING_WELCOME_KEY, cleanEmail);
-      } catch {
-        /* localStorage indisponível — envio será tentado no próximo login */
-      }
-    }
-    setJustSignedUp(true);
-    return { error: null, justSignedUp: true };
+    return finishSignUp();
+
   };
 
 
