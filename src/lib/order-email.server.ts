@@ -41,6 +41,25 @@ export async function enqueueOrderEmail(
   const subject = typeof entry.subject === 'function' ? entry.subject(data) : entry.subject
   const messageId = crypto.randomUUID()
 
+  // Destinatários que se descadastraram ou sofreram bounce não recebem e-mail.
+  const { data: suppressed } = await supabase
+    .from('suppressed_emails')
+    .select('email')
+    .eq('email', recipient)
+    .maybeSingle()
+  if (suppressed) {
+    await supabase.from('email_send_log').insert({
+      message_id: messageId,
+      template_name: kind,
+      recipient_email: recipient,
+      status: 'suppressed',
+    })
+    return messageId
+  }
+
+  // A API de envio exige um unsubscribe_token para e-mails transacionais.
+  const unsubscribeToken = await ensureUnsubscribeToken(supabase, recipient)
+
   const { error: logError } = await supabase.from('email_send_log').insert({
     message_id: messageId,
     template_name: kind,
@@ -61,10 +80,15 @@ export async function enqueueOrderEmail(
       text,
       purpose: 'transactional',
       label: kind,
-      idempotency_key: `${kind}:${data.orderNumber}`,
+      // Chave única por tentativa: a API rejeita (409) reenvios com a mesma
+      // chave de um envio que falhou. A não-duplicação por pedido é garantida
+      // pelas flags *_mail_sent na tabela orders.
+      idempotency_key: `${kind}:${data.orderNumber}:${messageId.slice(0, 8)}`,
+      unsubscribe_token: unsubscribeToken,
       queued_at: new Date().toISOString(),
     },
   })
+
   if (error) {
     await supabase.from('email_send_log').insert({
       message_id: messageId,
