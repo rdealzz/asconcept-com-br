@@ -10,13 +10,20 @@ const PedidoEmPreparacaoEmail = ({ orderNumber = 'AS-000000', customerName }: Pr
     <Text style={{ ...styles.muted, color: BRAND.gold, textTransform: 'uppercase' as const }}>
       Atualização do pedido
     </Text>
-    <Heading style={styles.h1}>Seu pedido está em preparação</Heading>
+    <Heading style={styles.h1}>Suas peças estão em boas mãos</Heading>
     <Text style={styles.text}>
-      {customerName ? `Olá, ${customerName}. ` : ''}Nosso ateliê iniciou a preparação cuidadosa
-      das peças do pedido <strong>{orderNumber}</strong>. Cada detalhe está sendo conferido antes
-      do envio.
+      {customerName ? `${customerName}, ` : ''}o pedido <strong>{orderNumber}</strong> acabou de
+      entrar em preparação. Cada peça é conferida, dobrada e embalada à mão — do caimento ao
+      acabamento, nada segue adiante sem passar por esse olhar.
     </Text>
-    <Text style={styles.muted}>Você receberá uma nova mensagem assim que o pedido partir.</Text>
+    <Text style={styles.muted}>
+      Avisaremos assim que ele deixar o ateliê, já com o código de rastreio.
+    </Text>
+    <Text style={{ ...styles.text, margin: '18px 0 0' }}>
+      Com carinho,
+      <br />
+      Equipe A&amp;S Conccept · The New Era of Heritage
+    </Text>
   </BrandLayout>
 )
 
