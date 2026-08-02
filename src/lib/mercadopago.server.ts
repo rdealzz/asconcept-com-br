@@ -80,7 +80,9 @@ export async function mpGetPayment(paymentId: string): Promise<MpPayment | null>
 export function mapMpStatus(status: string): string {
   switch (status) {
     case "approved":
-      return "Preparando pedido";
+      // Pagamento aprovado entra na fila de aprovação do ateliê. O avanço para
+      // "Preparando pedido" é sempre manual, feito pelo admin no painel.
+      return "Aguardando Aprovação";
     case "pending":
     case "in_process":
     case "authorized":
