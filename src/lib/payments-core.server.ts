@@ -34,11 +34,23 @@ type OrderRow = {
   customer_email: string;
   customer_name: string | null;
   mp_payment_id: string | null;
+  mp_status: string | null;
   coupon_code: string | null;
 
 };
 
+// Etapas que só existem depois do pagamento confirmado.
 const PAID_STATUSES = new Set(["Preparando pedido", "Em trânsito", "Entregue"]);
+
+/**
+ * Um pedido está pago quando já avançou no fluxo do ateliê ou quando está em
+ * "Aguardando Aprovação" com um pagamento aprovado registrado no Mercado Pago
+ * (pedidos manuais nascem nesse status sem pagamento e não contam).
+ */
+function isOrderPaid(order: { status: string; mp_status: string | null }): boolean {
+  if (PAID_STATUSES.has(order.status)) return true;
+  return order.status === "Aguardando Aprovação" && order.mp_status === "approved";
+}
 
 async function loadOwnOrder(
   supabase: AnySupabase,
@@ -48,7 +60,7 @@ async function loadOwnOrder(
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "order_number, total, status, user_id, customer_email, customer_name, mp_payment_id, coupon_code",
+      "order_number, total, status, user_id, customer_email, customer_name, mp_payment_id, mp_status, coupon_code",
     )
 
     .eq("order_number", orderNumber)
@@ -73,6 +85,10 @@ async function persistPayment(
   payment: { id: number | string; status: string; installments?: number | null },
   status: string,
 ) {
+  // O gatilho de "pagamento aprovado" depende do status do Mercado Pago, e não
+  // do nome do status interno — assim a renomeação das etapas do ateliê não
+  // afeta baixa de estoque nem envio de e-mail.
+  const approved = payment.status === "approved";
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   await supabaseAdmin
     .from("orders")
@@ -85,7 +101,7 @@ async function persistPayment(
     } as never)
     .eq("order_number", orderNumber);
 
-  if (status === "Preparando pedido") {
+  if (approved) {
     const { data: row } = await supabaseAdmin
       .from("orders")
       .select("stock_decremented, customer_email, customer_name, total, items, mail_sent, preparation_mail_sent")
@@ -125,12 +141,9 @@ async function persistPayment(
           total: Number(mailRow.total ?? 0),
           items: Array.isArray(mailRow.items) ? mailRow.items : [],
         });
-        // O e-mail de confirmação já anuncia o início da preparação, então
-        // marcamos a etapa de preparação como notificada para não enviar
-        // duas mensagens quase idênticas em sequência ao cliente.
         await supabaseAdmin
           .from("orders")
-          .update({ mail_sent: true, preparation_mail_sent: true } as never)
+          .update({ mail_sent: true } as never)
           .eq("order_number", orderNumber);
       } catch (e) {
         console.error("[mail] falha ao enviar e-mail de pedido confirmado", e);
@@ -271,7 +284,7 @@ export async function payWithCardCore(
   data: CardInput,
 ): Promise<CardResult> {
   const order = await loadOwnOrder(supabase, data.orderNumber, userId);
-  if (PAID_STATUSES.has(order.status)) {
+  if (isOrderPaid(order)) {
     return { orderNumber: order.order_number, status: order.status, approved: true };
   }
 
@@ -404,7 +417,7 @@ export async function paymentStatusCore(
   orderNumber: string,
 ): Promise<{ orderNumber: string; status: string; paid: boolean }> {
   const order = await loadOwnOrder(supabase, orderNumber, userId);
-  if (PAID_STATUSES.has(order.status)) {
+  if (isOrderPaid(order)) {
     return { orderNumber: order.order_number, status: order.status, paid: true };
   }
 
