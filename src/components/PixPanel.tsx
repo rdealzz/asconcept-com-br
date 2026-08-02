@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { Check, Copy, Loader2, QrCode } from "lucide-react";
+import { Check, Copy, Loader2, QrCode, ShieldCheck } from "lucide-react";
+
+import { WHATSAPP_LINK } from "@/components/WhatsAppFab";
 
 import { formatBRL } from "@/lib/cart-context";
 
@@ -87,6 +89,42 @@ export function PixPanel({
           {copied ? "Código copiado" : "Copiar código"}
         </button>
       </div>
+
+      <aside className="mt-6 border border-[color:var(--gold)]/45 bg-[color:var(--ivory)] p-4 sm:p-5">
+        <p className="flex items-center gap-2 font-serif text-sm text-charcoal">
+          <ShieldCheck className="h-4 w-4 text-[color:var(--gold)]" strokeWidth={1.5} />
+          Por que o Pix aparece em outro nome?
+        </p>
+        <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+          Como a A&S Conccept ainda não possui CNPJ próprio, os pagamentos via Pix são
+          processados pela conta pessoal do fundador da marca, verificada e protegida pelo
+          Mercado Pago. Por isso, o comprovante pode aparecer em nome de{" "}
+          <strong className="text-charcoal">Erick</strong>, CEO e fundador da A&S Conccept.
+          Assim que formalizarmos nosso CNPJ, essa informação será atualizada.
+        </p>
+        <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+          Seus dados de pagamento não são armazenados pela A&S Conccept — são processados
+          exclusivamente pelo Mercado Pago, uma das maiores plataformas de pagamento da América
+          Latina, garantindo total segurança e privacidade. Qualquer dúvida,{" "}
+          <a
+            href={WHATSAPP_LINK}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-charcoal"
+          >
+            fale com a gente pelo WhatsApp
+          </a>
+          .
+        </p>
+        <div className="mt-3 flex items-center gap-2 border-t border-[color:var(--gold)]/30 pt-3">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#009EE3] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+            <ShieldCheck className="h-3 w-3" strokeWidth={2} /> Mercado Pago
+          </span>
+          <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            Pagamento protegido
+          </span>
+        </div>
+      </aside>
 
       <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-4 text-[11px] text-muted-foreground">
         {awaiting && (
