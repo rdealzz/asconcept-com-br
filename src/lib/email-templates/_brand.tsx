@@ -6,6 +6,7 @@ import {
   Heading,
   Hr,
   Html,
+  Img,
   Link,
   Preview,
   Section,
@@ -43,8 +44,17 @@ export const styles = {
   },
   header: {
     backgroundColor: BRAND.navy,
-    padding: '34px 32px',
+    padding: 0,
     textAlign: 'center' as const,
+    fontSize: 0,
+    lineHeight: 0,
+  },
+  banner: {
+    display: 'block',
+    width: '100%',
+    maxWidth: '560px',
+    height: 'auto',
+    border: 0,
   },
   brand: {
     color: BRAND.ivory,
