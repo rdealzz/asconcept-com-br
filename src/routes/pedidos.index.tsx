@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
@@ -25,11 +25,10 @@ export const Route = createFileRoute("/pedidos/")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  beforeLoad: async () => {
-    if (typeof window === "undefined") return;
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/" });
-  },
+  // Sem guard de redirecionamento: em navegadores mobile (Safari iOS/Chrome
+  // Android) a sessão pode ainda não ter hidratado quando o beforeLoad roda, e
+  // o redirect derrubava o cliente para fora. O componente renderiza o estado
+  // "entre para ver seus pedidos" enquanto a sessão carrega.
   component: OrdersPage,
 });
 
@@ -61,21 +60,19 @@ const ALL_STATUSES = Object.keys(STATUS_META) as OrderStatus[];
 function OrdersPage() {
   const { user, loading, openAuth } = useAuth();
   const { orders, byUser } = useOrders();
-  const navigate = useNavigate();
 
-  // Trava runtime anti-devtools: se, por qualquer razão, um usuário não-mestre
-  // acabar renderizando esta rota, força signOut + redirect. Manipular
-  // `isAdmin` no console não libera nada — o componente sempre revalida.
+  // Log de diagnóstico temporário para a checagem de sessão em mobile.
   useEffect(() => {
     if (loading) return;
-    if (!user) return; // estado de "faça login" abaixo cuida disso
-    const allowed = isMasterAdminEmail(user.email);
-    if (!allowed) {
-      void supabase.auth.signOut().finally(() => {
-        navigate({ to: "/", replace: true });
+    if (!user) {
+      void supabase.auth.getSession().then(({ data, error }) => {
+        if (error) console.error("[pedidos] getSession error", error.message);
+        else if (data.session) {
+          console.error("[pedidos] sessão existe no storage, mas o contexto está sem usuário");
+        }
       });
     }
-  }, [loading, user, navigate]);
+  }, [loading, user]);
 
   const isAllowedAdmin = !!user && isMasterAdminEmail(user.email);
   const visible = isAllowedAdmin ? orders : user ? byUser(user.email) : [];
@@ -112,7 +109,12 @@ function OrdersPage() {
             : "Histórico de compras da sua conta"}
         </p>
 
-        {!user ? (
+        {loading ? (
+          <EmptyCard
+            title="Carregando seus pedidos…"
+            subtitle="Um instante enquanto confirmamos sua sessão."
+          />
+        ) : !user ? (
           <EmptyCard
             title="Entre para ver seus pedidos"
             action={
@@ -677,21 +679,37 @@ function AdminOrderCard({ order }: { order: Order }) {
             Fluxo de aprovação
           </h3>
           <div className="mt-2 space-y-2">
-            {ALL_STATUSES.map((s) => {
+            {ALL_STATUSES.map((s, index) => {
               const active = s === order.status;
+              const currentIndex = ALL_STATUSES.indexOf(order.status);
+              // O fluxo só avança uma etapa por vez, sempre na ordem.
+              const selectable = index === currentIndex + 1;
               return (
                 <button
                   key={s}
                   onClick={() => changeStatus(s)}
+                  disabled={!selectable}
+                  title={
+                    selectable
+                      ? `Avançar para "${STATUS_META[s].label}"`
+                      : active
+                        ? "Status atual"
+                        : "Disponível apenas na ordem do fluxo"
+                  }
                   className={`flex w-full items-center gap-2 border px-3 py-2 text-left text-xs transition-all ${
                     active
                       ? `${STATUS_META[s].className} font-medium`
-                      : "border-border bg-background hover:border-charcoal"
+                      : selectable
+                        ? "border-border bg-background hover:border-charcoal"
+                        : "cursor-not-allowed border-border/60 bg-background/40 text-muted-foreground/60"
                   }`}
                 >
                   <StatusIcon status={s} />
                   <span className="flex-1">{STATUS_META[s].label}</span>
                   {active && <span className="text-[10px] uppercase tracking-luxe">Atual</span>}
+                  {selectable && (
+                    <span className="text-[10px] uppercase tracking-luxe">Avançar</span>
+                  )}
                 </button>
               );
             })}

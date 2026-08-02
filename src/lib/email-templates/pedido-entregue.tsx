@@ -10,12 +10,25 @@ const PedidoEntregueEmail = ({ orderNumber = 'AS-000000', customerName }: Props)
     <Text style={{ ...styles.muted, color: BRAND.gold, textTransform: 'uppercase' as const }}>
       Entrega concluída
     </Text>
-    <Heading style={styles.h1}>Seu pedido foi entregue</Heading>
+    <Heading style={styles.h1}>Chegou. Agora é história sua</Heading>
     <Text style={styles.text}>
-      {customerName ? `Olá, ${customerName}. ` : ''}A entrega do pedido <strong>{orderNumber}</strong>{' '}
-      foi concluída. Esperamos que cada peça acompanhe muitos momentos especiais.
+      {customerName ? `${customerName}, ` : ''}a entrega do pedido <strong>{orderNumber}</strong>{' '}
+      foi concluída. Que essas peças acompanhem encontros, viagens e dias comuns — e envelheçam
+      bem com você.
     </Text>
-    <Text style={styles.text}>Obrigado por fazer parte da A&amp;S Conccept.</Text>
+    <Text style={styles.text}>
+      Se quiser, marque a A&amp;S Conccept nas suas redes: adoramos ver a curadoria ganhando vida
+      fora do ateliê. E quando quiser somar uma nova peça,{' '}
+      <a href={BRAND.site} style={styles.link}>
+        nossa vitrine
+      </a>{' '}
+      está sempre por perto.
+    </Text>
+    <Text style={{ ...styles.text, margin: '18px 0 0' }}>
+      Com carinho,
+      <br />
+      Equipe A&amp;S Conccept · The New Era of Heritage
+    </Text>
   </BrandLayout>
 )
 

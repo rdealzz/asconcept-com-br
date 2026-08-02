@@ -10,17 +10,26 @@ interface SignupEmailProps {
 }
 
 export const SignupEmail = ({ recipient, confirmationUrl }: SignupEmailProps) => (
-  <BrandLayout preview="Confirme seu e-mail na A&S Conccept">
-    <Heading style={styles.h1}>Bem-vindo à A&amp;S Conccept</Heading>
+  <BrandLayout preview="Sua entrada na A&S Conccept começa aqui">
+    <Heading style={styles.h1}>Que bom ter você por aqui</Heading>
     <Text style={styles.text}>
-      Sua conta foi criada. Para concluir o cadastro e acessar a nossa curadoria,
-      confirme o endereço {recipient ? <strong>{recipient}</strong> : 'de e-mail'}.
+      A&amp;S Conccept nasceu de uma ideia simples: peças que atravessam o tempo, escolhidas
+      uma a uma. A partir de agora, você faz parte desse círculo.
+    </Text>
+    <Text style={styles.text}>
+      Falta só um gesto para abrir as portas: confirme o endereço{' '}
+      {recipient ? <strong>{recipient}</strong> : 'de e-mail'} e sua conta estará pronta.
     </Text>
     <Button style={styles.button} href={confirmationUrl}>
       Confirmar meu e-mail
     </Button>
     <Text style={{ ...styles.muted, margin: '26px 0 0' }}>
-      Se você não criou esta conta, basta ignorar esta mensagem.
+      Se não foi você quem criou esta conta, pode ignorar esta mensagem com tranquilidade.
+    </Text>
+    <Text style={{ ...styles.text, margin: '22px 0 0' }}>
+      Com carinho,
+      <br />
+      Equipe A&amp;S Conccept · The New Era of Heritage
     </Text>
   </BrandLayout>
 )

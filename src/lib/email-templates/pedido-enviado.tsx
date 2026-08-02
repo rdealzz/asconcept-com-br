@@ -10,10 +10,11 @@ const PedidoEnviadoEmail = ({ orderNumber = 'AS-000000', customerName, trackingC
     <Text style={{ ...styles.muted, color: BRAND.gold, textTransform: 'uppercase' as const }}>
       Atualização do pedido
     </Text>
-    <Heading style={styles.h1}>Seu pedido foi enviado</Heading>
+    <Heading style={styles.h1}>A caminho de você</Heading>
     <Text style={styles.text}>
-      {customerName ? `Olá, ${customerName}. ` : ''}As peças do pedido <strong>{orderNumber}</strong>{' '}
-      partiram do nosso ateliê e estão a caminho do endereço informado.
+      {customerName ? `${customerName}, ` : ''}o pedido <strong>{orderNumber}</strong> deixou o
+      ateliê e já está a caminho do endereço que você informou. Agora é só a expectativa —
+      a melhor parte.
     </Text>
     {trackingCode ? (
       <Section style={{ border: `1px solid ${BRAND.border}`, padding: '18px', margin: '24px 0' }}>
@@ -25,7 +26,14 @@ const PedidoEnviadoEmail = ({ orderNumber = 'AS-000000', customerName, trackingC
         </Text>
       </Section>
     ) : null}
-    <Text style={styles.muted}>O rastreamento pode levar algumas horas para ser atualizado.</Text>
+    <Text style={styles.muted}>
+      O rastreamento pode levar algumas horas para exibir a primeira movimentação.
+    </Text>
+    <Text style={{ ...styles.text, margin: '18px 0 0' }}>
+      Com carinho,
+      <br />
+      Equipe A&amp;S Conccept · The New Era of Heritage
+    </Text>
   </BrandLayout>
 )
 
