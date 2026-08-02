@@ -6,6 +6,7 @@ import {
   Heading,
   Hr,
   Html,
+  Img,
   Link,
   Preview,
   Section,
@@ -43,8 +44,17 @@ export const styles = {
   },
   header: {
     backgroundColor: BRAND.navy,
-    padding: '34px 32px',
+    padding: 0,
     textAlign: 'center' as const,
+    fontSize: 0,
+    lineHeight: 0,
+  },
+  banner: {
+    display: 'block',
+    width: '100%',
+    maxWidth: '560px',
+    height: 'auto',
+    border: 0,
   },
   brand: {
     color: BRAND.ivory,
@@ -133,8 +143,12 @@ export function BrandLayout({
       <Body style={styles.main}>
         <Container style={styles.container}>
           <Section style={styles.header}>
-            <Text style={styles.brand}>A&amp;S CONCCEPT</Text>
-            <Text style={styles.brandRule}>Atelier · Curitiba</Text>
+            <Img
+              src={`${BRAND.site}/email-banner.png`}
+              alt="A&S Conccept · Curadoria de Herança"
+              width="560"
+              style={styles.banner}
+            />
           </Section>
           <Section style={styles.card}>{children}</Section>
           <Section style={{ padding: '24px 32px 0' }}>
