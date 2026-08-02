@@ -30,11 +30,11 @@ const PedidoConfirmadoEmail = ({
     <Text style={{ ...styles.muted, color: BRAND.gold, textTransform: 'uppercase' as const }}>
       Pagamento aprovado
     </Text>
-    <Heading style={styles.h1}>Pedido confirmado</Heading>
+    <Heading style={styles.h1}>Está feito — a peça é sua</Heading>
     <Text style={styles.text}>
-      {customerName ? `Olá, ${customerName}. ` : ''}Obrigado por escolher a A&amp;S Conccept.
-      O pagamento do pedido <strong>{orderNumber}</strong> foi aprovado e o nosso ateliê dará
-      início à preparação das suas peças.
+      {customerName ? `${customerName}, ` : ''}seu pagamento foi aprovado e o pedido{' '}
+      <strong>{orderNumber}</strong> entrou na fila do nosso ateliê. Daqui em diante, cada
+      etapa é conduzida com o mesmo cuidado que definiu a escolha das peças.
     </Text>
     <Section style={{ margin: '26px 0' }}>
       {items.map((item, index) => (
@@ -51,7 +51,14 @@ const PedidoConfirmadoEmail = ({
         Total <strong>{formatBRL(total)}</strong>
       </Text>
     </Section>
-    <Text style={styles.muted}>Avisaremos por e-mail a cada nova etapa do seu pedido.</Text>
+    <Text style={styles.muted}>
+      Você receberá uma mensagem nossa a cada novo passo — sem pressa, sem ruído.
+    </Text>
+    <Text style={{ ...styles.text, margin: '18px 0 0' }}>
+      Com carinho,
+      <br />
+      Equipe A&amp;S Conccept · The New Era of Heritage
+    </Text>
   </BrandLayout>
 )
 
