@@ -25,11 +25,10 @@ export const Route = createFileRoute("/pedidos/")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  beforeLoad: async () => {
-    if (typeof window === "undefined") return;
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/" });
-  },
+  // Sem guard de redirecionamento: em navegadores mobile (Safari iOS/Chrome
+  // Android) a sessão pode ainda não ter hidratado quando o beforeLoad roda, e
+  // o redirect derrubava o cliente para fora. O componente renderiza o estado
+  // "entre para ver seus pedidos" enquanto a sessão carrega.
   component: OrdersPage,
 });
 
@@ -63,19 +62,18 @@ function OrdersPage() {
   const { orders, byUser } = useOrders();
   const navigate = useNavigate();
 
-  // Trava runtime anti-devtools: se, por qualquer razão, um usuário não-mestre
-  // acabar renderizando esta rota, força signOut + redirect. Manipular
-  // `isAdmin` no console não libera nada — o componente sempre revalida.
+  // Log de diagnóstico temporário para a checagem de sessão em mobile.
   useEffect(() => {
     if (loading) return;
-    if (!user) return; // estado de "faça login" abaixo cuida disso
-    const allowed = isMasterAdminEmail(user.email);
-    if (!allowed) {
-      void supabase.auth.signOut().finally(() => {
-        navigate({ to: "/", replace: true });
+    if (!user) {
+      void supabase.auth.getSession().then(({ data, error }) => {
+        if (error) console.error("[pedidos] getSession error", error.message);
+        else if (data.session) {
+          console.error("[pedidos] sessão existe no storage, mas o contexto está sem usuário");
+        }
       });
     }
-  }, [loading, user, navigate]);
+  }, [loading, user]);
 
   const isAllowedAdmin = !!user && isMasterAdminEmail(user.email);
   const visible = isAllowedAdmin ? orders : user ? byUser(user.email) : [];
