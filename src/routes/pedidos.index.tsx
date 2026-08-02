@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
@@ -60,7 +60,6 @@ const ALL_STATUSES = Object.keys(STATUS_META) as OrderStatus[];
 function OrdersPage() {
   const { user, loading, openAuth } = useAuth();
   const { orders, byUser } = useOrders();
-  const navigate = useNavigate();
 
   // Log de diagnóstico temporário para a checagem de sessão em mobile.
   useEffect(() => {
@@ -110,7 +109,12 @@ function OrdersPage() {
             : "Histórico de compras da sua conta"}
         </p>
 
-        {!user ? (
+        {loading ? (
+          <EmptyCard
+            title="Carregando seus pedidos…"
+            subtitle="Um instante enquanto confirmamos sua sessão."
+          />
+        ) : !user ? (
           <EmptyCard
             title="Entre para ver seus pedidos"
             action={
@@ -675,21 +679,37 @@ function AdminOrderCard({ order }: { order: Order }) {
             Fluxo de aprovação
           </h3>
           <div className="mt-2 space-y-2">
-            {ALL_STATUSES.map((s) => {
+            {ALL_STATUSES.map((s, index) => {
               const active = s === order.status;
+              const currentIndex = ALL_STATUSES.indexOf(order.status);
+              // O fluxo só avança uma etapa por vez, sempre na ordem.
+              const selectable = index === currentIndex + 1;
               return (
                 <button
                   key={s}
                   onClick={() => changeStatus(s)}
+                  disabled={!selectable}
+                  title={
+                    selectable
+                      ? `Avançar para "${STATUS_META[s].label}"`
+                      : active
+                        ? "Status atual"
+                        : "Disponível apenas na ordem do fluxo"
+                  }
                   className={`flex w-full items-center gap-2 border px-3 py-2 text-left text-xs transition-all ${
                     active
                       ? `${STATUS_META[s].className} font-medium`
-                      : "border-border bg-background hover:border-charcoal"
+                      : selectable
+                        ? "border-border bg-background hover:border-charcoal"
+                        : "cursor-not-allowed border-border/60 bg-background/40 text-muted-foreground/60"
                   }`}
                 >
                   <StatusIcon status={s} />
                   <span className="flex-1">{STATUS_META[s].label}</span>
                   {active && <span className="text-[10px] uppercase tracking-luxe">Atual</span>}
+                  {selectable && (
+                    <span className="text-[10px] uppercase tracking-luxe">Avançar</span>
+                  )}
                 </button>
               );
             })}
