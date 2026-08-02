@@ -133,8 +133,12 @@ export function BrandLayout({
       <Body style={styles.main}>
         <Container style={styles.container}>
           <Section style={styles.header}>
-            <Text style={styles.brand}>A&amp;S CONCCEPT</Text>
-            <Text style={styles.brandRule}>Atelier · Curitiba</Text>
+            <Img
+              src={`${BRAND.site}/email-banner.png`}
+              alt="A&S Conccept · Curadoria de Herança"
+              width="560"
+              style={styles.banner}
+            />
           </Section>
           <Section style={styles.card}>{children}</Section>
           <Section style={{ padding: '24px 32px 0' }}>
