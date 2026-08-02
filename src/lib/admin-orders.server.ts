@@ -25,6 +25,14 @@ const emailForStatus: Partial<Record<OrderStatus, { kind: OrderEmailKind; flag: 
   Entregue: { kind: 'pedido-entregue', flag: 'delivered_mail_sent' },
 }
 
+/** Sequência obrigatória do fluxo do ateliê. */
+const STATUS_FLOW: OrderStatus[] = [
+  'Aguardando Aprovação',
+  'Preparando pedido',
+  'Em trânsito',
+  'Entregue',
+]
+
 export async function updateAdminOrderStatusCore(
   supabaseAdmin: SupabaseClient,
   input: AdminStatusInput,
@@ -38,6 +46,19 @@ export async function updateAdminOrderStatusCore(
     .maybeSingle()
   if (error || !data) throw new Error('Pedido não encontrado.')
   const order = data as OrderRow
+
+  // Só é permitido manter o status atual ou avançar exatamente uma etapa.
+  const currentIndex = STATUS_FLOW.indexOf(order.status as OrderStatus)
+  const nextIndex = STATUS_FLOW.indexOf(input.status)
+  if (nextIndex === -1) throw new Error('Status inválido.')
+  if (currentIndex !== -1 && nextIndex !== currentIndex && nextIndex !== currentIndex + 1) {
+    throw new Error(
+      nextIndex < currentIndex
+        ? 'Não é possível retroceder o status do pedido.'
+        : `Avance uma etapa por vez: o próximo status é "${STATUS_FLOW[currentIndex + 1]}".`,
+    )
+  }
+
   const trackingCode = input.trackingCode?.trim().toUpperCase() || order.tracking_code
 
   const { error: updateError } = await supabaseAdmin
