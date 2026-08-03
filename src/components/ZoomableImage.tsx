@@ -96,8 +96,11 @@ function ZoomViewer({ src, alt, onClose }: { src: string; alt: string; onClose: 
     zoomAt(stateRef.current.zoom * factor, r.width / 2, r.height / 2);
   };
 
-  return (
-    <div className="fixed inset-0 z-[120] flex flex-col bg-charcoal/95 animate-in fade-in duration-200">
+  const body = typeof document !== "undefined" ? document.body : null;
+  if (!body) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[999] flex flex-col bg-charcoal animate-in fade-in duration-200">
       <div className="flex items-center justify-between px-4 py-3">
         <span className="font-serif text-sm text-ivory">{alt}</span>
         <div className="flex items-center gap-1">
