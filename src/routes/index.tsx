@@ -112,6 +112,7 @@ type ProductRow = {
   sizes: unknown;
   force_last_item: boolean;
   sort_order: number;
+  created_at?: string | null;
 };
 
 function rowToProduct(r: ProductRow): Product {
@@ -129,6 +130,7 @@ function rowToProduct(r: ProductRow): Product {
     gallery: galleryArr.length ? galleryArr : image ? [image] : [],
     category: (r.category === "sneakers" ? "sneakers" : "clothes") as ProductCategory,
     forceLastItem: r.force_last_item || undefined,
+    createdAt: r.created_at ?? undefined,
   };
 }
 
