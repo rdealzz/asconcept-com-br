@@ -1285,7 +1285,7 @@ function ProductModal() {
         className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
       />
       <div className="fixed inset-0 z-[90] flex items-stretch justify-center pointer-events-none md:items-center md:p-8">
-        <div className="pointer-events-auto relative flex h-[100svh] w-full max-w-5xl flex-col overflow-hidden bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-500 md:h-auto md:max-h-[92vh]">
+        <div className="pointer-events-auto relative flex h-[100svh] w-full max-w-5xl flex-col overflow-hidden bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-500 md:h-[88vh]">
           <button
             onClick={close}
             aria-label="Fechar"
@@ -1294,7 +1294,7 @@ function ProductModal() {
             <X className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.5} />
           </button>
           <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] md:pb-0">
-            <div className="flex flex-col bg-secondary md:sticky md:top-0 md:h-full md:max-h-[92vh]">
+            <div className="flex flex-col bg-secondary md:sticky md:top-0 md:h-[88vh]">
               <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-secondary max-md:aspect-[4/5]">
                 <img
                   src={gallery[activeImg]}
