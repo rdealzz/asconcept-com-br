@@ -732,44 +732,6 @@ function matchesSub(name: string, description: string, sub: SubFilter) {
   return re.test(name) || re.test(description);
 }
 
-/* ---------- Filtros de vitrine ---------- */
-type SortId = "curadoria" | "novidades" | "menor" | "maior";
-type PriceRangeId = "todos" | "ate199" | "200a399" | "400a699" | "700mais";
-
-const SORT_OPTIONS: { id: SortId; label: string }[] = [
-  { id: "curadoria", label: "Curadoria" },
-  { id: "novidades", label: "Novidades" },
-  { id: "menor", label: "Menor preço" },
-  { id: "maior", label: "Maior preço" },
-];
-
-const PRICE_RANGES: { id: PriceRangeId; label: string; min: number; max: number }[] = [
-  { id: "ate199", label: "Até R$ 199", min: 0, max: 200 },
-  { id: "200a399", label: "R$ 200 – 399", min: 200, max: 400 },
-  { id: "400a699", label: "R$ 400 – 699", min: 400, max: 700 },
-  { id: "700mais", label: "R$ 700+", min: 700, max: Infinity },
-];
-
-const COLOR_TERMS: { label: string; terms: string[] }[] = [
-  { label: "Preto", terms: ["preto", "black", "ônix", "onix"] },
-  { label: "Branco", terms: ["branco", "off-white", "white", "marfim", "ivory"] },
-  { label: "Bege", terms: ["bege", "areia", "camel", "caramelo", "nude", "cru"] },
-  { label: "Azul", terms: ["azul", "navy", "marinho", "denim", "jeans"] },
-  { label: "Verde", terms: ["verde", "oliva", "militar"] },
-  { label: "Cinza", terms: ["cinza", "grafite", "chumbo"] },
-  { label: "Marrom", terms: ["marrom", "café", "cafe", "chocolate", "terracota"] },
-  { label: "Vinho", terms: ["vinho", "bordô", "bordo", "burgundy"] },
-];
-
-/** Deduz a cor da peça a partir do nome/descrição. */
-function detectColor(p: Product): string | null {
-  const hay = `${p.name} ${p.description} ${p.longDescription ?? ""}`.toLowerCase();
-  for (const c of COLOR_TERMS) {
-    if (c.terms.some((t) => hay.includes(t))) return c.label;
-  }
-  return null;
-}
-
 /** Peças cadastradas nos últimos 15 dias recebem o selo "Novidade". */
 function isNewArrival(p: Product): boolean {
   if (!p.createdAt) return false;
@@ -778,45 +740,11 @@ function isNewArrival(p: Product): boolean {
   return Date.now() - ts <= 15 * 86400000;
 }
 
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string }[];
-}) {
-  return (
-    <label className="flex items-center gap-2">
-      <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="cursor-pointer border-0 border-b border-border bg-transparent py-1 pr-5 text-xs font-light outline-none transition-colors focus:border-accent"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 function Products() {
   const { query, setQuery, tab, subFilter, setSubFilter } = useSearch();
   const { products, stock, refresh: resetCatalog } = useCatalog();
   const { openCreate } = useProduct();
   const isAdmin = useIsAdmin();
-
-  const [sizeFilter, setSizeFilter] = useState<Size | "todos">("todos");
-  const [priceFilter, setPriceFilter] = useState<PriceRangeId>("todos");
-  const [colorFilter, setColorFilter] = useState<string>("todos");
-  const [sortBy, setSortBy] = useState<SortId>("curadoria");
 
   const base = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -838,46 +766,7 @@ function Products() {
     );
   }, [query, products, tab, subFilter, isAdmin, stock]);
 
-  const availableColors = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of base) {
-      const c = detectColor(p);
-      if (c) set.add(c);
-    }
-    return Array.from(set).sort();
-  }, [base]);
-
-  const filtered = useMemo(() => {
-    let list = base;
-    if (sizeFilter !== "todos") {
-      list = list.filter((p) => (stock[p.id]?.[sizeFilter] ?? 0) > 0);
-    }
-    if (priceFilter !== "todos") {
-      const range = PRICE_RANGES.find((r) => r.id === priceFilter);
-      if (range) list = list.filter((p) => p.price >= range.min && p.price < range.max);
-    }
-    if (colorFilter !== "todos") {
-      list = list.filter((p) => detectColor(p) === colorFilter);
-    }
-    const sorted = [...list];
-    if (sortBy === "menor") sorted.sort((a, b) => a.price - b.price);
-    if (sortBy === "maior") sorted.sort((a, b) => b.price - a.price);
-    if (sortBy === "novidades")
-      sorted.sort(
-        (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
-      );
-    return sorted;
-  }, [base, sizeFilter, priceFilter, colorFilter, sortBy, stock]);
-
-  const activeFilters =
-    (sizeFilter !== "todos" ? 1 : 0) +
-    (priceFilter !== "todos" ? 1 : 0) +
-    (colorFilter !== "todos" ? 1 : 0);
-  const clearFilters = () => {
-    setSizeFilter("todos");
-    setPriceFilter("todos");
-    setColorFilter("todos");
-  };
+  const filtered = base;
 
   const showSneakersComingSoon = tab === "sneakers" && !isAdmin && base.length === 0;
 
@@ -947,65 +836,6 @@ function Products() {
             </div>
           )}
         </div>
-
-        {!showSneakersComingSoon && base.length > 0 && (
-          <div className="mb-10 border-y border-border py-4">
-            <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                <FilterSelect
-                  label="Tamanho"
-                  value={sizeFilter}
-                  onChange={(v) => setSizeFilter(v as Size | "todos")}
-                  options={[
-                    { value: "todos", label: "Todos" },
-                    ...SIZES.map((s) => ({ value: s, label: s })),
-                  ]}
-                />
-                <FilterSelect
-                  label="Preço"
-                  value={priceFilter}
-                  onChange={(v) => setPriceFilter(v as PriceRangeId)}
-                  options={[
-                    { value: "todos", label: "Todos" },
-                    ...PRICE_RANGES.map((r) => ({ value: r.id, label: r.label })),
-                  ]}
-                />
-                {availableColors.length > 0 && (
-                  <FilterSelect
-                    label="Cor"
-                    value={colorFilter}
-                    onChange={setColorFilter}
-                    options={[
-                      { value: "todos", label: "Todas" },
-                      ...availableColors.map((c) => ({ value: c, label: c })),
-                    ]}
-                  />
-                )}
-                {activeFilters > 0 && (
-                  <button
-                    onClick={clearFilters}
-                    className="inline-flex items-center gap-1.5 text-[10px] tracking-luxe uppercase text-muted-foreground transition-colors hover:text-accent"
-                  >
-                    <X className="h-3 w-3" strokeWidth={1.5} /> Limpar ({activeFilters})
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="hidden text-[11px] text-muted-foreground md:inline">
-                  {filtered.length} {filtered.length === 1 ? "peça" : "peças"}
-                </span>
-                <FilterSelect
-                  label="Ordenar"
-                  value={sortBy}
-                  onChange={(v) => setSortBy(v as SortId)}
-                  options={SORT_OPTIONS.map((o) => ({ value: o.id, label: o.label }))}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-
 
         {showSneakersComingSoon ? (
           <SneakersComingSoon />
@@ -1285,7 +1115,7 @@ function ProductModal() {
         className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
       />
       <div className="fixed inset-0 z-[90] flex items-stretch justify-center pointer-events-none md:items-center md:p-8">
-        <div className="pointer-events-auto relative flex h-[100svh] w-full max-w-5xl flex-col overflow-hidden bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-500 md:h-auto md:max-h-[92vh]">
+        <div className="pointer-events-auto relative flex h-[100svh] w-full max-w-5xl flex-col overflow-hidden bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-500 md:h-[88vh]">
           <button
             onClick={close}
             aria-label="Fechar"
@@ -1293,9 +1123,9 @@ function ProductModal() {
           >
             <X className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.5} />
           </button>
-          <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-2 md:pb-0">
-            <div className="bg-secondary md:sticky md:top-0 md:self-start">
-              <div className="relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden bg-secondary">
+          <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] md:pb-0">
+            <div className="flex flex-col bg-secondary md:sticky md:top-0 md:h-[88vh]">
+              <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-secondary max-md:aspect-[4/5]">
                 <img
                   src={gallery[activeImg]}
                   alt={active.name}
@@ -1326,13 +1156,16 @@ function ProductModal() {
                 )}
               </div>
               {gallery.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto p-3">
+                <div className="flex shrink-0 items-center justify-center gap-3 border-t border-border/40 bg-secondary px-4 py-4">
                   {gallery.map((g, i) => (
                     <button
                       key={i}
                       onClick={() => setActiveImg(i)}
-                      className={`h-20 w-16 shrink-0 overflow-hidden border transition-all ${
-                        activeImg === i ? "border-accent" : "border-transparent opacity-70"
+                      aria-label={`Ver foto ${i + 1}`}
+                      className={`h-24 w-[68px] shrink-0 overflow-hidden border transition-all duration-300 ${
+                        activeImg === i
+                          ? "border-accent opacity-100"
+                          : "border-border/50 opacity-60 hover:opacity-100"
                       }`}
                     >
                       <img src={g} alt="" className="h-full w-full object-cover" />
@@ -1341,6 +1174,7 @@ function ProductModal() {
                 </div>
               )}
             </div>
+
 
 
             <div className="flex flex-col p-6 md:p-12">
@@ -2089,18 +1923,40 @@ function InstitutionalModal({
   );
 }
 
+type FooterLink = { label: string; to?: string; hash?: string };
+
 function Footer() {
   const [modal, setModal] = useState<InstitutionalKey | null>(null);
   const institutional: { id: InstitutionalKey; label: string }[] = [
     { id: "conceito", label: "O Conceito" },
     { id: "filosofia", label: "A Filosofia" },
-    { id: "termos", label: "Termos e Condições" },
-    { id: "privacidade", label: "Políticas de Privacidade" },
   ];
-  const cols = [
-    { title: "Maison", links: ["Nossa História", "Ateliês", "Craftsmanship", "Sustentabilidade"] },
-    { title: "Serviço", links: ["Concierge", "Envio", "Trocas", "Ajustes"] },
-    { title: "Descobrir", links: ["O Editorial", "Journal", "Lookbook", "Revendedores"] },
+  const cols: { title: string; links: FooterLink[] }[] = [
+    {
+      title: "Maison",
+      links: [
+        { label: "Nossa História", to: "/sobre" },
+        { label: "Craftsmanship", to: "/craftsmanship" },
+        { label: "Sustentabilidade", to: "/sustentabilidade" },
+      ],
+    },
+    {
+      title: "Serviço",
+      links: [
+        { label: "Envio e Prazos", to: "/envio" },
+        { label: "Trocas e Devoluções", to: "/trocas" },
+        { label: "Ajustes e Caimento", to: "/ajustes" },
+        { label: "Perguntas Frequentes", to: "/faq" },
+      ],
+    },
+    {
+      title: "Descobrir",
+      links: [
+        { label: "A Coleção", hash: "/#collections" },
+        { label: "O Editorial", hash: "/#edit" },
+        { label: "Sobre Nós", hash: "/#about" },
+      ],
+    },
   ];
   return (
     <footer className="border-t border-border bg-charcoal text-ivory">
@@ -2129,13 +1985,22 @@ function Footer() {
               <h4 className="mb-5 text-[11px] tracking-luxe uppercase text-accent">{c.title}</h4>
               <ul className="space-y-3">
                 {c.links.map((l) => (
-                  <li key={l}>
-                    <a
-                      href="#"
-                      className="text-xs font-light text-ivory/70 transition-colors hover:text-ivory"
-                    >
-                      {l}
-                    </a>
+                  <li key={l.label}>
+                    {l.to ? (
+                      <Link
+                        to={l.to}
+                        className="text-xs font-light text-ivory/70 transition-colors hover:text-ivory"
+                      >
+                        {l.label}
+                      </Link>
+                    ) : (
+                      <a
+                        href={l.hash}
+                        className="text-xs font-light text-ivory/70 transition-colors hover:text-ivory"
+                      >
+                        {l.label}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -2154,8 +2019,25 @@ function Footer() {
                   </button>
                 </li>
               ))}
+              <li>
+                <Link
+                  to="/termos"
+                  className="text-xs font-light text-ivory/70 transition-colors hover:text-ivory"
+                >
+                  Termos e Condições
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/privacidade"
+                  className="text-xs font-light text-ivory/70 transition-colors hover:text-ivory"
+                >
+                  Políticas de Privacidade
+                </Link>
+              </li>
             </ul>
           </div>
+
         </div>
         <div className="mt-16 flex flex-col gap-3 border-t border-ivory/10 pt-8 text-xs font-light text-ivory/70 md:flex-row md:items-center md:justify-between">
           <p>

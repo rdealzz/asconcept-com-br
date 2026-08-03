@@ -12,12 +12,16 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
 import { Route as TrocasRouteImport } from './routes/trocas'
 import { Route as TermosRouteImport } from './routes/termos'
+import { Route as SustentabilidadeRouteImport } from './routes/sustentabilidade'
 import { Route as SucessoRouteImport } from './routes/sucesso'
 import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as FaqRouteImport } from './routes/faq'
+import { Route as EnvioRouteImport } from './routes/envio'
+import { Route as CraftsmanshipRouteImport } from './routes/craftsmanship'
 import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as AjustesRouteImport } from './routes/ajustes'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PedidosIndexRouteImport } from './routes/pedidos.index'
 import { Route as PedidosIdRouteImport } from './routes/pedidos.$id'
@@ -46,6 +50,11 @@ const TermosRoute = TermosRouteImport.update({
   path: '/termos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SustentabilidadeRoute = SustentabilidadeRouteImport.update({
+  id: '/sustentabilidade',
+  path: '/sustentabilidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SucessoRoute = SucessoRouteImport.update({
   id: '/sucesso',
   path: '/sucesso',
@@ -71,9 +80,24 @@ const FaqRoute = FaqRouteImport.update({
   path: '/faq',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EnvioRoute = EnvioRouteImport.update({
+  id: '/envio',
+  path: '/envio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CraftsmanshipRoute = CraftsmanshipRouteImport.update({
+  id: '/craftsmanship',
+  path: '/craftsmanship',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CheckoutRoute = CheckoutRouteImport.update({
   id: '/checkout',
   path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AjustesRoute = AjustesRouteImport.update({
+  id: '/ajustes',
+  path: '/ajustes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -144,12 +168,16 @@ const ApiPublicPaymentsMercadopagoRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ajustes': typeof AjustesRoute
   '/checkout': typeof CheckoutRoute
+  '/craftsmanship': typeof CraftsmanshipRoute
+  '/envio': typeof EnvioRoute
   '/faq': typeof FaqRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
   '/sucesso': typeof SucessoRoute
+  '/sustentabilidade': typeof SustentabilidadeRoute
   '/termos': typeof TermosRoute
   '/trocas': typeof TrocasRoute
   '/unsubscribe': typeof UnsubscribeRoute
@@ -167,12 +195,16 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ajustes': typeof AjustesRoute
   '/checkout': typeof CheckoutRoute
+  '/craftsmanship': typeof CraftsmanshipRoute
+  '/envio': typeof EnvioRoute
   '/faq': typeof FaqRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
   '/sucesso': typeof SucessoRoute
+  '/sustentabilidade': typeof SustentabilidadeRoute
   '/termos': typeof TermosRoute
   '/trocas': typeof TrocasRoute
   '/unsubscribe': typeof UnsubscribeRoute
@@ -191,12 +223,16 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ajustes': typeof AjustesRoute
   '/checkout': typeof CheckoutRoute
+  '/craftsmanship': typeof CraftsmanshipRoute
+  '/envio': typeof EnvioRoute
   '/faq': typeof FaqRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
   '/sucesso': typeof SucessoRoute
+  '/sustentabilidade': typeof SustentabilidadeRoute
   '/termos': typeof TermosRoute
   '/trocas': typeof TrocasRoute
   '/unsubscribe': typeof UnsubscribeRoute
@@ -216,12 +252,16 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ajustes'
     | '/checkout'
+    | '/craftsmanship'
+    | '/envio'
     | '/faq'
     | '/privacidade'
     | '/reset-password'
     | '/sobre'
     | '/sucesso'
+    | '/sustentabilidade'
     | '/termos'
     | '/trocas'
     | '/unsubscribe'
@@ -239,12 +279,16 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ajustes'
     | '/checkout'
+    | '/craftsmanship'
+    | '/envio'
     | '/faq'
     | '/privacidade'
     | '/reset-password'
     | '/sobre'
     | '/sucesso'
+    | '/sustentabilidade'
     | '/termos'
     | '/trocas'
     | '/unsubscribe'
@@ -262,12 +306,16 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/ajustes'
     | '/checkout'
+    | '/craftsmanship'
+    | '/envio'
     | '/faq'
     | '/privacidade'
     | '/reset-password'
     | '/sobre'
     | '/sucesso'
+    | '/sustentabilidade'
     | '/termos'
     | '/trocas'
     | '/unsubscribe'
@@ -286,12 +334,16 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AjustesRoute: typeof AjustesRoute
   CheckoutRoute: typeof CheckoutRoute
+  CraftsmanshipRoute: typeof CraftsmanshipRoute
+  EnvioRoute: typeof EnvioRoute
   FaqRoute: typeof FaqRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SobreRoute: typeof SobreRoute
   SucessoRoute: typeof SucessoRoute
+  SustentabilidadeRoute: typeof SustentabilidadeRoute
   TermosRoute: typeof TermosRoute
   TrocasRoute: typeof TrocasRoute
   UnsubscribeRoute: typeof UnsubscribeRoute
@@ -331,6 +383,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sustentabilidade': {
+      id: '/sustentabilidade'
+      path: '/sustentabilidade'
+      fullPath: '/sustentabilidade'
+      preLoaderRoute: typeof SustentabilidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sucesso': {
       id: '/sucesso'
       path: '/sucesso'
@@ -366,11 +425,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FaqRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/envio': {
+      id: '/envio'
+      path: '/envio'
+      fullPath: '/envio'
+      preLoaderRoute: typeof EnvioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/craftsmanship': {
+      id: '/craftsmanship'
+      path: '/craftsmanship'
+      fullPath: '/craftsmanship'
+      preLoaderRoute: typeof CraftsmanshipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/checkout': {
       id: '/checkout'
       path: '/checkout'
       fullPath: '/checkout'
       preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ajustes': {
+      id: '/ajustes'
+      path: '/ajustes'
+      fullPath: '/ajustes'
+      preLoaderRoute: typeof AjustesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -462,12 +542,16 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AjustesRoute: AjustesRoute,
   CheckoutRoute: CheckoutRoute,
+  CraftsmanshipRoute: CraftsmanshipRoute,
+  EnvioRoute: EnvioRoute,
   FaqRoute: FaqRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SobreRoute: SobreRoute,
   SucessoRoute: SucessoRoute,
+  SustentabilidadeRoute: SustentabilidadeRoute,
   TermosRoute: TermosRoute,
   TrocasRoute: TrocasRoute,
   UnsubscribeRoute: UnsubscribeRoute,
