@@ -17,38 +17,21 @@ type Props = {
  * em tela cheia com roda do mouse, arrasto e pinça.
  */
 export function ZoomableImage({ src, alt, className = "" }: Props) {
-  const [lens, setLens] = useState<{ x: number; y: number } | null>(null);
   const [open, setOpen] = useState(false);
 
   return (
     <>
       <div
         className="relative h-full w-full cursor-zoom-in"
-        onMouseMove={(e) => {
-          const r = e.currentTarget.getBoundingClientRect();
-          setLens({
-            x: ((e.clientX - r.left) / r.width) * 100,
-            y: ((e.clientY - r.top) / r.height) * 100,
-          });
-        }}
-        onMouseLeave={() => setLens(null)}
         onClick={() => setOpen(true)}
       >
-        <img
-          src={src}
-          alt={alt}
-          className={`h-full w-full transition-transform duration-200 ease-out ${className}`}
-          style={
-            lens
-              ? { transform: "scale(2.2)", transformOrigin: `${lens.x}% ${lens.y}%` }
-              : undefined
-          }
-        />
+        <img src={src} alt={alt} className={`h-full w-full ${className}`} />
         <span className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 bg-charcoal/70 px-2.5 py-1 text-[10px] tracking-luxe uppercase text-ivory">
           <ZoomIn className="h-3 w-3" strokeWidth={1.5} />
           Ampliar
         </span>
       </div>
+
 
       {open && <ZoomViewer src={src} alt={alt} onClose={() => setOpen(false)} />}
     </>
