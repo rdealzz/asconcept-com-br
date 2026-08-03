@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
+import { Route as TrocasRouteImport } from './routes/trocas'
 import { Route as SucessoRouteImport } from './routes/sucesso'
 import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
@@ -30,6 +31,11 @@ import { Route as ApiPublicPaymentsMercadopagoRouteImport } from './routes/api/p
 const UnsubscribeRoute = UnsubscribeRouteImport.update({
   id: '/unsubscribe',
   path: '/unsubscribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrocasRoute = TrocasRouteImport.update({
+  id: '/trocas',
+  path: '/trocas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SucessoRoute = SucessoRouteImport.update({
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
   '/sucesso': typeof SucessoRoute
+  '/trocas': typeof TrocasRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/pedidos/$id': typeof PedidosIdRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
   '/sucesso': typeof SucessoRoute
+  '/trocas': typeof TrocasRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/pedidos/$id': typeof PedidosIdRoute
@@ -163,6 +171,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
   '/sucesso': typeof SucessoRoute
+  '/trocas': typeof TrocasRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/pedidos/$id': typeof PedidosIdRoute
@@ -184,6 +193,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sobre'
     | '/sucesso'
+    | '/trocas'
     | '/unsubscribe'
     | '/email/unsubscribe'
     | '/pedidos/$id'
@@ -203,6 +213,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sobre'
     | '/sucesso'
+    | '/trocas'
     | '/unsubscribe'
     | '/email/unsubscribe'
     | '/pedidos/$id'
@@ -222,6 +233,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sobre'
     | '/sucesso'
+    | '/trocas'
     | '/unsubscribe'
     | '/email/unsubscribe'
     | '/pedidos/$id'
@@ -242,6 +254,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SobreRoute: typeof SobreRoute
   SucessoRoute: typeof SucessoRoute
+  TrocasRoute: typeof TrocasRoute
   UnsubscribeRoute: typeof UnsubscribeRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
   PedidosIdRoute: typeof PedidosIdRoute
@@ -263,6 +276,13 @@ declare module '@tanstack/react-router' {
       path: '/unsubscribe'
       fullPath: '/unsubscribe'
       preLoaderRoute: typeof UnsubscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trocas': {
+      id: '/trocas'
+      path: '/trocas'
+      fullPath: '/trocas'
+      preLoaderRoute: typeof TrocasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sucesso': {
@@ -386,6 +406,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SobreRoute: SobreRoute,
   SucessoRoute: SucessoRoute,
+  TrocasRoute: TrocasRoute,
   UnsubscribeRoute: UnsubscribeRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
   PedidosIdRoute: PedidosIdRoute,
