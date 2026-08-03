@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
 import { Route as TrocasRouteImport } from './routes/trocas'
 import { Route as TermosRouteImport } from './routes/termos'
+import { Route as SustentabilidadeRouteImport } from './routes/sustentabilidade'
 import { Route as SucessoRouteImport } from './routes/sucesso'
 import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
@@ -45,6 +46,11 @@ const TrocasRoute = TrocasRouteImport.update({
 const TermosRoute = TermosRouteImport.update({
   id: '/termos',
   path: '/termos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SustentabilidadeRoute = SustentabilidadeRouteImport.update({
+  id: '/sustentabilidade',
+  path: '/sustentabilidade',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SucessoRoute = SucessoRouteImport.update({
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
   '/sucesso': typeof SucessoRoute
+  '/sustentabilidade': typeof SustentabilidadeRoute
   '/termos': typeof TermosRoute
   '/trocas': typeof TrocasRoute
   '/unsubscribe': typeof UnsubscribeRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
   '/sucesso': typeof SucessoRoute
+  '/sustentabilidade': typeof SustentabilidadeRoute
   '/termos': typeof TermosRoute
   '/trocas': typeof TrocasRoute
   '/unsubscribe': typeof UnsubscribeRoute
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
   '/sucesso': typeof SucessoRoute
+  '/sustentabilidade': typeof SustentabilidadeRoute
   '/termos': typeof TermosRoute
   '/trocas': typeof TrocasRoute
   '/unsubscribe': typeof UnsubscribeRoute
@@ -232,6 +241,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sobre'
     | '/sucesso'
+    | '/sustentabilidade'
     | '/termos'
     | '/trocas'
     | '/unsubscribe'
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sobre'
     | '/sucesso'
+    | '/sustentabilidade'
     | '/termos'
     | '/trocas'
     | '/unsubscribe'
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sobre'
     | '/sucesso'
+    | '/sustentabilidade'
     | '/termos'
     | '/trocas'
     | '/unsubscribe'
@@ -305,6 +317,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SobreRoute: typeof SobreRoute
   SucessoRoute: typeof SucessoRoute
+  SustentabilidadeRoute: typeof SustentabilidadeRoute
   TermosRoute: typeof TermosRoute
   TrocasRoute: typeof TrocasRoute
   UnsubscribeRoute: typeof UnsubscribeRoute
@@ -342,6 +355,13 @@ declare module '@tanstack/react-router' {
       path: '/termos'
       fullPath: '/termos'
       preLoaderRoute: typeof TermosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sustentabilidade': {
+      id: '/sustentabilidade'
+      path: '/sustentabilidade'
+      fullPath: '/sustentabilidade'
+      preLoaderRoute: typeof SustentabilidadeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sucesso': {
@@ -489,6 +509,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SobreRoute: SobreRoute,
   SucessoRoute: SucessoRoute,
+  SustentabilidadeRoute: SustentabilidadeRoute,
   TermosRoute: TermosRoute,
   TrocasRoute: TrocasRoute,
   UnsubscribeRoute: UnsubscribeRoute,
@@ -507,13 +528,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
