@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Minus, Plus, RotateCcw, X, ZoomIn } from "lucide-react";
 
 const MIN_ZOOM = 1;
