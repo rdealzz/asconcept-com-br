@@ -917,6 +917,65 @@ function Products() {
           )}
         </div>
 
+        {!showSneakersComingSoon && base.length > 0 && (
+          <div className="mb-10 border-y border-border py-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                <FilterSelect
+                  label="Tamanho"
+                  value={sizeFilter}
+                  onChange={(v) => setSizeFilter(v as Size | "todos")}
+                  options={[
+                    { value: "todos", label: "Todos" },
+                    ...SIZES.map((s) => ({ value: s, label: s })),
+                  ]}
+                />
+                <FilterSelect
+                  label="Preço"
+                  value={priceFilter}
+                  onChange={(v) => setPriceFilter(v as PriceRangeId)}
+                  options={[
+                    { value: "todos", label: "Todos" },
+                    ...PRICE_RANGES.map((r) => ({ value: r.id, label: r.label })),
+                  ]}
+                />
+                {availableColors.length > 0 && (
+                  <FilterSelect
+                    label="Cor"
+                    value={colorFilter}
+                    onChange={setColorFilter}
+                    options={[
+                      { value: "todos", label: "Todas" },
+                      ...availableColors.map((c) => ({ value: c, label: c })),
+                    ]}
+                  />
+                )}
+                {activeFilters > 0 && (
+                  <button
+                    onClick={clearFilters}
+                    className="inline-flex items-center gap-1.5 text-[10px] tracking-luxe uppercase text-muted-foreground transition-colors hover:text-accent"
+                  >
+                    <X className="h-3 w-3" strokeWidth={1.5} /> Limpar ({activeFilters})
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="hidden text-[11px] text-muted-foreground md:inline">
+                  {filtered.length} {filtered.length === 1 ? "peça" : "peças"}
+                </span>
+                <FilterSelect
+                  label="Ordenar"
+                  value={sortBy}
+                  onChange={(v) => setSortBy(v as SortId)}
+                  options={SORT_OPTIONS.map((o) => ({ value: o.id, label: o.label }))}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+
+
         {showSneakersComingSoon ? (
           <SneakersComingSoon />
         ) : filtered.length === 0 ? (
