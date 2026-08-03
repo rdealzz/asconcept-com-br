@@ -36,6 +36,8 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
 import { ProductInfoAccordion } from "@/components/ProductInfoAccordion";
+import { InstallmentsNote } from "@/components/InstallmentsNote";
+import { FavoriteButton, ShareButton } from "@/components/ProductActions";
 
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 import { AVAILABLE_COUPONS, findCoupon, hasUsedCoupon } from "@/lib/coupons";
@@ -112,6 +114,7 @@ type ProductRow = {
   sizes: unknown;
   force_last_item: boolean;
   sort_order: number;
+  created_at?: string | null;
 };
 
 function rowToProduct(r: ProductRow): Product {
@@ -129,6 +132,7 @@ function rowToProduct(r: ProductRow): Product {
     gallery: galleryArr.length ? galleryArr : image ? [image] : [],
     category: (r.category === "sneakers" ? "sneakers" : "clothes") as ProductCategory,
     forceLastItem: r.force_last_item || undefined,
+    createdAt: r.created_at ?? undefined,
   };
 }
 
@@ -728,13 +732,93 @@ function matchesSub(name: string, description: string, sub: SubFilter) {
   return re.test(name) || re.test(description);
 }
 
+/* ---------- Filtros de vitrine ---------- */
+type SortId = "curadoria" | "novidades" | "menor" | "maior";
+type PriceRangeId = "todos" | "ate199" | "200a399" | "400a699" | "700mais";
+
+const SORT_OPTIONS: { id: SortId; label: string }[] = [
+  { id: "curadoria", label: "Curadoria" },
+  { id: "novidades", label: "Novidades" },
+  { id: "menor", label: "Menor preço" },
+  { id: "maior", label: "Maior preço" },
+];
+
+const PRICE_RANGES: { id: PriceRangeId; label: string; min: number; max: number }[] = [
+  { id: "ate199", label: "Até R$ 199", min: 0, max: 200 },
+  { id: "200a399", label: "R$ 200 – 399", min: 200, max: 400 },
+  { id: "400a699", label: "R$ 400 – 699", min: 400, max: 700 },
+  { id: "700mais", label: "R$ 700+", min: 700, max: Infinity },
+];
+
+const COLOR_TERMS: { label: string; terms: string[] }[] = [
+  { label: "Preto", terms: ["preto", "black", "ônix", "onix"] },
+  { label: "Branco", terms: ["branco", "off-white", "white", "marfim", "ivory"] },
+  { label: "Bege", terms: ["bege", "areia", "camel", "caramelo", "nude", "cru"] },
+  { label: "Azul", terms: ["azul", "navy", "marinho", "denim", "jeans"] },
+  { label: "Verde", terms: ["verde", "oliva", "militar"] },
+  { label: "Cinza", terms: ["cinza", "grafite", "chumbo"] },
+  { label: "Marrom", terms: ["marrom", "café", "cafe", "chocolate", "terracota"] },
+  { label: "Vinho", terms: ["vinho", "bordô", "bordo", "burgundy"] },
+];
+
+/** Deduz a cor da peça a partir do nome/descrição. */
+function detectColor(p: Product): string | null {
+  const hay = `${p.name} ${p.description} ${p.longDescription ?? ""}`.toLowerCase();
+  for (const c of COLOR_TERMS) {
+    if (c.terms.some((t) => hay.includes(t))) return c.label;
+  }
+  return null;
+}
+
+/** Peças cadastradas nos últimos 15 dias recebem o selo "Novidade". */
+function isNewArrival(p: Product): boolean {
+  if (!p.createdAt) return false;
+  const ts = new Date(p.createdAt).getTime();
+  if (!Number.isFinite(ts)) return false;
+  return Date.now() - ts <= 15 * 86400000;
+}
+
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <label className="flex items-center gap-2">
+      <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="cursor-pointer border-0 border-b border-border bg-transparent py-1 pr-5 text-xs font-light outline-none transition-colors focus:border-accent"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function Products() {
   const { query, setQuery, tab, subFilter, setSubFilter } = useSearch();
   const { products, stock, refresh: resetCatalog } = useCatalog();
   const { openCreate } = useProduct();
   const isAdmin = useIsAdmin();
 
-  const filtered = useMemo(() => {
+  const [sizeFilter, setSizeFilter] = useState<Size | "todos">("todos");
+  const [priceFilter, setPriceFilter] = useState<PriceRangeId>("todos");
+  const [colorFilter, setColorFilter] = useState<string>("todos");
+  const [sortBy, setSortBy] = useState<SortId>("curadoria");
+
+  const base = useMemo(() => {
     const q = query.trim().toLowerCase();
     let inTab = products.filter((p) => (p.category ?? "clothes") === tab);
     // Produtos sem estoque em nenhum tamanho somem da vitrine pública,
@@ -754,7 +838,48 @@ function Products() {
     );
   }, [query, products, tab, subFilter, isAdmin, stock]);
 
-  const showSneakersComingSoon = tab === "sneakers" && !isAdmin && filtered.length === 0;
+  const availableColors = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of base) {
+      const c = detectColor(p);
+      if (c) set.add(c);
+    }
+    return Array.from(set).sort();
+  }, [base]);
+
+  const filtered = useMemo(() => {
+    let list = base;
+    if (sizeFilter !== "todos") {
+      list = list.filter((p) => (stock[p.id]?.[sizeFilter] ?? 0) > 0);
+    }
+    if (priceFilter !== "todos") {
+      const range = PRICE_RANGES.find((r) => r.id === priceFilter);
+      if (range) list = list.filter((p) => p.price >= range.min && p.price < range.max);
+    }
+    if (colorFilter !== "todos") {
+      list = list.filter((p) => detectColor(p) === colorFilter);
+    }
+    const sorted = [...list];
+    if (sortBy === "menor") sorted.sort((a, b) => a.price - b.price);
+    if (sortBy === "maior") sorted.sort((a, b) => b.price - a.price);
+    if (sortBy === "novidades")
+      sorted.sort(
+        (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
+      );
+    return sorted;
+  }, [base, sizeFilter, priceFilter, colorFilter, sortBy, stock]);
+
+  const activeFilters =
+    (sizeFilter !== "todos" ? 1 : 0) +
+    (priceFilter !== "todos" ? 1 : 0) +
+    (colorFilter !== "todos" ? 1 : 0);
+  const clearFilters = () => {
+    setSizeFilter("todos");
+    setPriceFilter("todos");
+    setColorFilter("todos");
+  };
+
+  const showSneakersComingSoon = tab === "sneakers" && !isAdmin && base.length === 0;
 
   return (
     <section className="py-20 md:py-28">
@@ -822,6 +947,65 @@ function Products() {
             </div>
           )}
         </div>
+
+        {!showSneakersComingSoon && base.length > 0 && (
+          <div className="mb-10 border-y border-border py-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                <FilterSelect
+                  label="Tamanho"
+                  value={sizeFilter}
+                  onChange={(v) => setSizeFilter(v as Size | "todos")}
+                  options={[
+                    { value: "todos", label: "Todos" },
+                    ...SIZES.map((s) => ({ value: s, label: s })),
+                  ]}
+                />
+                <FilterSelect
+                  label="Preço"
+                  value={priceFilter}
+                  onChange={(v) => setPriceFilter(v as PriceRangeId)}
+                  options={[
+                    { value: "todos", label: "Todos" },
+                    ...PRICE_RANGES.map((r) => ({ value: r.id, label: r.label })),
+                  ]}
+                />
+                {availableColors.length > 0 && (
+                  <FilterSelect
+                    label="Cor"
+                    value={colorFilter}
+                    onChange={setColorFilter}
+                    options={[
+                      { value: "todos", label: "Todas" },
+                      ...availableColors.map((c) => ({ value: c, label: c })),
+                    ]}
+                  />
+                )}
+                {activeFilters > 0 && (
+                  <button
+                    onClick={clearFilters}
+                    className="inline-flex items-center gap-1.5 text-[10px] tracking-luxe uppercase text-muted-foreground transition-colors hover:text-accent"
+                  >
+                    <X className="h-3 w-3" strokeWidth={1.5} /> Limpar ({activeFilters})
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="hidden text-[11px] text-muted-foreground md:inline">
+                  {filtered.length} {filtered.length === 1 ? "peça" : "peças"}
+                </span>
+                <FilterSelect
+                  label="Ordenar"
+                  value={sortBy}
+                  onChange={(v) => setSortBy(v as SortId)}
+                  options={SORT_OPTIONS.map((o) => ({ value: o.id, label: o.label }))}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+
 
         {showSneakersComingSoon ? (
           <SneakersComingSoon />
@@ -952,6 +1136,9 @@ function ProductCard({ product }: { product: Product }) {
   const showLastItem =
     !soldOut && (product.forceLastItem === true || hasLastSize(sizeStock) || total === 1);
 
+  const hoverImg = (product.gallery ?? []).find((g) => g && g !== product.image);
+  const novidade = isNewArrival(product);
+
   return (
     <article className="group flex flex-col">
       <div
@@ -964,11 +1151,25 @@ function ProductCard({ product }: { product: Product }) {
           src={product.image}
           alt={product.name}
           loading="lazy"
-          className={`h-full w-full object-cover transition-transform duration-[1400ms] ease-out group-hover:scale-[1.08] ${
+          className={`h-full w-full object-cover transition-all duration-[1400ms] ease-out group-hover:scale-[1.08] ${
             soldOut ? "opacity-50 grayscale" : ""
-          }`}
+          } ${hoverImg && !soldOut ? "group-hover:opacity-0" : ""}`}
         />
+        {hoverImg && !soldOut && (
+          <img
+            src={hoverImg}
+            alt={`${product.name} — segunda vista`}
+            loading="lazy"
+            aria-hidden
+            className="pointer-events-none absolute inset-0 h-full w-full scale-[1.02] object-cover opacity-0 transition-all duration-[1200ms] ease-out group-hover:scale-[1.08] group-hover:opacity-100"
+          />
+        )}
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
+          {novidade && !soldOut && (
+            <span className="inline-flex items-center border border-navy/40 bg-background/95 px-2 py-1 text-[10px] tracking-luxe uppercase text-navy backdrop-blur">
+              Novidade
+            </span>
+          )}
           {showLastItem ? (
             <span className="inline-flex items-center gap-1 border border-[color:var(--gold)]/70 bg-background/95 px-2 py-1 text-[10px] tracking-luxe uppercase text-[color:var(--gold)] backdrop-blur">
               ✦ Último Item
@@ -993,30 +1194,33 @@ function ProductCard({ product }: { product: Product }) {
             Ver Produto
           </div>
         )}
-        {isAdmin && (
-          <div className="pointer-events-auto absolute right-3 top-3 z-30 flex flex-col gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                openEdit(product.id);
-              }}
-              aria-label="Editar produto"
-              className="flex h-8 w-8 items-center justify-center border border-accent/70 bg-background/90 text-accent shadow-sm backdrop-blur transition-colors hover:bg-accent hover:text-ivory"
-            >
-              <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (confirm(`Excluir "${product.name}"?`)) deleteProduct(product.id);
-              }}
-              aria-label="Excluir produto"
-              className="flex h-8 w-8 items-center justify-center border border-destructive/60 bg-background/90 text-destructive shadow-sm backdrop-blur transition-colors hover:bg-destructive hover:text-ivory"
-            >
-              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-            </button>
-          </div>
-        )}
+        <div className="pointer-events-auto absolute right-3 top-3 z-30 flex flex-col gap-2">
+          <FavoriteButton productId={product.id} className="h-8 w-8" />
+          {isAdmin && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openEdit(product.id);
+                }}
+                aria-label="Editar produto"
+                className="flex h-8 w-8 items-center justify-center border border-accent/70 bg-background/90 text-accent shadow-sm backdrop-blur transition-colors hover:bg-accent hover:text-ivory"
+              >
+                <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm(`Excluir "${product.name}"?`)) deleteProduct(product.id);
+                }}
+                aria-label="Excluir produto"
+                className="flex h-8 w-8 items-center justify-center border border-destructive/60 bg-background/90 text-destructive shadow-sm backdrop-blur transition-colors hover:bg-destructive hover:text-ivory"
+              >
+                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <div className="mt-5 flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -1027,6 +1231,7 @@ function ProductCard({ product }: { product: Product }) {
         </div>
         <div className="shrink-0 text-right">
           <span className="block text-xs md:text-sm tabular-nums">{formatBRL(product.price)}</span>
+          <InstallmentsNote amount={product.price} className="mt-1" />
         </div>
       </div>
       {isAdmin && sizeStock && (

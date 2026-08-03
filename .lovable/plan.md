@@ -1,38 +1,57 @@
-## 1. Pedido aprovado entra como "Aguardando Aprovação"
+## O que já existe (não será refeito)
 
-Hoje `mapMpStatus()` em `src/lib/mercadopago.server.ts` converte `approved` → `"Preparando pedido"`, então o pedido pula a primeira etapa.
+Verifiquei o código antes de planejar:
+- Botão flutuante de WhatsApp `(41) 99996-4035` já em todas as páginas (`WhatsAppFab` no `__root.tsx`).
+- Rodapé já traz e-mail `asconccept@gmail.com` e WhatsApp.
+- Seção de depoimentos já existe na home (`Testimonials`, alimentada pela tabela `testimonials`).
+- Newsletter já existe e já grava em `newsletter_subscribers` (falta só ir para o rodapé com a chamada dos 10%).
+- Busca por nome já existe (`SearchOverlay`) — vou apenas estender para descrição e confirmar.
+- Guia de tamanhos existe no modal, mas com medidas erradas — será substituído pela sua tabela.
+- Frete grátis já está ativo a partir de **R$ 249,99** no motor real de frete. Vou manter esse valor (mudar para R$ 299 alteraria a cobrança real de frete) e apenas exibi-lo com destaque; me avise se quiser trocar para 299.
 
-- `approved` passa a mapear para `"Aguardando Aprovação"`.
-- Em `persistPayment` (`src/lib/payments-core.server.ts`), o gatilho de "pagamento aprovado" (baixa de estoque, `consume_order_stock`, e-mail "Pedido confirmado", consumo do cupom) passa a depender do status **do Mercado Pago** (`payment.status === 'approved'`), não do texto do status interno — assim nada quebra com a renomeação.
-- `PAID_STATUSES` passa a incluir `"Aguardando Aprovação"` **somente quando** já existe pagamento aprovado registrado (`mp_status = 'approved'`), para não tratar pedidos manuais como pagos.
-- O e-mail de confirmação deixa de marcar `preparation_mail_sent = true`, já que "Preparando pedido" volta a ser uma etapa real feita pelo admin (e terá seu próprio e-mail).
+---
 
-### Ordem obrigatória de status
-Em `src/lib/admin.functions.ts` / `src/lib/admin-orders.server.ts`, validação server-side: só é permitido avançar exatamente uma etapa por vez na sequência Aguardando Aprovação → Preparando pedido → Em trânsito → Entregue (sem pular nem voltar). No painel (`src/routes/pedidos.index.tsx`), os botões/opções de status fora da próxima etapa ficam desabilitados.
+## 1. Confiança e credibilidade
 
-### Boleto
-Verificação: hoje o checkout oferece apenas cartão e Pix (não há fluxo de boleto). O webhook `/api/public/payments/mercadopago` já reprocessa qualquer aprovação assíncrona pelo mesmo `persistPayment`, então caso boleto seja ativado no futuro ele seguirá a mesma regra. Nada a alterar além disso — confirmo no relatório final.
+- **Selo "Compra 100% Segura"** (cadeado) + bandeiras Visa/Master/Elo + Mercado Pago: novo componente `TrustSeals`, usado no rodapé e ao lado do resumo do pedido no checkout, com o texto "Seus dados estão protegidos com criptografia de ponta a ponta".
+- **Páginas novas** (rotas reais, linkadas no rodapé): `/trocas` (arrependimento de 7 dias corridos, condições sem uso/etiqueta/embalagem, como solicitar por e-mail ou WhatsApp), `/sobre` (texto "The New Era of Heritage", curadoria e público), `/faq` (acordeon com prazo de entrega, formas de pagamento, trocas, acompanhamento do pedido, autenticidade), `/termos` e `/privacidade` (conteúdo dos modais institucionais promovido a página, mantendo também o modal).
+- **Sem CNPJ** em nenhum lugar.
+- Depoimentos: manter a seção existente e reforçá-la com o número de destaque "+500 clientes satisfeitos" e estrelas.
 
-## 2. Celular: /pedidos desloga o usuário
+## 2. Rodapé: links quebrados
 
-Causa raiz encontrada no código: em `src/routes/pedidos.index.tsx` existe um `useEffect` que, para **qualquer** usuário logado que não seja o e-mail master, executa `supabase.auth.signOut()` e redireciona para "/". Ou seja, todo cliente comum que abre "Meus Pedidos" é deslogado por design — no celular é mais visível porque o ícone de pessoa leva direto para essa rota.
+- Removidos (sem conteúdo hoje): Ateliês, Craftsmanship, Sustentabilidade, Concierge, Ajustes, Journal, Lookbook, Revendedores.
+- Mantidos com destino real: Nossa História → `/sobre`, Envio → `/faq#entrega`, Trocas → `/trocas`, O Editorial → âncora da home, O Conceito / A Filosofia (modais), Termos → `/termos`, Privacidade → `/privacidade`, FAQ → `/faq`.
+- Nova coluna de newsletter no rodapé: "Assine e ganhe 10% na primeira compra" ligada a `newsletter_subscribers`.
 
-Correção:
-- Remover o `signOut` automático. A rota passa a servir dois papéis: cliente vê os próprios pedidos; e-mail master vê o painel admin (o conteúdo admin continua gated por e-mail master + RLS/validação server-side, que é onde a segurança realmente está).
-- `beforeLoad`: em vez de `getUser()` (chamada de rede que pode correr antes da sessão hidratar em Safari iOS), usar `getSession()` e, quando não houver sessão, renderizar o estado "Entre para ver seus pedidos" em vez de redirecionar — elimina a race condition de sessão em mobile.
-- Confirmar que a lista de pedidos do cliente e a página de detalhe (`/pedidos/$id`, status + código de rastreio) funcionam autenticadas.
-- Verificação com navegador headless em viewport mobile (Chrome/Android e user-agent Safari iOS) na sessão de teste; logs de diagnóstico temporários em `console.error` nos pontos de checagem de sessão, para captura caso persista.
+## 3. Guia de tamanhos
 
-## 3. Mensagem de confiança no PIX
+Tabela corrigida para P 57/53/49/54, M 59/55/51/56, G 61/57/53/58, GG 63/59/55/59 (comprimento/busto/ombro/manga), com a nota sobre medidas com a peça deitada e convite ao WhatsApp. Link "Guia de Tamanhos" ao lado do seletor P/M/G/GG, abrindo o acordeon/modal.
 
-Em `src/components/PixPanel.tsx`, abaixo do QR Code: card sutil em marfim com borda dourada, ícone de escudo/ⓘ, título "Por que o PIX aparece em outro nome?", o texto fornecido (menção a Erick, fundador; dados não armazenados pela marca; processamento pelo Mercado Pago) em fonte menor, selo/logo do Mercado Pago e link para o WhatsApp já usado no site.
+## 4. Vitrine
 
-## 4. Reescrita dos textos dos e-mails (preview antes de aplicar)
+- Barra fixa no topo e aviso na sacola: "Frete grátis acima de R$ 249,99".
+- Filtros por tamanho disponível, faixa de preço e cor (só aparece se houver cor cadastrada) + ordenação Mais recentes / Menor preço / Maior preço.
+- Badge "Novidade" para produtos criados nos últimos 15 dias, coexistindo com "Último Item".
+- Hover no desktop troca a foto principal pela 2ª da galeria com transição suave.
+- Seção "Selecionados para Você" com 4–6 produtos logo abaixo do hero.
 
-Templates envolvidos: `signup`, `recovery` (auth) e `pedido-confirmado`, `pedido-em-preparacao`, `pedido-enviado`, `pedido-entregue` (app), todos em `src/lib/email-templates/`. Layout, banner e variáveis dinâmicas (nome, número do pedido, itens, valor, rastreio, botões) permanecem intactos — muda apenas a copy, com tom "The New Era of Heritage", português BR, textos curtos e assinatura consistente.
+## 5. Modal de produto
 
-Como você pediu preview antes de aplicar: na execução eu escrevo os novos textos, gero capturas de cada e-mail renderizado e mostro para aprovação **antes** de qualquer envio real; ajusto conforme seu retorno.
+- **Parcelamento real**: buscado dinamicamente na API de installments do Mercado Pago com o preço do produto, via server function com cache curto — nada de taxas fixas no código. Exibido no card e no modal, ao lado do preço. Se a API falhar, o texto simplesmente não aparece.
+- Ícone de **favoritar** (coração) no card e no modal, salvo em `localStorage`.
+- Botão **compartilhar**: WhatsApp e copiar link.
+- Seção "Você também pode gostar" com 3–4 produtos da mesma categoria.
+
+## 6. Botões e 404
+
+- Variantes de botão com elevação/sombra no hover, `active:scale-[0.98]`, transições de 200–300ms e spinner nos botões assíncronos (adicionar à sacola, finalizar pagamento).
+- Página 404 personalizada com identidade da marca ("Essa página não faz parte da nossa coleção") e botões para home/coleção.
 
 ## Detalhes técnicos
 
-Arquivos: `src/lib/mercadopago.server.ts`, `src/lib/payments-core.server.ts`, `src/lib/admin.functions.ts`, `src/lib/admin-orders.server.ts`, `src/routes/pedidos.index.tsx`, `src/routes/pedidos.$id.tsx`, `src/components/PixPanel.tsx`, `src/lib/email-templates/*`. Sem migração de banco necessária.
+- Novas rotas em `src/routes/` (`sobre.tsx`, `faq.tsx`, `trocas.tsx`, `termos.tsx`, `privacidade.tsx`), cada uma com `head()` próprio (title, description, og) e adicionadas ao `sitemap.xml`.
+- `src/routes/index.tsx` (4.4k linhas) será fatiado: `Footer`, `TrustSeals`, `ProductCard`, filtros e o modal passam para componentes em `src/components/` para não piorar a performance nem a manutenção.
+- Parcelamento: `src/lib/installments.functions.ts` (server fn) + `installments.server.ts` chamando `/v1/payment_methods/installments` com a chave pública já configurada; consumido por hook com React Query.
+- Nada de mudança em RLS/pagamento; validação server-side de preço permanece intacta.
+- Verificação final em desktop e mobile via navegador headless, e publicação ao fim.

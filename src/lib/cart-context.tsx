@@ -13,6 +13,8 @@ export type Product = {
   gallery?: string[];
   category?: ProductCategory;
   forceLastItem?: boolean;
+  /** ISO timestamp de cadastro — usado para o selo "Novidade". */
+  createdAt?: string;
 };
 
 export type CartItem = {
