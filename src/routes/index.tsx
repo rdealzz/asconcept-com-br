@@ -36,6 +36,8 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
 import { ProductInfoAccordion } from "@/components/ProductInfoAccordion";
+import { ZoomableImage } from "@/components/ZoomableImage";
+
 import { InstallmentsNote } from "@/components/InstallmentsNote";
 import { FavoriteButton, ShareButton } from "@/components/ProductActions";
 
