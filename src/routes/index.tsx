@@ -736,7 +736,12 @@ function Products() {
   const { openCreate } = useProduct();
   const isAdmin = useIsAdmin();
 
-  const filtered = useMemo(() => {
+  const [sizeFilter, setSizeFilter] = useState<Size | "todos">("todos");
+  const [priceFilter, setPriceFilter] = useState<PriceRangeId>("todos");
+  const [colorFilter, setColorFilter] = useState<string>("todos");
+  const [sortBy, setSortBy] = useState<SortId>("curadoria");
+
+  const base = useMemo(() => {
     const q = query.trim().toLowerCase();
     let inTab = products.filter((p) => (p.category ?? "clothes") === tab);
     // Produtos sem estoque em nenhum tamanho somem da vitrine pública,
@@ -756,7 +761,48 @@ function Products() {
     );
   }, [query, products, tab, subFilter, isAdmin, stock]);
 
-  const showSneakersComingSoon = tab === "sneakers" && !isAdmin && filtered.length === 0;
+  const availableColors = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of base) {
+      const c = detectColor(p);
+      if (c) set.add(c);
+    }
+    return Array.from(set).sort();
+  }, [base]);
+
+  const filtered = useMemo(() => {
+    let list = base;
+    if (sizeFilter !== "todos") {
+      list = list.filter((p) => (stock[p.id]?.[sizeFilter] ?? 0) > 0);
+    }
+    if (priceFilter !== "todos") {
+      const range = PRICE_RANGES.find((r) => r.id === priceFilter);
+      if (range) list = list.filter((p) => p.price >= range.min && p.price < range.max);
+    }
+    if (colorFilter !== "todos") {
+      list = list.filter((p) => detectColor(p) === colorFilter);
+    }
+    const sorted = [...list];
+    if (sortBy === "menor") sorted.sort((a, b) => a.price - b.price);
+    if (sortBy === "maior") sorted.sort((a, b) => b.price - a.price);
+    if (sortBy === "novidades")
+      sorted.sort(
+        (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
+      );
+    return sorted;
+  }, [base, sizeFilter, priceFilter, colorFilter, sortBy, stock]);
+
+  const activeFilters =
+    (sizeFilter !== "todos" ? 1 : 0) +
+    (priceFilter !== "todos" ? 1 : 0) +
+    (colorFilter !== "todos" ? 1 : 0);
+  const clearFilters = () => {
+    setSizeFilter("todos");
+    setPriceFilter("todos");
+    setColorFilter("todos");
+  };
+
+  const showSneakersComingSoon = tab === "sneakers" && !isAdmin && base.length === 0;
 
   return (
     <section className="py-20 md:py-28">
