@@ -1134,6 +1134,9 @@ function ProductCard({ product }: { product: Product }) {
   const showLastItem =
     !soldOut && (product.forceLastItem === true || hasLastSize(sizeStock) || total === 1);
 
+  const hoverImg = (product.gallery ?? []).find((g) => g && g !== product.image);
+  const novidade = isNewArrival(product);
+
   return (
     <article className="group flex flex-col">
       <div
@@ -1146,11 +1149,25 @@ function ProductCard({ product }: { product: Product }) {
           src={product.image}
           alt={product.name}
           loading="lazy"
-          className={`h-full w-full object-cover transition-transform duration-[1400ms] ease-out group-hover:scale-[1.08] ${
+          className={`h-full w-full object-cover transition-all duration-[1400ms] ease-out group-hover:scale-[1.08] ${
             soldOut ? "opacity-50 grayscale" : ""
-          }`}
+          } ${hoverImg && !soldOut ? "group-hover:opacity-0" : ""}`}
         />
+        {hoverImg && !soldOut && (
+          <img
+            src={hoverImg}
+            alt={`${product.name} — segunda vista`}
+            loading="lazy"
+            aria-hidden
+            className="pointer-events-none absolute inset-0 h-full w-full scale-[1.02] object-cover opacity-0 transition-all duration-[1200ms] ease-out group-hover:scale-[1.08] group-hover:opacity-100"
+          />
+        )}
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
+          {novidade && !soldOut && (
+            <span className="inline-flex items-center border border-navy/40 bg-background/95 px-2 py-1 text-[10px] tracking-luxe uppercase text-navy backdrop-blur">
+              Novidade
+            </span>
+          )}
           {showLastItem ? (
             <span className="inline-flex items-center gap-1 border border-[color:var(--gold)]/70 bg-background/95 px-2 py-1 text-[10px] tracking-luxe uppercase text-[color:var(--gold)] backdrop-blur">
               ✦ Último Item
@@ -1175,30 +1192,33 @@ function ProductCard({ product }: { product: Product }) {
             Ver Produto
           </div>
         )}
-        {isAdmin && (
-          <div className="pointer-events-auto absolute right-3 top-3 z-30 flex flex-col gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                openEdit(product.id);
-              }}
-              aria-label="Editar produto"
-              className="flex h-8 w-8 items-center justify-center border border-accent/70 bg-background/90 text-accent shadow-sm backdrop-blur transition-colors hover:bg-accent hover:text-ivory"
-            >
-              <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (confirm(`Excluir "${product.name}"?`)) deleteProduct(product.id);
-              }}
-              aria-label="Excluir produto"
-              className="flex h-8 w-8 items-center justify-center border border-destructive/60 bg-background/90 text-destructive shadow-sm backdrop-blur transition-colors hover:bg-destructive hover:text-ivory"
-            >
-              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-            </button>
-          </div>
-        )}
+        <div className="pointer-events-auto absolute right-3 top-3 z-30 flex flex-col gap-2">
+          <FavoriteButton productId={product.id} className="h-8 w-8" />
+          {isAdmin && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openEdit(product.id);
+                }}
+                aria-label="Editar produto"
+                className="flex h-8 w-8 items-center justify-center border border-accent/70 bg-background/90 text-accent shadow-sm backdrop-blur transition-colors hover:bg-accent hover:text-ivory"
+              >
+                <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm(`Excluir "${product.name}"?`)) deleteProduct(product.id);
+                }}
+                aria-label="Excluir produto"
+                className="flex h-8 w-8 items-center justify-center border border-destructive/60 bg-background/90 text-destructive shadow-sm backdrop-blur transition-colors hover:bg-destructive hover:text-ivory"
+              >
+                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <div className="mt-5 flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -1209,6 +1229,7 @@ function ProductCard({ product }: { product: Product }) {
         </div>
         <div className="shrink-0 text-right">
           <span className="block text-xs md:text-sm tabular-nums">{formatBRL(product.price)}</span>
+          <InstallmentsNote amount={product.price} className="mt-1" />
         </div>
       </div>
       {isAdmin && sizeStock && (
