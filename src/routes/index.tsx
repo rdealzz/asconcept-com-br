@@ -36,6 +36,8 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
 import { ProductInfoAccordion } from "@/components/ProductInfoAccordion";
+import { ZoomableImage } from "@/components/ZoomableImage";
+
 import { InstallmentsNote } from "@/components/InstallmentsNote";
 import { FavoriteButton, ShareButton } from "@/components/ProductActions";
 
@@ -1126,11 +1128,12 @@ function ProductModal() {
           <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] md:pb-0">
             <div className="flex flex-col bg-secondary md:sticky md:top-0 md:h-[88vh]">
               <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-secondary max-md:aspect-[4/5]">
-                <img
+                <ZoomableImage
                   src={gallery[activeImg]}
                   alt={active.name}
-                  className="h-full w-full object-contain transition-transform duration-700 hover:scale-105"
+                  className="object-contain"
                 />
+
                 {gallery.length > 1 && (
                   <>
                     <button
