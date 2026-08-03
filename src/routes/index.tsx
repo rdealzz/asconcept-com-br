@@ -1293,9 +1293,9 @@ function ProductModal() {
           >
             <X className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.5} />
           </button>
-          <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-2 md:pb-0">
-            <div className="bg-secondary md:sticky md:top-0 md:self-start">
-              <div className="relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden bg-secondary">
+          <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] md:pb-0">
+            <div className="flex flex-col bg-secondary md:sticky md:top-0 md:h-full md:max-h-[92vh]">
+              <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-secondary max-md:aspect-[4/5]">
                 <img
                   src={gallery[activeImg]}
                   alt={active.name}
@@ -1326,13 +1326,16 @@ function ProductModal() {
                 )}
               </div>
               {gallery.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto p-3">
+                <div className="flex shrink-0 items-center justify-center gap-3 border-t border-border/40 bg-secondary px-4 py-4">
                   {gallery.map((g, i) => (
                     <button
                       key={i}
                       onClick={() => setActiveImg(i)}
-                      className={`h-20 w-16 shrink-0 overflow-hidden border transition-all ${
-                        activeImg === i ? "border-accent" : "border-transparent opacity-70"
+                      aria-label={`Ver foto ${i + 1}`}
+                      className={`h-24 w-[68px] shrink-0 overflow-hidden border transition-all duration-300 ${
+                        activeImg === i
+                          ? "border-accent opacity-100"
+                          : "border-border/50 opacity-60 hover:opacity-100"
                       }`}
                     >
                       <img src={g} alt="" className="h-full w-full object-cover" />
@@ -1341,6 +1344,7 @@ function ProductModal() {
                 </div>
               )}
             </div>
+
 
 
             <div className="flex flex-col p-6 md:p-12">
