@@ -2151,13 +2151,22 @@ function Footer() {
               <h4 className="mb-5 text-[11px] tracking-luxe uppercase text-accent">{c.title}</h4>
               <ul className="space-y-3">
                 {c.links.map((l) => (
-                  <li key={l}>
-                    <a
-                      href="#"
-                      className="text-xs font-light text-ivory/70 transition-colors hover:text-ivory"
-                    >
-                      {l}
-                    </a>
+                  <li key={l.label}>
+                    {l.to ? (
+                      <Link
+                        to={l.to}
+                        className="text-xs font-light text-ivory/70 transition-colors hover:text-ivory"
+                      >
+                        {l.label}
+                      </Link>
+                    ) : (
+                      <a
+                        href={l.hash}
+                        className="text-xs font-light text-ivory/70 transition-colors hover:text-ivory"
+                      >
+                        {l.label}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -2176,8 +2185,25 @@ function Footer() {
                   </button>
                 </li>
               ))}
+              <li>
+                <Link
+                  to="/termos"
+                  className="text-xs font-light text-ivory/70 transition-colors hover:text-ivory"
+                >
+                  Termos e Condições
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/privacidade"
+                  className="text-xs font-light text-ivory/70 transition-colors hover:text-ivory"
+                >
+                  Políticas de Privacidade
+                </Link>
+              </li>
             </ul>
           </div>
+
         </div>
         <div className="mt-16 flex flex-col gap-3 border-t border-ivory/10 pt-8 text-xs font-light text-ivory/70 md:flex-row md:items-center md:justify-between">
           <p>
