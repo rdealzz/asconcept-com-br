@@ -776,6 +776,35 @@ function isNewArrival(p: Product): boolean {
   return Date.now() - ts <= 15 * 86400000;
 }
 
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <label className="flex items-center gap-2">
+      <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="cursor-pointer border-0 border-b border-border bg-transparent py-1 pr-5 text-xs font-light outline-none transition-colors focus:border-accent"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function Products() {
   const { query, setQuery, tab, subFilter, setSubFilter } = useSearch();
   const { products, stock, refresh: resetCatalog } = useCatalog();
