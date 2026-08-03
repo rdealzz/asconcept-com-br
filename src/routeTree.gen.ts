@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
 import { Route as TrocasRouteImport } from './routes/trocas'
+import { Route as TermosRouteImport } from './routes/termos'
 import { Route as SucessoRouteImport } from './routes/sucesso'
 import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
@@ -37,6 +38,11 @@ const UnsubscribeRoute = UnsubscribeRouteImport.update({
 const TrocasRoute = TrocasRouteImport.update({
   id: '/trocas',
   path: '/trocas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermosRoute = TermosRouteImport.update({
+  id: '/termos',
+  path: '/termos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SucessoRoute = SucessoRouteImport.update({
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
   '/sucesso': typeof SucessoRoute
+  '/termos': typeof TermosRoute
   '/trocas': typeof TrocasRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
   '/sucesso': typeof SucessoRoute
+  '/termos': typeof TermosRoute
   '/trocas': typeof TrocasRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -180,6 +188,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
   '/sucesso': typeof SucessoRoute
+  '/termos': typeof TermosRoute
   '/trocas': typeof TrocasRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -203,6 +212,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sobre'
     | '/sucesso'
+    | '/termos'
     | '/trocas'
     | '/unsubscribe'
     | '/email/unsubscribe'
@@ -224,6 +234,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sobre'
     | '/sucesso'
+    | '/termos'
     | '/trocas'
     | '/unsubscribe'
     | '/email/unsubscribe'
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sobre'
     | '/sucesso'
+    | '/termos'
     | '/trocas'
     | '/unsubscribe'
     | '/email/unsubscribe'
@@ -267,6 +279,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SobreRoute: typeof SobreRoute
   SucessoRoute: typeof SucessoRoute
+  TermosRoute: typeof TermosRoute
   TrocasRoute: typeof TrocasRoute
   UnsubscribeRoute: typeof UnsubscribeRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
@@ -296,6 +309,13 @@ declare module '@tanstack/react-router' {
       path: '/trocas'
       fullPath: '/trocas'
       preLoaderRoute: typeof TrocasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/termos': {
+      id: '/termos'
+      path: '/termos'
+      fullPath: '/termos'
+      preLoaderRoute: typeof TermosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sucesso': {
@@ -427,6 +447,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SobreRoute: SobreRoute,
   SucessoRoute: SucessoRoute,
+  TermosRoute: TermosRoute,
   TrocasRoute: TrocasRoute,
   UnsubscribeRoute: UnsubscribeRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
