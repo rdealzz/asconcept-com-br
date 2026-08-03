@@ -17,6 +17,7 @@ import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as FaqRouteImport } from './routes/faq'
+import { Route as CraftsmanshipRouteImport } from './routes/craftsmanship'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PedidosIndexRouteImport } from './routes/pedidos.index'
@@ -69,6 +70,11 @@ const PrivacidadeRoute = PrivacidadeRouteImport.update({
 const FaqRoute = FaqRouteImport.update({
   id: '/faq',
   path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CraftsmanshipRoute = CraftsmanshipRouteImport.update({
+  id: '/craftsmanship',
+  path: '/craftsmanship',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CheckoutRoute = CheckoutRouteImport.update({
@@ -145,6 +151,7 @@ const ApiPublicPaymentsMercadopagoRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/checkout': typeof CheckoutRoute
+  '/craftsmanship': typeof CraftsmanshipRoute
   '/faq': typeof FaqRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/checkout': typeof CheckoutRoute
+  '/craftsmanship': typeof CraftsmanshipRoute
   '/faq': typeof FaqRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -192,6 +200,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/checkout': typeof CheckoutRoute
+  '/craftsmanship': typeof CraftsmanshipRoute
   '/faq': typeof FaqRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -217,6 +226,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/checkout'
+    | '/craftsmanship'
     | '/faq'
     | '/privacidade'
     | '/reset-password'
@@ -240,6 +250,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/checkout'
+    | '/craftsmanship'
     | '/faq'
     | '/privacidade'
     | '/reset-password'
@@ -263,6 +274,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/checkout'
+    | '/craftsmanship'
     | '/faq'
     | '/privacidade'
     | '/reset-password'
@@ -287,6 +299,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CheckoutRoute: typeof CheckoutRoute
+  CraftsmanshipRoute: typeof CraftsmanshipRoute
   FaqRoute: typeof FaqRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -364,6 +377,13 @@ declare module '@tanstack/react-router' {
       path: '/faq'
       fullPath: '/faq'
       preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/craftsmanship': {
+      id: '/craftsmanship'
+      path: '/craftsmanship'
+      fullPath: '/craftsmanship'
+      preLoaderRoute: typeof CraftsmanshipRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/checkout': {
@@ -463,6 +483,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CheckoutRoute: CheckoutRoute,
+  CraftsmanshipRoute: CraftsmanshipRoute,
   FaqRoute: FaqRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   ResetPasswordRoute: ResetPasswordRoute,
