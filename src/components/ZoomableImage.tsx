@@ -179,7 +179,8 @@ function ZoomViewer({ src, alt, onClose }: { src: string; alt: string; onClose: 
       <p className="pb-4 text-center text-[10px] tracking-luxe uppercase text-ivory/50">
         Role para ampliar · arraste para mover · duplo clique para alternar
       </p>
-    </div>
+    </div>,
+    body,
   );
 }
 
