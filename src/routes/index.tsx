@@ -730,6 +730,52 @@ function matchesSub(name: string, description: string, sub: SubFilter) {
   return re.test(name) || re.test(description);
 }
 
+/* ---------- Filtros de vitrine ---------- */
+type SortId = "curadoria" | "novidades" | "menor" | "maior";
+type PriceRangeId = "todos" | "ate199" | "200a399" | "400a699" | "700mais";
+
+const SORT_OPTIONS: { id: SortId; label: string }[] = [
+  { id: "curadoria", label: "Curadoria" },
+  { id: "novidades", label: "Novidades" },
+  { id: "menor", label: "Menor preço" },
+  { id: "maior", label: "Maior preço" },
+];
+
+const PRICE_RANGES: { id: PriceRangeId; label: string; min: number; max: number }[] = [
+  { id: "ate199", label: "Até R$ 199", min: 0, max: 200 },
+  { id: "200a399", label: "R$ 200 – 399", min: 200, max: 400 },
+  { id: "400a699", label: "R$ 400 – 699", min: 400, max: 700 },
+  { id: "700mais", label: "R$ 700+", min: 700, max: Infinity },
+];
+
+const COLOR_TERMS: { label: string; terms: string[] }[] = [
+  { label: "Preto", terms: ["preto", "black", "ônix", "onix"] },
+  { label: "Branco", terms: ["branco", "off-white", "white", "marfim", "ivory"] },
+  { label: "Bege", terms: ["bege", "areia", "camel", "caramelo", "nude", "cru"] },
+  { label: "Azul", terms: ["azul", "navy", "marinho", "denim", "jeans"] },
+  { label: "Verde", terms: ["verde", "oliva", "militar"] },
+  { label: "Cinza", terms: ["cinza", "grafite", "chumbo"] },
+  { label: "Marrom", terms: ["marrom", "café", "cafe", "chocolate", "terracota"] },
+  { label: "Vinho", terms: ["vinho", "bordô", "bordo", "burgundy"] },
+];
+
+/** Deduz a cor da peça a partir do nome/descrição. */
+function detectColor(p: Product): string | null {
+  const hay = `${p.name} ${p.description} ${p.longDescription ?? ""}`.toLowerCase();
+  for (const c of COLOR_TERMS) {
+    if (c.terms.some((t) => hay.includes(t))) return c.label;
+  }
+  return null;
+}
+
+/** Peças cadastradas nos últimos 15 dias recebem o selo "Novidade". */
+function isNewArrival(p: Product): boolean {
+  if (!p.createdAt) return false;
+  const ts = new Date(p.createdAt).getTime();
+  if (!Number.isFinite(ts)) return false;
+  return Date.now() - ts <= 15 * 86400000;
+}
+
 function Products() {
   const { query, setQuery, tab, subFilter, setSubFilter } = useSearch();
   const { products, stock, refresh: resetCatalog } = useCatalog();
