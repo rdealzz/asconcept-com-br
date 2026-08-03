@@ -21,6 +21,7 @@ import { Route as FaqRouteImport } from './routes/faq'
 import { Route as EnvioRouteImport } from './routes/envio'
 import { Route as CraftsmanshipRouteImport } from './routes/craftsmanship'
 import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as AjustesRouteImport } from './routes/ajustes'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PedidosIndexRouteImport } from './routes/pedidos.index'
 import { Route as PedidosIdRouteImport } from './routes/pedidos.$id'
@@ -94,6 +95,11 @@ const CheckoutRoute = CheckoutRouteImport.update({
   path: '/checkout',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AjustesRoute = AjustesRouteImport.update({
+  id: '/ajustes',
+  path: '/ajustes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -162,6 +168,7 @@ const ApiPublicPaymentsMercadopagoRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ajustes': typeof AjustesRoute
   '/checkout': typeof CheckoutRoute
   '/craftsmanship': typeof CraftsmanshipRoute
   '/envio': typeof EnvioRoute
@@ -188,6 +195,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ajustes': typeof AjustesRoute
   '/checkout': typeof CheckoutRoute
   '/craftsmanship': typeof CraftsmanshipRoute
   '/envio': typeof EnvioRoute
@@ -215,6 +223,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ajustes': typeof AjustesRoute
   '/checkout': typeof CheckoutRoute
   '/craftsmanship': typeof CraftsmanshipRoute
   '/envio': typeof EnvioRoute
@@ -243,6 +252,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ajustes'
     | '/checkout'
     | '/craftsmanship'
     | '/envio'
@@ -269,6 +279,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ajustes'
     | '/checkout'
     | '/craftsmanship'
     | '/envio'
@@ -295,6 +306,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/ajustes'
     | '/checkout'
     | '/craftsmanship'
     | '/envio'
@@ -322,6 +334,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AjustesRoute: typeof AjustesRoute
   CheckoutRoute: typeof CheckoutRoute
   CraftsmanshipRoute: typeof CraftsmanshipRoute
   EnvioRoute: typeof EnvioRoute
@@ -433,6 +446,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ajustes': {
+      id: '/ajustes'
+      path: '/ajustes'
+      fullPath: '/ajustes'
+      preLoaderRoute: typeof AjustesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -522,6 +542,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AjustesRoute: AjustesRoute,
   CheckoutRoute: CheckoutRoute,
   CraftsmanshipRoute: CraftsmanshipRoute,
   EnvioRoute: EnvioRoute,

@@ -2089,18 +2089,40 @@ function InstitutionalModal({
   );
 }
 
+type FooterLink = { label: string; to?: string; hash?: string };
+
 function Footer() {
   const [modal, setModal] = useState<InstitutionalKey | null>(null);
   const institutional: { id: InstitutionalKey; label: string }[] = [
     { id: "conceito", label: "O Conceito" },
     { id: "filosofia", label: "A Filosofia" },
-    { id: "termos", label: "Termos e Condições" },
-    { id: "privacidade", label: "Políticas de Privacidade" },
   ];
-  const cols = [
-    { title: "Maison", links: ["Nossa História", "Ateliês", "Craftsmanship", "Sustentabilidade"] },
-    { title: "Serviço", links: ["Concierge", "Envio", "Trocas", "Ajustes"] },
-    { title: "Descobrir", links: ["O Editorial", "Journal", "Lookbook", "Revendedores"] },
+  const cols: { title: string; links: FooterLink[] }[] = [
+    {
+      title: "Maison",
+      links: [
+        { label: "Nossa História", to: "/sobre" },
+        { label: "Craftsmanship", to: "/craftsmanship" },
+        { label: "Sustentabilidade", to: "/sustentabilidade" },
+      ],
+    },
+    {
+      title: "Serviço",
+      links: [
+        { label: "Envio e Prazos", to: "/envio" },
+        { label: "Trocas e Devoluções", to: "/trocas" },
+        { label: "Ajustes e Caimento", to: "/ajustes" },
+        { label: "Perguntas Frequentes", to: "/faq" },
+      ],
+    },
+    {
+      title: "Descobrir",
+      links: [
+        { label: "A Coleção", hash: "/#collections" },
+        { label: "O Editorial", hash: "/#edit" },
+        { label: "Sobre Nós", hash: "/#about" },
+      ],
+    },
   ];
   return (
     <footer className="border-t border-border bg-charcoal text-ivory">
