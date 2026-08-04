@@ -32,9 +32,32 @@
   --color-navy: var(--navy);
   --color-charcoal: var(--charcoal);
   --color-ivory: var(--ivory);
-  --font-serif: "Playfair Display", "Bodoni Moda", Georgia, serif;
+
+  /* — A&S Conccept · Quiet Luxury tokens — */
+  --color-asc-bg: var(--asc-bg);
+  --color-asc-bg-raised: var(--asc-bg-raised);
+  --color-asc-bg-dark: var(--asc-bg-dark);
+  --color-asc-bg-dark-raised: var(--asc-bg-dark-raised);
+  --color-asc-ink: var(--asc-ink);
+  --color-asc-ink-muted: var(--asc-ink-muted);
+  --color-asc-ink-inverse: var(--asc-ink-inverse);
+  --color-asc-ink-inverse-muted: var(--asc-ink-inverse-muted);
+  --color-asc-line: var(--asc-line);
+  --color-asc-line-dark: var(--asc-line-dark);
+  --color-asc-gold: var(--asc-gold);
+  --color-asc-gold-soft: var(--asc-gold-soft);
+  --color-asc-error: var(--asc-error);
+  --color-asc-success: var(--asc-success);
+
+  --tracking-label: 0.15em;
+  --ease-asc: cubic-bezier(0.16, 1, 0.3, 1);
+  --shadow-hairline: 0 1px 0 0 var(--asc-line);
+
+  --font-display: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+  --font-serif: "Cormorant Garamond", "Playfair Display", Georgia, serif;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
+
 
 :root {
   --radius: 0.125rem;
