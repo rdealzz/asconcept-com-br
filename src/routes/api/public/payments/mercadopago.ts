@@ -8,35 +8,14 @@ async function syncPayment(paymentId: string) {
   if (!orderNumber) return;
 
   const internal = mapMpStatus(payment.status);
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-  const { data: order, error } = await supabaseAdmin
-    .from("orders")
-    .select("order_number, status, stock_decremented")
-    .eq("order_number", orderNumber)
-    .maybeSingle();
-  if (error || !order) return;
-
-  await supabaseAdmin
-    .from("orders")
-    .update({
-      mp_payment_id: String(payment.id),
-      mp_status: payment.status,
-      status: internal,
-      updated_at: new Date().toISOString(),
-    } as never)
-    .eq("order_number", orderNumber);
-
-  if (payment.status === "approved" && !(order as { stock_decremented: boolean }).stock_decremented) {
-    try {
-      await (
-        supabaseAdmin.rpc as unknown as (n: string, a: Record<string, unknown>) => Promise<unknown>
-      )("consume_order_stock", { _order_number: orderNumber });
-    } catch (e) {
-      console.error("[mp-webhook] consume_order_stock failed", e);
-    }
-  }
+  // Usa exatamente a mesma rotina do fluxo do site: além de gravar o status,
+  // ela dá baixa no estoque e enfileira o e-mail de "pedido confirmado"
+  // (idempotente via flags stock_decremented / mail_sent).
+  const { persistPayment } = await import("@/lib/payments-core.server");
+  await persistPayment(orderNumber, payment, internal);
 }
+
 
 export const Route = createFileRoute("/api/public/payments/mercadopago")({
   server: {
