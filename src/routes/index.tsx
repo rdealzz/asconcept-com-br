@@ -849,35 +849,39 @@ function Products() {
         {showSneakersComingSoon ? (
           <SneakersComingSoon />
         ) : filtered.length === 0 ? (
-          <div className="mx-auto max-w-lg py-16 text-center">
-            <p className="font-serif text-2xl">
-              {query
-                ? `Nenhum produto encontrado para "${query}".`
-                : "Nada por aqui ainda."}
-            </p>
-            <p className="mt-4 text-sm text-muted-foreground font-light">
-              {query
-                ? "Tente outra palavra-chave ou explore a coleção completa."
-                : isAdmin
-                  ? "Adicione o primeiro produto desta seção."
-                  : "Volte em breve."}
-            </p>
-            {query && (
+          query ? (
+            <div className="mx-auto max-w-lg py-16 text-center">
+              <p className="font-display text-3xl text-asc-ink">
+                Nenhuma peça para "{query}".
+              </p>
+              <p className="mt-4 font-sans text-sm font-light text-asc-ink-muted">
+                Tente outra palavra-chave ou percorra a coleção completa.
+              </p>
               <button
                 onClick={() => setQuery("")}
-                className="mt-8 border border-foreground px-8 py-3 text-[11px] tracking-luxe uppercase transition-colors hover:bg-foreground hover:text-ivory"
+                className="asc-label mt-8 border border-asc-ink px-8 py-3 transition-all duration-asc ease-asc hover:bg-asc-ink hover:text-asc-bg"
               >
                 Ver toda a coleção
               </button>
-            )}
-          </div>
+            </div>
+          ) : isAdmin ? (
+            <div className="mx-auto max-w-lg py-16 text-center">
+              <p className="font-display text-3xl text-asc-ink">Nada por aqui ainda.</p>
+              <p className="mt-4 font-sans text-sm font-light text-asc-ink-muted">
+                Adicione o primeiro produto desta seção.
+              </p>
+            </div>
+          ) : (
+            <EmptyCategoryState categoryName={tab === "clothes" ? "A Coleção" : "Sneakers"} />
+          )
         ) : (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-16 md:grid-cols-3 md:gap-x-8 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-14 md:grid-cols-3 md:gap-x-8 md:gap-y-20 lg:grid-cols-4">
             {filtered.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
           </div>
         )}
+
       </div>
     </section>
   );
