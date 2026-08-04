@@ -2131,42 +2131,42 @@ function CartDrawer() {
     <>
       <div
         onClick={close}
-        className={`fixed inset-0 z-[60] bg-charcoal/60 backdrop-blur-sm transition-opacity duration-500 ${
+        className={`fixed inset-0 z-[60] bg-asc-ink/40 backdrop-blur-sm transition-opacity duration-asc ease-asc ${
           isOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       />
       <aside
-        className={`fixed inset-y-0 right-0 z-[70] flex w-full max-w-md flex-col bg-background shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`fixed inset-y-0 right-0 z-[70] flex w-full flex-col border-l border-asc-line bg-asc-bg transition-transform duration-asc ease-asc sm:max-w-[420px] ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-border px-6 py-5">
+        <div className="flex items-center justify-between border-b border-asc-line px-6 py-6">
           <div>
-            <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">Sua Sacola</p>
-            <h3 className="font-serif text-xl">
+            <h2 className="font-display text-2xl text-asc-ink">Sua Sacola</h2>
+            <p className="asc-label mt-1 text-[10px] text-asc-ink-muted">
               {count} {count === 1 ? "Peça" : "Peças"}
-            </h3>
+            </p>
           </div>
-          <button onClick={close} aria-label="Fechar" className="hover:text-accent">
+          <button
+            onClick={close}
+            aria-label="Fechar sacola"
+            className="text-asc-ink transition-colors duration-ascfast ease-asc hover:text-asc-gold"
+          >
             <X className="h-5 w-5" strokeWidth={1.5} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="flex-1 overflow-y-auto px-6 py-8">
           {items.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-accent/40 bg-accent/5">
-                <ShoppingBag className="h-9 w-9 text-accent" strokeWidth={1} />
-                <span className="absolute -right-1 -top-1 flex h-3 w-3">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent/60" />
-                  <span className="relative inline-flex h-3 w-3 rounded-full bg-accent" />
-                </span>
-              </div>
-              <p className="mt-8 font-serif text-2xl leading-tight">
-                Seu carrinho<br />está vazio...
+              <p className="asc-label text-asc-gold">A&amp;S Conccept</p>
+              <p className="mt-6 font-display text-3xl leading-tight text-asc-ink">
+                Sua sacola aguarda<br />a primeira peça.
               </p>
-              <p className="mt-4 max-w-[280px] text-sm font-light text-muted-foreground">
-                Não deixe seus produtos favoritos esgotarem — as edições são limitadas.
+              <StitchDivider className="my-8 w-40" />
+              <p className="max-w-[280px] font-sans text-sm font-light leading-relaxed text-asc-ink-muted">
+                Cada edição é limitada e produzida em pequenas séries. Comece pela
+                coleção da estação.
               </p>
               <button
                 onClick={() => {
@@ -2177,7 +2177,8 @@ function CartDrawer() {
                     150,
                   );
                 }}
-                className="mt-8 bg-charcoal px-8 py-3 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
+                className="asc-label mt-10 border border-asc-ink px-8 py-3 text-asc-ink transition-all duration-asc ease-asc hover:bg-asc-ink hover:text-asc-bg"
+
               >
                 Ver Novidades
               </button>
