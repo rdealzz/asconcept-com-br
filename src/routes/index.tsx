@@ -1012,12 +1012,12 @@ function ProductCard({ product }: { product: Product }) {
         )}
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
           {novidade && !soldOut && (
-            <span className="inline-flex items-center border border-navy/40 bg-background/95 px-2 py-1 text-[10px] tracking-luxe uppercase text-navy backdrop-blur">
+            <span className="asc-label inline-flex items-center bg-asc-bg/90 px-2 py-1 text-[10px] text-asc-ink backdrop-blur">
               Novidade
             </span>
           )}
           {showLastItem ? (
-            <span className="inline-flex items-center gap-1 border border-[color:var(--gold)]/70 bg-background/95 px-2 py-1 text-[10px] tracking-luxe uppercase text-[color:var(--gold)] backdrop-blur">
+            <span className="asc-label inline-flex items-center gap-1 bg-asc-bg/90 px-2 py-1 text-[10px] text-asc-gold backdrop-blur">
               ✦ Último Item
             </span>
           ) : (
@@ -1025,21 +1025,15 @@ function ProductCard({ product }: { product: Product }) {
           )}
         </div>
         {soldOut ? (
-          <>
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <span className="rotate-[-8deg] border-2 border-destructive/80 bg-charcoal/40 px-6 py-2 font-serif text-2xl tracking-widest text-destructive backdrop-blur">
-                SOLD OUT
-              </span>
-            </div>
-            <div className="pointer-events-none absolute inset-x-4 bottom-4 border border-ivory/40 bg-charcoal/80 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory/80 backdrop-blur-sm">
-              Produto Esgotado
-            </div>
-          </>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-asc-bg-dark/75 py-3 text-center backdrop-blur-sm">
+            <span className="asc-label text-[10px] text-asc-ink-inverse-muted">Esgotado</span>
+          </div>
         ) : (
-          <div className="pointer-events-none absolute inset-x-4 bottom-4 translate-y-6 border border-ivory/80 bg-charcoal/70 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory opacity-0 backdrop-blur-sm transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">
-            Ver Produto
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-2 bg-asc-bg-dark/70 py-3 text-center opacity-0 backdrop-blur-sm transition-all duration-asc ease-asc group-hover:translate-y-0 group-hover:opacity-100">
+            <span className="asc-label text-[10px] text-asc-ink-inverse">Ver Peça</span>
           </div>
         )}
+
         <div className="pointer-events-auto absolute right-3 top-3 z-30 flex flex-col gap-2">
           <FavoriteButton productId={product.id} className="h-8 w-8" />
           {isAdmin && (
