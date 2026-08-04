@@ -987,7 +987,7 @@ function ProductCard({ product }: { product: Product }) {
   return (
     <article className="group flex flex-col">
       <div
-        className={`relative aspect-[3/4] w-full overflow-hidden bg-secondary transition-transform duration-500 hover:-translate-y-1 hover:shadow-xl ${
+        className={`relative aspect-[3/4] w-full overflow-hidden bg-asc-bg-raised ${
           soldOut ? "" : "cursor-pointer"
         }`}
         onClick={() => !soldOut && open(product.id)}
@@ -996,7 +996,7 @@ function ProductCard({ product }: { product: Product }) {
           src={product.image}
           alt={product.name}
           loading="lazy"
-          className={`h-full w-full object-cover transition-all duration-[1400ms] ease-out group-hover:scale-[1.08] ${
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-ascslow ease-asc ${
             soldOut ? "opacity-50 grayscale" : ""
           } ${hoverImg && !soldOut ? "group-hover:opacity-0" : ""}`}
         />
@@ -1006,8 +1006,9 @@ function ProductCard({ product }: { product: Product }) {
             alt={`${product.name} — segunda vista`}
             loading="lazy"
             aria-hidden
-            className="pointer-events-none absolute inset-0 h-full w-full scale-[1.02] object-cover opacity-0 transition-all duration-[1200ms] ease-out group-hover:scale-[1.08] group-hover:opacity-100"
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-ascslow ease-asc group-hover:opacity-100"
           />
+
         )}
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
           {novidade && !soldOut && (
