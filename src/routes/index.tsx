@@ -1062,18 +1062,21 @@ function ProductCard({ product }: { product: Product }) {
           )}
         </div>
       </div>
-      <div className="mt-5 flex items-start justify-between gap-4">
+      <div className="mt-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-serif text-base md:text-lg leading-tight">{product.name}</h3>
-          <p className="mt-1 text-xs text-muted-foreground font-light line-clamp-1">
+          <h3 className="font-display text-lg leading-snug text-asc-ink">{product.name}</h3>
+          <p className="mt-1 line-clamp-1 font-sans text-xs font-light text-asc-ink-muted">
             {product.description}
           </p>
         </div>
-        <div className="shrink-0 text-right">
-          <span className="block text-xs md:text-sm tabular-nums">{formatBRL(product.price)}</span>
+        <div className="shrink-0 pt-1 text-right">
+          <span className="block whitespace-nowrap font-sans text-sm tabular-nums text-asc-ink">
+            {formatBRL(product.price)}
+          </span>
           <InstallmentsNote amount={product.price} className="mt-1" />
         </div>
       </div>
+
       {isAdmin && sizeStock && (
         <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
           Estoque · P{sizeStock.P} · M{sizeStock.M} · G{sizeStock.G} · GG{sizeStock.GG}
