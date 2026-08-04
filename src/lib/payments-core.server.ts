@@ -80,7 +80,7 @@ async function notificationUrl(): Promise<string> {
   }
 }
 
-async function persistPayment(
+export async function persistPayment(
   orderNumber: string,
   payment: { id: number | string; status: string; installments?: number | null },
   status: string,
