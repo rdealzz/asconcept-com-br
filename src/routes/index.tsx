@@ -436,23 +436,28 @@ function Nav({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const navLink =
+    "asc-label relative transition-colors duration-ascfast ease-asc after:absolute after:-bottom-1 after:left-0 after:h-px after:w-0 after:bg-asc-gold after:transition-all after:duration-asc after:ease-asc hover:after:w-full hover:text-asc-gold";
+
   return (
     <header
-      className={`fixed top-0 z-50 w-full transition-all duration-500 ${
-        scrolled ? "bg-background/90 backdrop-blur border-b border-border" : "bg-transparent"
+      className={`fixed top-0 z-50 w-full border-b transition-all duration-asc ease-asc ${
+        scrolled
+          ? "border-asc-line bg-asc-bg/80 py-2 backdrop-blur-md md:py-3"
+          : "border-transparent bg-transparent py-4 md:py-6"
       }`}
     >
-      <div className="mx-auto grid max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center px-4 py-4 md:px-12 md:py-5">
+      <div className="mx-auto grid max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center px-4 md:px-10">
         <div
           className={`flex items-center gap-5 ${
-            scrolled ? "text-foreground" : "text-ivory"
+            scrolled ? "text-asc-ink" : "text-asc-ink-inverse"
           }`}
         >
           {/* Mobile hamburger */}
           <button
             aria-label="Abrir menu"
             onClick={onOpenMobileMenu}
-            className="hover:text-accent transition-colors md:hidden"
+            className="transition-colors duration-ascfast ease-asc hover:text-asc-gold md:hidden"
           >
             <Menu className="h-5 w-5" strokeWidth={1.25} />
           </button>
@@ -460,38 +465,39 @@ function Nav({
           <button
             aria-label="Filtrar categoria"
             onClick={onOpenFilter}
-            className="hidden hover:text-accent transition-colors md:inline-flex"
+            className="hidden transition-colors duration-ascfast ease-asc hover:text-asc-gold md:inline-flex"
           >
             <Menu className="h-4 w-4" strokeWidth={1.5} />
           </button>
-          <nav className="hidden items-center gap-8 text-[11px] tracking-luxe uppercase md:flex">
-            <a href="#collections" className="hover:text-accent transition-colors">Coleção</a>
-            <a href="#edit" className="hover:text-accent transition-colors">O Editorial</a>
-            <a href="#about" className="hover:text-accent transition-colors">Sobre</a>
+          <nav className="hidden items-center gap-9 md:flex">
+            <a href="#collections" className={navLink}>Coleção</a>
+            <a href="#edit" className={navLink}>O Editorial</a>
+            <a href="#about" className={navLink}>Somente por Convite</a>
           </nav>
         </div>
         <a
           href="#"
-          className={`font-serif text-lg md:text-2xl tracking-wider text-center whitespace-nowrap ${
-            scrolled ? "text-foreground" : "text-ivory"
-          }`}
+          className={`whitespace-nowrap text-center font-display tracking-wide transition-all duration-asc ease-asc ${
+            scrolled ? "text-xl md:text-2xl" : "text-2xl md:text-3xl"
+          } ${scrolled ? "text-asc-ink" : "text-asc-ink-inverse"}`}
         >
-          A<span className="text-accent">&amp;</span>S Concept
+          A<span className="text-asc-gold">&amp;</span>S{" "}
+          <span className="font-light italic">Conccept</span>
           {isAdmin && (
-            <span className="ml-2 hidden align-middle text-[9px] tracking-luxe uppercase text-accent md:inline">
+            <span className="asc-label ml-2 hidden align-middle text-[9px] text-asc-gold md:inline">
               · Dev
             </span>
           )}
         </a>
         <div
           className={`flex items-center justify-end gap-4 md:gap-5 ${
-            scrolled ? "text-foreground" : "text-ivory"
+            scrolled ? "text-asc-ink" : "text-asc-ink-inverse"
           }`}
         >
           <button
             aria-label="Buscar"
             onClick={openSearch}
-            className="hidden hover:text-accent transition-colors md:inline-flex"
+            className="hidden transition-colors duration-ascfast ease-asc hover:text-asc-gold md:inline-flex"
           >
             <Search className="h-4 w-4" strokeWidth={1.5} />
           </button>
@@ -499,18 +505,18 @@ function Nav({
             onClick={() => (user ? onOpenAccount() : openAuth())}
             aria-label={user ? "Minha Conta" : "Entrar"}
             title={user ? `${user.email}` : "Entrar"}
-            className="hidden hover:text-accent transition-colors md:inline-flex"
+            className="hidden transition-colors duration-ascfast ease-asc hover:text-asc-gold md:inline-flex"
           >
             <UserIcon className="h-4 w-4" strokeWidth={1.5} />
           </button>
           <button
             aria-label="Sacola"
             onClick={open}
-            className="relative hover:text-accent transition-colors"
+            className="relative transition-colors duration-ascfast ease-asc hover:text-asc-gold"
           >
             <ShoppingBag className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.5} />
             {count > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-medium text-charcoal">
+              <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-asc-gold px-1 text-[10px] font-medium text-asc-ink-inverse">
                 {count}
               </span>
             )}
@@ -521,7 +527,7 @@ function Nav({
                 to="/pedidos"
                 aria-label="Controle de Pedidos"
                 title="Controle de Pedidos"
-                className="hidden hover:text-accent transition-colors md:inline-flex"
+                className="hidden transition-colors duration-ascfast ease-asc hover:text-asc-gold md:inline-flex"
               >
                 <Package className="h-4 w-4" strokeWidth={1.5} />
               </Link>
@@ -529,10 +535,10 @@ function Nav({
                 aria-label="Painel Admin"
                 onClick={onOpenAdmin}
                 title="Painel Admin"
-                className="relative hidden hover:text-accent transition-colors md:inline-flex"
+                className="relative hidden transition-colors duration-ascfast ease-asc hover:text-asc-gold md:inline-flex"
               >
                 <Settings className="h-4 w-4" strokeWidth={1.5} />
-                <span className="absolute -right-2 -top-2 h-1.5 w-1.5 rounded-full bg-accent" />
+                <span className="absolute -right-2 -top-2 h-1.5 w-1.5 rounded-full bg-asc-gold" />
               </button>
             </>
           )}
@@ -542,6 +548,7 @@ function Nav({
     </header>
   );
 }
+
 
 /* ---------- Mobile Menu Drawer ---------- */
 function MobileMenu({
