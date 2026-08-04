@@ -40,6 +40,8 @@ import { ZoomableImage } from "@/components/ZoomableImage";
 
 import { InstallmentsNote } from "@/components/InstallmentsNote";
 import { FavoriteButton, ShareButton } from "@/components/ProductActions";
+import { StitchDivider } from "@/components/StitchDivider";
+import { EmptyCategoryState } from "@/components/EmptyCategoryState";
 
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 import { AVAILABLE_COUPONS, findCoupon, hasUsedCoupon } from "@/lib/coupons";
