@@ -40,6 +40,8 @@ import { ZoomableImage } from "@/components/ZoomableImage";
 
 import { InstallmentsNote } from "@/components/InstallmentsNote";
 import { FavoriteButton, ShareButton } from "@/components/ProductActions";
+import { StitchDivider } from "@/components/StitchDivider";
+import { EmptyCategoryState } from "@/components/EmptyCategoryState";
 
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 import { AVAILABLE_COUPONS, findCoupon, hasUsedCoupon } from "@/lib/coupons";
@@ -329,8 +331,12 @@ function Index() {
               onOpenMobileMenu={() => setMobileMenuOpen(true)}
             />
             <Hero />
+            <div className="mx-auto max-w-[1600px] px-6 pt-10 md:px-12 md:pt-14">
+              <StitchDivider label="The New Era of Heritage" />
+            </div>
             <CategoryTabs />
             <Products />
+
             <Testimonials />
             <Concept />
             <Newsletter />
@@ -436,23 +442,28 @@ function Nav({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const navLink =
+    "asc-label relative transition-colors duration-ascfast ease-asc after:absolute after:-bottom-1 after:left-0 after:h-px after:w-0 after:bg-asc-gold after:transition-all after:duration-asc after:ease-asc hover:after:w-full hover:text-asc-gold";
+
   return (
     <header
-      className={`fixed top-0 z-50 w-full transition-all duration-500 ${
-        scrolled ? "bg-background/90 backdrop-blur border-b border-border" : "bg-transparent"
+      className={`fixed top-0 z-50 w-full border-b transition-all duration-asc ease-asc ${
+        scrolled
+          ? "border-asc-line bg-asc-bg/80 py-2 backdrop-blur-md md:py-3"
+          : "border-transparent bg-transparent py-4 md:py-6"
       }`}
     >
-      <div className="mx-auto grid max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center px-4 py-4 md:px-12 md:py-5">
+      <div className="mx-auto grid max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center px-4 md:px-10">
         <div
           className={`flex items-center gap-5 ${
-            scrolled ? "text-foreground" : "text-ivory"
+            scrolled ? "text-asc-ink" : "text-asc-ink-inverse"
           }`}
         >
           {/* Mobile hamburger */}
           <button
             aria-label="Abrir menu"
             onClick={onOpenMobileMenu}
-            className="hover:text-accent transition-colors md:hidden"
+            className="transition-colors duration-ascfast ease-asc hover:text-asc-gold md:hidden"
           >
             <Menu className="h-5 w-5" strokeWidth={1.25} />
           </button>
@@ -460,38 +471,39 @@ function Nav({
           <button
             aria-label="Filtrar categoria"
             onClick={onOpenFilter}
-            className="hidden hover:text-accent transition-colors md:inline-flex"
+            className="hidden transition-colors duration-ascfast ease-asc hover:text-asc-gold md:inline-flex"
           >
             <Menu className="h-4 w-4" strokeWidth={1.5} />
           </button>
-          <nav className="hidden items-center gap-8 text-[11px] tracking-luxe uppercase md:flex">
-            <a href="#collections" className="hover:text-accent transition-colors">Coleção</a>
-            <a href="#edit" className="hover:text-accent transition-colors">O Editorial</a>
-            <a href="#about" className="hover:text-accent transition-colors">Sobre</a>
+          <nav className="hidden items-center gap-9 md:flex">
+            <a href="#collections" className={navLink}>Coleção</a>
+            <a href="#edit" className={navLink}>O Editorial</a>
+            <a href="#about" className={navLink}>Somente por Convite</a>
           </nav>
         </div>
         <a
           href="#"
-          className={`font-serif text-lg md:text-2xl tracking-wider text-center whitespace-nowrap ${
-            scrolled ? "text-foreground" : "text-ivory"
-          }`}
+          className={`whitespace-nowrap text-center font-display tracking-wide transition-all duration-asc ease-asc ${
+            scrolled ? "text-xl md:text-2xl" : "text-2xl md:text-3xl"
+          } ${scrolled ? "text-asc-ink" : "text-asc-ink-inverse"}`}
         >
-          A<span className="text-accent">&amp;</span>S Concept
+          A<span className="text-asc-gold">&amp;</span>S{" "}
+          <span className="font-light italic">Conccept</span>
           {isAdmin && (
-            <span className="ml-2 hidden align-middle text-[9px] tracking-luxe uppercase text-accent md:inline">
+            <span className="asc-label ml-2 hidden align-middle text-[9px] text-asc-gold md:inline">
               · Dev
             </span>
           )}
         </a>
         <div
           className={`flex items-center justify-end gap-4 md:gap-5 ${
-            scrolled ? "text-foreground" : "text-ivory"
+            scrolled ? "text-asc-ink" : "text-asc-ink-inverse"
           }`}
         >
           <button
             aria-label="Buscar"
             onClick={openSearch}
-            className="hidden hover:text-accent transition-colors md:inline-flex"
+            className="hidden transition-colors duration-ascfast ease-asc hover:text-asc-gold md:inline-flex"
           >
             <Search className="h-4 w-4" strokeWidth={1.5} />
           </button>
@@ -499,18 +511,18 @@ function Nav({
             onClick={() => (user ? onOpenAccount() : openAuth())}
             aria-label={user ? "Minha Conta" : "Entrar"}
             title={user ? `${user.email}` : "Entrar"}
-            className="hidden hover:text-accent transition-colors md:inline-flex"
+            className="hidden transition-colors duration-ascfast ease-asc hover:text-asc-gold md:inline-flex"
           >
             <UserIcon className="h-4 w-4" strokeWidth={1.5} />
           </button>
           <button
             aria-label="Sacola"
             onClick={open}
-            className="relative hover:text-accent transition-colors"
+            className="relative transition-colors duration-ascfast ease-asc hover:text-asc-gold"
           >
             <ShoppingBag className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.5} />
             {count > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-medium text-charcoal">
+              <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-asc-gold px-1 text-[10px] font-medium text-asc-ink-inverse">
                 {count}
               </span>
             )}
@@ -521,7 +533,7 @@ function Nav({
                 to="/pedidos"
                 aria-label="Controle de Pedidos"
                 title="Controle de Pedidos"
-                className="hidden hover:text-accent transition-colors md:inline-flex"
+                className="hidden transition-colors duration-ascfast ease-asc hover:text-asc-gold md:inline-flex"
               >
                 <Package className="h-4 w-4" strokeWidth={1.5} />
               </Link>
@@ -529,10 +541,10 @@ function Nav({
                 aria-label="Painel Admin"
                 onClick={onOpenAdmin}
                 title="Painel Admin"
-                className="relative hidden hover:text-accent transition-colors md:inline-flex"
+                className="relative hidden transition-colors duration-ascfast ease-asc hover:text-asc-gold md:inline-flex"
               >
                 <Settings className="h-4 w-4" strokeWidth={1.5} />
-                <span className="absolute -right-2 -top-2 h-1.5 w-1.5 rounded-full bg-accent" />
+                <span className="absolute -right-2 -top-2 h-1.5 w-1.5 rounded-full bg-asc-gold" />
               </button>
             </>
           )}
@@ -542,6 +554,7 @@ function Nav({
     </header>
   );
 }
+
 
 /* ---------- Mobile Menu Drawer ---------- */
 function MobileMenu({
@@ -842,35 +855,39 @@ function Products() {
         {showSneakersComingSoon ? (
           <SneakersComingSoon />
         ) : filtered.length === 0 ? (
-          <div className="mx-auto max-w-lg py-16 text-center">
-            <p className="font-serif text-2xl">
-              {query
-                ? `Nenhum produto encontrado para "${query}".`
-                : "Nada por aqui ainda."}
-            </p>
-            <p className="mt-4 text-sm text-muted-foreground font-light">
-              {query
-                ? "Tente outra palavra-chave ou explore a coleção completa."
-                : isAdmin
-                  ? "Adicione o primeiro produto desta seção."
-                  : "Volte em breve."}
-            </p>
-            {query && (
+          query ? (
+            <div className="mx-auto max-w-lg py-16 text-center">
+              <p className="font-display text-3xl text-asc-ink">
+                Nenhuma peça para "{query}".
+              </p>
+              <p className="mt-4 font-sans text-sm font-light text-asc-ink-muted">
+                Tente outra palavra-chave ou percorra a coleção completa.
+              </p>
               <button
                 onClick={() => setQuery("")}
-                className="mt-8 border border-foreground px-8 py-3 text-[11px] tracking-luxe uppercase transition-colors hover:bg-foreground hover:text-ivory"
+                className="asc-label mt-8 border border-asc-ink px-8 py-3 transition-all duration-asc ease-asc hover:bg-asc-ink hover:text-asc-bg"
               >
                 Ver toda a coleção
               </button>
-            )}
-          </div>
+            </div>
+          ) : isAdmin ? (
+            <div className="mx-auto max-w-lg py-16 text-center">
+              <p className="font-display text-3xl text-asc-ink">Nada por aqui ainda.</p>
+              <p className="mt-4 font-sans text-sm font-light text-asc-ink-muted">
+                Adicione o primeiro produto desta seção.
+              </p>
+            </div>
+          ) : (
+            <EmptyCategoryState categoryName={tab === "clothes" ? "A Coleção" : "Sneakers"} />
+          )
         ) : (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-16 md:grid-cols-3 md:gap-x-8 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-14 md:grid-cols-3 md:gap-x-8 md:gap-y-20 lg:grid-cols-4">
             {filtered.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
           </div>
         )}
+
       </div>
     </section>
   );
@@ -974,7 +991,7 @@ function ProductCard({ product }: { product: Product }) {
   return (
     <article className="group flex flex-col">
       <div
-        className={`relative aspect-[3/4] w-full overflow-hidden bg-secondary transition-transform duration-500 hover:-translate-y-1 hover:shadow-xl ${
+        className={`relative aspect-[3/4] w-full overflow-hidden bg-asc-bg-raised ${
           soldOut ? "" : "cursor-pointer"
         }`}
         onClick={() => !soldOut && open(product.id)}
@@ -983,7 +1000,7 @@ function ProductCard({ product }: { product: Product }) {
           src={product.image}
           alt={product.name}
           loading="lazy"
-          className={`h-full w-full object-cover transition-all duration-[1400ms] ease-out group-hover:scale-[1.08] ${
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-ascslow ease-asc ${
             soldOut ? "opacity-50 grayscale" : ""
           } ${hoverImg && !soldOut ? "group-hover:opacity-0" : ""}`}
         />
@@ -993,17 +1010,18 @@ function ProductCard({ product }: { product: Product }) {
             alt={`${product.name} — segunda vista`}
             loading="lazy"
             aria-hidden
-            className="pointer-events-none absolute inset-0 h-full w-full scale-[1.02] object-cover opacity-0 transition-all duration-[1200ms] ease-out group-hover:scale-[1.08] group-hover:opacity-100"
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-ascslow ease-asc group-hover:opacity-100"
           />
+
         )}
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
           {novidade && !soldOut && (
-            <span className="inline-flex items-center border border-navy/40 bg-background/95 px-2 py-1 text-[10px] tracking-luxe uppercase text-navy backdrop-blur">
+            <span className="asc-label inline-flex items-center bg-asc-bg/90 px-2 py-1 text-[10px] text-asc-ink backdrop-blur">
               Novidade
             </span>
           )}
           {showLastItem ? (
-            <span className="inline-flex items-center gap-1 border border-[color:var(--gold)]/70 bg-background/95 px-2 py-1 text-[10px] tracking-luxe uppercase text-[color:var(--gold)] backdrop-blur">
+            <span className="asc-label inline-flex items-center gap-1 bg-asc-bg/90 px-2 py-1 text-[10px] text-asc-gold backdrop-blur">
               ✦ Último Item
             </span>
           ) : (
@@ -1011,21 +1029,15 @@ function ProductCard({ product }: { product: Product }) {
           )}
         </div>
         {soldOut ? (
-          <>
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <span className="rotate-[-8deg] border-2 border-destructive/80 bg-charcoal/40 px-6 py-2 font-serif text-2xl tracking-widest text-destructive backdrop-blur">
-                SOLD OUT
-              </span>
-            </div>
-            <div className="pointer-events-none absolute inset-x-4 bottom-4 border border-ivory/40 bg-charcoal/80 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory/80 backdrop-blur-sm">
-              Produto Esgotado
-            </div>
-          </>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-asc-bg-dark/75 py-3 text-center backdrop-blur-sm">
+            <span className="asc-label text-[10px] text-asc-ink-inverse-muted">Esgotado</span>
+          </div>
         ) : (
-          <div className="pointer-events-none absolute inset-x-4 bottom-4 translate-y-6 border border-ivory/80 bg-charcoal/70 py-3 text-center text-[10px] tracking-luxe uppercase text-ivory opacity-0 backdrop-blur-sm transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">
-            Ver Produto
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-2 bg-asc-bg-dark/70 py-3 text-center opacity-0 backdrop-blur-sm transition-all duration-asc ease-asc group-hover:translate-y-0 group-hover:opacity-100">
+            <span className="asc-label text-[10px] text-asc-ink-inverse">Ver Peça</span>
           </div>
         )}
+
         <div className="pointer-events-auto absolute right-3 top-3 z-30 flex flex-col gap-2">
           <FavoriteButton productId={product.id} className="h-8 w-8" />
           {isAdmin && (
@@ -1054,18 +1066,21 @@ function ProductCard({ product }: { product: Product }) {
           )}
         </div>
       </div>
-      <div className="mt-5 flex items-start justify-between gap-4">
+      <div className="mt-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-serif text-base md:text-lg leading-tight">{product.name}</h3>
-          <p className="mt-1 text-xs text-muted-foreground font-light line-clamp-1">
+          <h3 className="font-display text-lg leading-snug text-asc-ink">{product.name}</h3>
+          <p className="mt-1 line-clamp-1 font-sans text-xs font-light text-asc-ink-muted">
             {product.description}
           </p>
         </div>
-        <div className="shrink-0 text-right">
-          <span className="block text-xs md:text-sm tabular-nums">{formatBRL(product.price)}</span>
+        <div className="shrink-0 pt-1 text-right">
+          <span className="block whitespace-nowrap font-sans text-sm tabular-nums text-asc-ink">
+            {formatBRL(product.price)}
+          </span>
           <InstallmentsNote amount={product.price} className="mt-1" />
         </div>
       </div>
+
       {isAdmin && sizeStock && (
         <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
           Estoque · P{sizeStock.P} · M{sizeStock.M} · G{sizeStock.G} · GG{sizeStock.GG}
@@ -1785,40 +1800,62 @@ function Newsletter() {
     setMsg("Convite reservado. Verificaremos e retornaremos em breve.");
   };
   return (
-    <section id="about" className="py-32 md:py-44">
-      <div className="mx-auto max-w-2xl px-6 text-center">
-        <p className="mb-6 text-[11px] tracking-luxe uppercase text-accent">Membership</p>
-        <h2 className="font-serif text-4xl md:text-6xl leading-tight">
-          Entre para o Clube<br />
-          <em className="font-normal not-italic text-accent md:italic">(Somente por Convite)</em>
+    <section
+      id="about"
+      className="bg-asc-bg-dark py-[var(--asc-section-y)] text-asc-ink-inverse"
+    >
+      <div className="mx-auto max-w-xl px-6 text-center">
+        <p className="asc-label mb-6 text-asc-gold-soft">Acesso Restrito</p>
+        <h2 className="mb-6 font-display text-4xl leading-tight md:text-5xl">
+          Somente por Convite
         </h2>
-        <p className="mx-auto mt-8 max-w-md text-sm md:text-base text-muted-foreground font-light">
-          Prévias privadas, histórias dos ateliês e acesso antecipado às edições limitadas.
+        <p className="mx-auto mb-10 max-w-md font-sans text-sm leading-relaxed text-asc-ink-inverse-muted">
+          Peças em edição limitada, acesso antecipado a novos drops e atendimento
+          dedicado — reservado a quem faz parte do círculo A&amp;S Conccept.
         </p>
-        <form
-          onSubmit={onSubmit}
-          className="mx-auto mt-12 flex max-w-md items-center border-b border-foreground/40 pb-2 transition-colors focus-within:border-accent"
-        >
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="seu@email.com"
-            className="flex-1 bg-transparent px-1 py-2 text-sm outline-none placeholder:text-muted-foreground/60"
-          />
-          <button
-            disabled={status === "sending"}
-            className="text-[11px] tracking-luxe uppercase hover:text-accent transition-colors disabled:opacity-50"
-          >
-            {status === "sent" ? "Recebido ✦" : status === "sending" ? "Enviando..." : "Solicitar Convite"}
-          </button>
-        </form>
-        {msg && <p className="mt-4 text-xs text-muted-foreground">{msg}</p>}
+
+        <StitchDivider className="mb-10 opacity-60" />
+
+        {status === "sent" ? (
+          <p className="font-display text-xl text-asc-gold-soft">
+            {msg ?? "Recebemos seu pedido. Em breve, entraremos em contato."}
+          </p>
+        ) : (
+          <form onSubmit={onSubmit} className="space-y-8 text-left">
+            <div className="relative">
+              <label
+                htmlFor="member-email"
+                className="asc-label mb-2 block text-[10px] text-asc-ink-inverse-muted"
+              >
+                E-mail
+              </label>
+              <input
+                id="member-email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                className="w-full border-b border-asc-line-dark bg-transparent py-3 font-sans text-sm text-asc-ink-inverse outline-none transition-colors duration-asc ease-asc placeholder:text-asc-ink-inverse-muted/60 focus:border-asc-gold"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={status === "sending"}
+              className="asc-label w-full border border-asc-ink-inverse/30 py-4 text-asc-ink-inverse transition-all duration-asc ease-asc hover:border-asc-gold hover:text-asc-gold disabled:opacity-50"
+            >
+              {status === "sending" ? "Enviando..." : "Solicitar Convite"}
+            </button>
+            {status === "error" && msg && (
+              <p className="font-sans text-xs text-asc-error">{msg}</p>
+            )}
+          </form>
+        )}
       </div>
     </section>
   );
 }
+
 
 /* ---------- Footer ---------- */
 function InstagramIcon({ className = "h-5 w-5" }: { className?: string }) {
@@ -2098,42 +2135,42 @@ function CartDrawer() {
     <>
       <div
         onClick={close}
-        className={`fixed inset-0 z-[60] bg-charcoal/60 backdrop-blur-sm transition-opacity duration-500 ${
+        className={`fixed inset-0 z-[60] bg-asc-ink/40 backdrop-blur-sm transition-opacity duration-asc ease-asc ${
           isOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       />
       <aside
-        className={`fixed inset-y-0 right-0 z-[70] flex w-full max-w-md flex-col bg-background shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`fixed inset-y-0 right-0 z-[70] flex w-full flex-col border-l border-asc-line bg-asc-bg transition-transform duration-asc ease-asc sm:max-w-[420px] ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-border px-6 py-5">
+        <div className="flex items-center justify-between border-b border-asc-line px-6 py-6">
           <div>
-            <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">Sua Sacola</p>
-            <h3 className="font-serif text-xl">
+            <h2 className="font-display text-2xl text-asc-ink">Sua Sacola</h2>
+            <p className="asc-label mt-1 text-[10px] text-asc-ink-muted">
               {count} {count === 1 ? "Peça" : "Peças"}
-            </h3>
+            </p>
           </div>
-          <button onClick={close} aria-label="Fechar" className="hover:text-accent">
+          <button
+            onClick={close}
+            aria-label="Fechar sacola"
+            className="text-asc-ink transition-colors duration-ascfast ease-asc hover:text-asc-gold"
+          >
             <X className="h-5 w-5" strokeWidth={1.5} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="flex-1 overflow-y-auto px-6 py-8">
           {items.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-accent/40 bg-accent/5">
-                <ShoppingBag className="h-9 w-9 text-accent" strokeWidth={1} />
-                <span className="absolute -right-1 -top-1 flex h-3 w-3">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent/60" />
-                  <span className="relative inline-flex h-3 w-3 rounded-full bg-accent" />
-                </span>
-              </div>
-              <p className="mt-8 font-serif text-2xl leading-tight">
-                Seu carrinho<br />está vazio...
+              <p className="asc-label text-asc-gold">A&amp;S Conccept</p>
+              <p className="mt-6 font-display text-3xl leading-tight text-asc-ink">
+                Sua sacola aguarda<br />a primeira peça.
               </p>
-              <p className="mt-4 max-w-[280px] text-sm font-light text-muted-foreground">
-                Não deixe seus produtos favoritos esgotarem — as edições são limitadas.
+              <StitchDivider className="my-8 w-40" />
+              <p className="max-w-[280px] font-sans text-sm font-light leading-relaxed text-asc-ink-muted">
+                Cada edição é limitada e produzida em pequenas séries. Comece pela
+                coleção da estação.
               </p>
               <button
                 onClick={() => {
@@ -2144,54 +2181,64 @@ function CartDrawer() {
                     150,
                   );
                 }}
-                className="mt-8 bg-charcoal px-8 py-3 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
+                className="asc-label mt-10 border border-asc-ink px-8 py-3 text-asc-ink transition-all duration-asc ease-asc hover:bg-asc-ink hover:text-asc-bg"
+
               >
                 Ver Novidades
               </button>
             </div>
           ) : (
             <>
-              <div className="mb-6 rounded-sm border border-border/60 bg-secondary/40 p-4">
+              <div className="mb-8 border border-asc-line bg-asc-bg-raised p-4">
                 <FreeShippingHint subtotal={subtotal} />
               </div>
-              <ul className="space-y-6">
+              <ul className="divide-y divide-asc-line">
                 {items.map((i) => (
-                  <li
-                    key={`${i.id}-${i.size}`}
-                    className="flex gap-4 border-b border-border pb-6 last:border-0"
-                  >
-                    <img src={i.image} alt={i.name} className="h-28 w-20 object-cover" />
+                  <li key={`${i.id}-${i.size}`} className="flex gap-4 py-6 first:pt-0">
+                    <img
+                      src={i.image}
+                      alt={i.name}
+                      className="h-24 w-20 shrink-0 bg-asc-bg-raised object-cover"
+                    />
                     <div className="flex flex-1 flex-col">
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-serif text-base leading-tight">{i.name}</h4>
+                        <h3 className="font-display text-base leading-snug text-asc-ink">
+                          {i.name}
+                        </h3>
                         <button
                           onClick={() => remove(i.id, i.size)}
                           aria-label="Remover"
-                          className="text-muted-foreground hover:text-accent"
+                          className="text-asc-ink-muted transition-colors duration-ascfast ease-asc hover:text-asc-gold"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                      <p className="mt-1 text-[11px] text-muted-foreground">Tamanho {i.size}</p>
-                      <div className="mt-auto flex items-center justify-between">
-                        <div className="flex items-center border border-border">
+                      <p className="asc-label mt-1 text-[10px] text-asc-ink-muted">
+                        Tamanho {i.size}
+                      </p>
+                      <div className="mt-auto flex items-center justify-between pt-4">
+                        <div className="flex items-center border border-asc-line">
                           <button
                             onClick={() => updateQty(i.id, i.size, -1)}
                             aria-label="Diminuir"
-                            className="flex h-8 w-8 items-center justify-center hover:bg-secondary transition-colors"
+                            className="flex h-8 w-8 items-center justify-center transition-colors duration-ascfast ease-asc hover:bg-asc-bg-raised"
                           >
                             <Minus className="h-3 w-3" />
                           </button>
-                          <span className="w-8 text-center text-sm tabular-nums">{i.qty}</span>
+                          <span className="w-8 text-center font-sans text-sm tabular-nums">
+                            {i.qty}
+                          </span>
                           <button
                             onClick={() => updateQty(i.id, i.size, 1)}
                             aria-label="Aumentar"
-                            className="flex h-8 w-8 items-center justify-center hover:bg-secondary transition-colors"
+                            className="flex h-8 w-8 items-center justify-center transition-colors duration-ascfast ease-asc hover:bg-asc-bg-raised"
                           >
                             <Plus className="h-3 w-3" />
                           </button>
                         </div>
-                        <span className="text-sm tabular-nums">{formatBRL(i.price * i.qty)}</span>
+                        <span className="font-sans text-sm tabular-nums text-asc-ink">
+                          {formatBRL(i.price * i.qty)}
+                        </span>
                       </div>
                     </div>
                   </li>
@@ -2205,37 +2252,38 @@ function CartDrawer() {
         </div>
 
         {items.length > 0 && (
-          <div className="space-y-4 border-t border-border px-6 py-6">
+          <div className="space-y-4 border-t border-asc-line px-6 py-6">
             <CouponRow subtotal={subtotal} />
             <div className="flex items-center justify-between">
-              <span className="text-[11px] tracking-luxe uppercase text-muted-foreground">
-                Subtotal
+              <span className="asc-label text-[10px] text-asc-ink-muted">Subtotal</span>
+              <span className="font-display text-xl tabular-nums text-asc-ink">
+                {formatBRL(subtotal)}
               </span>
-              <span className="font-serif text-xl tabular-nums">{formatBRL(subtotal)}</span>
             </div>
             {PIX_ENABLED && (
-              <p className="text-[11px] font-light italic tracking-wide text-[color:var(--gold)]">
+              <p className="font-sans text-[11px] font-light italic tracking-wide text-asc-gold">
                 ou {formatBRL(applyPixDiscount(subtotal))} no Pix (5% de desconto)
               </p>
             )}
-            <p className="text-[11px] font-light text-muted-foreground">
-              Frete grátis para pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}. Impostos
-              calculados no checkout.
+            <p className="font-sans text-[11px] font-light text-asc-ink-muted">
+              Frete cortesia acima de {formatBRL(FREE_SHIPPING_THRESHOLD)} · Embalagem do
+              ateliê inclusa.
             </p>
-            {checkoutMsg && <p className="text-[11px] text-accent">{checkoutMsg}</p>}
+            {checkoutMsg && <p className="font-sans text-[11px] text-asc-gold">{checkoutMsg}</p>}
             <button
               onClick={onCheckout}
-              className="w-full bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
+              className="asc-label w-full bg-asc-ink py-4 text-asc-ink-inverse transition-all duration-asc ease-asc hover:bg-asc-bg-dark-raised"
             >
               {user ? "Finalizar Compra" : "Entrar para Finalizar"}
             </button>
             {!user && (
-              <p className="text-center text-[10px] text-muted-foreground">
+              <p className="text-center font-sans text-[10px] text-asc-ink-muted">
                 É necessário estar autenticado para prosseguir ao pagamento.
               </p>
             )}
           </div>
         )}
+
       </aside>
     </>
   );

@@ -32,38 +32,92 @@
   --color-navy: var(--navy);
   --color-charcoal: var(--charcoal);
   --color-ivory: var(--ivory);
-  --font-serif: "Playfair Display", "Bodoni Moda", Georgia, serif;
+
+  /* — A&S Conccept · Quiet Luxury tokens — */
+  --color-asc-bg: var(--asc-bg);
+  --color-asc-bg-raised: var(--asc-bg-raised);
+  --color-asc-bg-dark: var(--asc-bg-dark);
+  --color-asc-bg-dark-raised: var(--asc-bg-dark-raised);
+  --color-asc-ink: var(--asc-ink);
+  --color-asc-ink-muted: var(--asc-ink-muted);
+  --color-asc-ink-inverse: var(--asc-ink-inverse);
+  --color-asc-ink-inverse-muted: var(--asc-ink-inverse-muted);
+  --color-asc-line: var(--asc-line);
+  --color-asc-line-dark: var(--asc-line-dark);
+  --color-asc-gold: var(--asc-gold);
+  --color-asc-gold-soft: var(--asc-gold-soft);
+  --color-asc-error: var(--asc-error);
+  --color-asc-success: var(--asc-success);
+
+  --tracking-label: 0.15em;
+  --ease-asc: cubic-bezier(0.16, 1, 0.3, 1);
+  --shadow-hairline: 0 1px 0 0 var(--asc-line);
+
+  --font-display: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+  --font-serif: "Cormorant Garamond", "Playfair Display", Georgia, serif;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
+
 
 :root {
   --radius: 0.125rem;
 
-  /* Luxury palette */
-  --ivory: oklch(0.978 0.005 85);
-  --navy: oklch(0.22 0.045 265);
-  --charcoal: oklch(0.18 0.005 260);
-  --gold: oklch(0.72 0.09 78);
+  /* ═══ A&S Conccept — Quiet Luxury / Old Money ═══ */
+  /* Superfícies */
+  --asc-bg: #FBF9F6;
+  --asc-bg-raised: #F3F0EA;
+  --asc-bg-dark: #121212;
+  --asc-bg-dark-raised: #1C1C1C;
+  /* Texto */
+  --asc-ink: #1A1A1A;
+  --asc-ink-muted: #6B6862;
+  --asc-ink-inverse: #FBF9F6;
+  --asc-ink-inverse-muted: #A8A49C;
+  /* Linhas */
+  --asc-line: #E5E1D8;
+  --asc-line-dark: #333333;
+  /* Assinatura dourada — usar com moderação */
+  --asc-gold: #A9863F;
+  --asc-gold-soft: #C9AD74;
+  /* Estado */
+  --asc-error: #8C3D2E;
+  --asc-success: #3D5A45;
+  /* Espaçamento editorial */
+  --asc-section-y: clamp(5rem, 9vw, 9rem);
+  --asc-section-y-sm: clamp(3rem, 6vw, 5rem);
+  /* Movimento */
+  --asc-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --asc-duration-fast: 0.35s;
+  --asc-duration: 0.5s;
+  --asc-duration-slow: 0.8s;
+  --asc-ring: 0 0 0 1px var(--asc-line);
 
-  --background: var(--ivory);
-  --foreground: var(--charcoal);
-  --card: oklch(1 0 0);
-  --card-foreground: var(--charcoal);
-  --popover: oklch(1 0 0);
-  --popover-foreground: var(--charcoal);
+  /* Paleta herdada, alinhada aos novos tokens */
+  --ivory: var(--asc-bg);
+  --navy: #2A2F3A;
+  --charcoal: var(--asc-bg-dark);
+  --gold: var(--asc-gold);
+
+  --background: var(--asc-bg);
+  --foreground: var(--asc-ink);
+  --card: #FFFFFF;
+  --card-foreground: var(--asc-ink);
+  --popover: #FFFFFF;
+  --popover-foreground: var(--asc-ink);
   --primary: var(--navy);
-  --primary-foreground: var(--ivory);
-  --secondary: oklch(0.94 0.005 85);
-  --secondary-foreground: var(--charcoal);
-  --muted: oklch(0.94 0.005 85);
-  --muted-foreground: oklch(0.45 0.01 260);
-  --accent: var(--gold);
-  --accent-foreground: var(--charcoal);
-  --destructive: oklch(0.55 0.2 27);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.88 0.008 85);
-  --input: oklch(0.88 0.008 85);
-  --ring: var(--gold);
+  --primary-foreground: var(--asc-ink-inverse);
+  --secondary: var(--asc-bg-raised);
+  --secondary-foreground: var(--asc-ink);
+  --muted: var(--asc-bg-raised);
+  --muted-foreground: var(--asc-ink-muted);
+  --accent: var(--asc-gold);
+  --accent-foreground: var(--asc-ink);
+  --destructive: var(--asc-error);
+  --destructive-foreground: var(--asc-ink-inverse);
+  --border: var(--asc-line);
+  --input: var(--asc-line);
+  --ring: var(--asc-gold);
+
 
   --chart-1: var(--navy);
   --chart-2: var(--gold);
@@ -104,6 +158,50 @@
     letter-spacing: -0.01em;
   }
 }
+
+/* — Rótulos: nav, botões, eyebrows — */
+@utility asc-label {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+/* — Grão sutil de filme sobre imagens editoriais — */
+@utility asc-grain {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+/* — Assinatura de movimento da marca — */
+@utility ease-asc {
+  transition-timing-function: var(--asc-ease);
+}
+
+@utility duration-ascfast {
+  transition-duration: var(--asc-duration-fast);
+}
+
+@utility duration-asc {
+  transition-duration: var(--asc-duration);
+}
+
+@utility duration-ascslow {
+  transition-duration: var(--asc-duration-slow);
+}
+
+@utility shadow-hairline {
+  box-shadow: 0 1px 0 0 var(--asc-line);
+}
+
 
 @utility tracking-luxe {
   letter-spacing: 0.22em;
