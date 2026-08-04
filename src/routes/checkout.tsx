@@ -113,7 +113,12 @@ function CheckoutPage() {
 
   const shippingCost = shippingQuote?.displayCost ?? 0;
   const totalCard = Math.max(0, subtotal - couponDiscount) + shippingCost;
-  const totalPix = Math.max(0, totalCard * (1 - PIX_DISCOUNT_RATE));
+  // O desconto Pix incide apenas sobre os produtos (nunca sobre o frete),
+  // exatamente como o servidor calcula em createPendingOrderCore.
+  const totalPix =
+    Math.round(
+      (Math.max(0, subtotal - couponDiscount) * (1 - PIX_DISCOUNT_RATE) + shippingCost) * 100,
+    ) / 100;
   const totalDue = method === "pix" && PIX_ENABLED ? totalPix : totalCard;
 
   const setField = <K extends keyof CustomerForm>(k: K, v: string) => {
