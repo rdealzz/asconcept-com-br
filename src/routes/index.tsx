@@ -2185,47 +2185,56 @@ function CartDrawer() {
             </div>
           ) : (
             <>
-              <div className="mb-6 rounded-sm border border-border/60 bg-secondary/40 p-4">
+              <div className="mb-8 border border-asc-line bg-asc-bg-raised p-4">
                 <FreeShippingHint subtotal={subtotal} />
               </div>
-              <ul className="space-y-6">
+              <ul className="divide-y divide-asc-line">
                 {items.map((i) => (
-                  <li
-                    key={`${i.id}-${i.size}`}
-                    className="flex gap-4 border-b border-border pb-6 last:border-0"
-                  >
-                    <img src={i.image} alt={i.name} className="h-28 w-20 object-cover" />
+                  <li key={`${i.id}-${i.size}`} className="flex gap-4 py-6 first:pt-0">
+                    <img
+                      src={i.image}
+                      alt={i.name}
+                      className="h-24 w-20 shrink-0 bg-asc-bg-raised object-cover"
+                    />
                     <div className="flex flex-1 flex-col">
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-serif text-base leading-tight">{i.name}</h4>
+                        <h3 className="font-display text-base leading-snug text-asc-ink">
+                          {i.name}
+                        </h3>
                         <button
                           onClick={() => remove(i.id, i.size)}
                           aria-label="Remover"
-                          className="text-muted-foreground hover:text-accent"
+                          className="text-asc-ink-muted transition-colors duration-ascfast ease-asc hover:text-asc-gold"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                      <p className="mt-1 text-[11px] text-muted-foreground">Tamanho {i.size}</p>
-                      <div className="mt-auto flex items-center justify-between">
-                        <div className="flex items-center border border-border">
+                      <p className="asc-label mt-1 text-[10px] text-asc-ink-muted">
+                        Tamanho {i.size}
+                      </p>
+                      <div className="mt-auto flex items-center justify-between pt-4">
+                        <div className="flex items-center border border-asc-line">
                           <button
                             onClick={() => updateQty(i.id, i.size, -1)}
                             aria-label="Diminuir"
-                            className="flex h-8 w-8 items-center justify-center hover:bg-secondary transition-colors"
+                            className="flex h-8 w-8 items-center justify-center transition-colors duration-ascfast ease-asc hover:bg-asc-bg-raised"
                           >
                             <Minus className="h-3 w-3" />
                           </button>
-                          <span className="w-8 text-center text-sm tabular-nums">{i.qty}</span>
+                          <span className="w-8 text-center font-sans text-sm tabular-nums">
+                            {i.qty}
+                          </span>
                           <button
                             onClick={() => updateQty(i.id, i.size, 1)}
                             aria-label="Aumentar"
-                            className="flex h-8 w-8 items-center justify-center hover:bg-secondary transition-colors"
+                            className="flex h-8 w-8 items-center justify-center transition-colors duration-ascfast ease-asc hover:bg-asc-bg-raised"
                           >
                             <Plus className="h-3 w-3" />
                           </button>
                         </div>
-                        <span className="text-sm tabular-nums">{formatBRL(i.price * i.qty)}</span>
+                        <span className="font-sans text-sm tabular-nums text-asc-ink">
+                          {formatBRL(i.price * i.qty)}
+                        </span>
                       </div>
                     </div>
                   </li>
@@ -2239,37 +2248,38 @@ function CartDrawer() {
         </div>
 
         {items.length > 0 && (
-          <div className="space-y-4 border-t border-border px-6 py-6">
+          <div className="space-y-4 border-t border-asc-line px-6 py-6">
             <CouponRow subtotal={subtotal} />
             <div className="flex items-center justify-between">
-              <span className="text-[11px] tracking-luxe uppercase text-muted-foreground">
-                Subtotal
+              <span className="asc-label text-[10px] text-asc-ink-muted">Subtotal</span>
+              <span className="font-display text-xl tabular-nums text-asc-ink">
+                {formatBRL(subtotal)}
               </span>
-              <span className="font-serif text-xl tabular-nums">{formatBRL(subtotal)}</span>
             </div>
             {PIX_ENABLED && (
-              <p className="text-[11px] font-light italic tracking-wide text-[color:var(--gold)]">
+              <p className="font-sans text-[11px] font-light italic tracking-wide text-asc-gold">
                 ou {formatBRL(applyPixDiscount(subtotal))} no Pix (5% de desconto)
               </p>
             )}
-            <p className="text-[11px] font-light text-muted-foreground">
-              Frete grátis para pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}. Impostos
-              calculados no checkout.
+            <p className="font-sans text-[11px] font-light text-asc-ink-muted">
+              Frete cortesia acima de {formatBRL(FREE_SHIPPING_THRESHOLD)} · Embalagem do
+              ateliê inclusa.
             </p>
-            {checkoutMsg && <p className="text-[11px] text-accent">{checkoutMsg}</p>}
+            {checkoutMsg && <p className="font-sans text-[11px] text-asc-gold">{checkoutMsg}</p>}
             <button
               onClick={onCheckout}
-              className="w-full bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
+              className="asc-label w-full bg-asc-ink py-4 text-asc-ink-inverse transition-all duration-asc ease-asc hover:bg-asc-bg-dark-raised"
             >
               {user ? "Finalizar Compra" : "Entrar para Finalizar"}
             </button>
             {!user && (
-              <p className="text-center text-[10px] text-muted-foreground">
+              <p className="text-center font-sans text-[10px] text-asc-ink-muted">
                 É necessário estar autenticado para prosseguir ao pagamento.
               </p>
             )}
           </div>
         )}
+
       </aside>
     </>
   );
