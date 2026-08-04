@@ -331,8 +331,12 @@ function Index() {
               onOpenMobileMenu={() => setMobileMenuOpen(true)}
             />
             <Hero />
+            <div className="mx-auto max-w-[1600px] px-6 pt-10 md:px-12 md:pt-14">
+              <StitchDivider label="The New Era of Heritage" />
+            </div>
             <CategoryTabs />
             <Products />
+
             <Testimonials />
             <Concept />
             <Newsletter />
