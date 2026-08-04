@@ -1796,40 +1796,62 @@ function Newsletter() {
     setMsg("Convite reservado. Verificaremos e retornaremos em breve.");
   };
   return (
-    <section id="about" className="py-32 md:py-44">
-      <div className="mx-auto max-w-2xl px-6 text-center">
-        <p className="mb-6 text-[11px] tracking-luxe uppercase text-accent">Membership</p>
-        <h2 className="font-serif text-4xl md:text-6xl leading-tight">
-          Entre para o Clube<br />
-          <em className="font-normal not-italic text-accent md:italic">(Somente por Convite)</em>
+    <section
+      id="about"
+      className="bg-asc-bg-dark py-[var(--asc-section-y)] text-asc-ink-inverse"
+    >
+      <div className="mx-auto max-w-xl px-6 text-center">
+        <p className="asc-label mb-6 text-asc-gold-soft">Acesso Restrito</p>
+        <h2 className="mb-6 font-display text-4xl leading-tight md:text-5xl">
+          Somente por Convite
         </h2>
-        <p className="mx-auto mt-8 max-w-md text-sm md:text-base text-muted-foreground font-light">
-          Prévias privadas, histórias dos ateliês e acesso antecipado às edições limitadas.
+        <p className="mx-auto mb-10 max-w-md font-sans text-sm leading-relaxed text-asc-ink-inverse-muted">
+          Peças em edição limitada, acesso antecipado a novos drops e atendimento
+          dedicado — reservado a quem faz parte do círculo A&amp;S Conccept.
         </p>
-        <form
-          onSubmit={onSubmit}
-          className="mx-auto mt-12 flex max-w-md items-center border-b border-foreground/40 pb-2 transition-colors focus-within:border-accent"
-        >
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="seu@email.com"
-            className="flex-1 bg-transparent px-1 py-2 text-sm outline-none placeholder:text-muted-foreground/60"
-          />
-          <button
-            disabled={status === "sending"}
-            className="text-[11px] tracking-luxe uppercase hover:text-accent transition-colors disabled:opacity-50"
-          >
-            {status === "sent" ? "Recebido ✦" : status === "sending" ? "Enviando..." : "Solicitar Convite"}
-          </button>
-        </form>
-        {msg && <p className="mt-4 text-xs text-muted-foreground">{msg}</p>}
+
+        <StitchDivider className="mb-10 opacity-60" />
+
+        {status === "sent" ? (
+          <p className="font-display text-xl text-asc-gold-soft">
+            {msg ?? "Recebemos seu pedido. Em breve, entraremos em contato."}
+          </p>
+        ) : (
+          <form onSubmit={onSubmit} className="space-y-8 text-left">
+            <div className="relative">
+              <label
+                htmlFor="member-email"
+                className="asc-label mb-2 block text-[10px] text-asc-ink-inverse-muted"
+              >
+                E-mail
+              </label>
+              <input
+                id="member-email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                className="w-full border-b border-asc-line-dark bg-transparent py-3 font-sans text-sm text-asc-ink-inverse outline-none transition-colors duration-asc ease-asc placeholder:text-asc-ink-inverse-muted/60 focus:border-asc-gold"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={status === "sending"}
+              className="asc-label w-full border border-asc-ink-inverse/30 py-4 text-asc-ink-inverse transition-all duration-asc ease-asc hover:border-asc-gold hover:text-asc-gold disabled:opacity-50"
+            >
+              {status === "sending" ? "Enviando..." : "Solicitar Convite"}
+            </button>
+            {status === "error" && msg && (
+              <p className="font-sans text-xs text-asc-error">{msg}</p>
+            )}
+          </form>
+        )}
       </div>
     </section>
   );
 }
+
 
 /* ---------- Footer ---------- */
 function InstagramIcon({ className = "h-5 w-5" }: { className?: string }) {
