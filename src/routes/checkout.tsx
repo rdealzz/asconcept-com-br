@@ -756,15 +756,25 @@ function StepTwo({
 
       {method === "card" ? (
         <section className="border border-border p-6">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-            Dados do cartão
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+              Dados do cartão
+            </p>
+            <InstallmentsBadge amount={totalCard} />
+          </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
             Os dados do seu cartão são enviados criptografados diretamente ao Mercado Pago.
           </p>
           <div className="mt-6">
             <CardBrick amount={totalCard} email={form.email} onSubmitCard={onCardSubmit} />
           </div>
+          <details className="mt-6 border-t border-border/60 pt-4">
+            <summary className="cursor-pointer list-none text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+              Condições de parcelamento
+            </summary>
+            <InstallmentsTable amount={totalCard} className="mt-3" />
+          </details>
+
           {submitting && (
             <p className="mt-4 inline-flex items-center gap-2 text-[11px] text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" strokeWidth={1.5} />
