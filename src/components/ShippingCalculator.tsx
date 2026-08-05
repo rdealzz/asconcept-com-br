@@ -59,9 +59,7 @@ export function ShippingCalculator({ subtotal, compact = false }: Props) {
         </button>
       </form>
 
-      {error && (
-        <p className="mt-3 text-xs text-destructive">{error}</p>
-      )}
+      {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
 
       {quote && !error && (
         <div className="mt-4 space-y-1.5 text-xs">
@@ -74,17 +72,13 @@ export function ShippingCalculator({ subtotal, compact = false }: Props) {
                 Frete Grátis
               </span>
             ) : (
-              <span className="tabular-nums font-medium">
-                {formatBRL(quote.displayCost)}
-              </span>
+              <span className="tabular-nums font-medium">{formatBRL(quote.displayCost)}</span>
             )}
           </div>
           <p className="text-[11px] font-light text-muted-foreground">
             Entrega em {quote.etaDays[0]}–{quote.etaDays[1]} dias úteis · Envio de Curitiba/PR
           </p>
-          {!quote.free && subtotal > 0 && (
-            <FreeShippingHint subtotal={subtotal} />
-          )}
+          {!quote.free && subtotal > 0 && <FreeShippingHint subtotal={subtotal} />}
         </div>
       )}
     </div>
@@ -106,16 +100,14 @@ export function FreeShippingHint({ subtotal }: { subtotal: number }) {
         ) : (
           <>
             Faltam apenas{" "}
-            <span className="text-foreground font-medium tabular-nums">
-              {formatBRL(remaining)}
-            </span>{" "}
+            <span className="text-foreground font-medium tabular-nums">{formatBRL(remaining)}</span>{" "}
             para você ganhar <span className="text-accent">Frete Grátis</span>.
           </>
         )}
       </p>
       <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-secondary">
         <div
-          className="h-full bg-accent transition-all duration-500"
+          className="h-full bg-accent transition-all duration-300"
           style={{ width: `${pct}%` }}
         />
       </div>

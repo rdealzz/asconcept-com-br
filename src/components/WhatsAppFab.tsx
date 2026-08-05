@@ -11,7 +11,7 @@ export function WhatsAppFab() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label={`Falar no WhatsApp ${WHATSAPP_DISPLAY}`}
-      className="fixed bottom-5 right-5 z-[70] flex h-12 w-12 items-center justify-center rounded-full border border-[color:var(--gold)]/50 bg-charcoal text-[color:var(--gold)] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] transition-all duration-300 hover:scale-105 hover:border-[color:var(--gold)] hover:shadow-[0_10px_28px_-6px_rgba(212,175,55,0.45)] md:h-14 md:w-14"
+      className="fixed bottom-5 right-5 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-[color:var(--gold)]/50 bg-charcoal text-[color:var(--gold)] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] transition-all duration-300 hover:scale-105 hover:border-[color:var(--gold)] hover:shadow-[0_10px_28px_-6px_rgba(212,175,55,0.45)] md:h-14 md:w-14"
     >
       <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6 md:h-7 md:w-7">
         <path d="M17.47 14.38c-.3-.15-1.75-.86-2.02-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.47-.88-.78-1.47-1.75-1.64-2.05-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.6-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.01-1.04 2.470 1.07 2.53c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.09 1.75-.72 2-1.41.25-.69.25-1.28.17-1.41-.07-.13-.27-.2-.57-.35z" />

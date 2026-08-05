@@ -57,6 +57,7 @@ export function RelatedProducts({
                   src={p.image}
                   alt={p.name}
                   loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover transition-transform duration-ascslow ease-asc group-hover:scale-105"
                 />
               </div>

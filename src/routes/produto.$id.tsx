@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ChevronLeft, ShoppingBag } from "lucide-react";
+import { ChevronLeft, ChevronRight, ShoppingBag, X } from "lucide-react";
 import { useCart, formatBRL, type Product } from "@/lib/cart-context";
 import {
   useCatalog,
@@ -22,6 +22,7 @@ import { RelatedProducts } from "@/components/RelatedProducts";
 import { TrustSeals } from "@/components/TrustSeals";
 import { StitchDivider } from "@/components/StitchDivider";
 import { ContactStrip } from "@/components/ContactStrip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const Route = createFileRoute("/produto/$id")({
   // O loader é best-effort: serve para o HTML do servidor já sair com título e
@@ -131,6 +132,15 @@ function ProductView({
     .filter((p) => p.id !== product.id && p.category === product.category)
     .slice(0, 10);
 
+  const [activeImg, setActiveImg] = useState(0);
+  const [zoomIndex, setZoomIndex] = useState<number | null>(null);
+
+  // Ao trocar de peça (via "Complete o Look"), volta para a primeira foto.
+  useEffect(() => {
+    setActiveImg(0);
+    setZoomIndex(null);
+  }, [product.id]);
+
   function handleAdd() {
     if (!canAdd || !size) return;
     onAdd(size);
@@ -164,21 +174,56 @@ function ProductView({
 
       <div className="mx-auto max-w-[1600px] px-6 py-10 md:px-12 md:py-16">
         <div className="grid gap-10 lg:grid-cols-[1.65fr_1fr] lg:gap-16">
-          {/* Coluna esquerda — pilha contínua de imagens, rola com a página */}
-          <div className="flex flex-col gap-3 md:gap-4">
-            {gallery.map((src, i) => (
-              <div
-                key={i}
-                className="w-full overflow-hidden border border-asc-line bg-asc-bg-raised"
-              >
-                <img
-                  src={src}
-                  alt={`${product.name} — imagem ${i + 1}`}
-                  className="h-auto w-full object-cover"
-                  loading={i === 0 ? "eager" : "lazy"}
-                />
+          {/* Coluna esquerda — foto principal contida na altura da tela, com
+              miniaturas abaixo. Antes era uma pilha de fotos em tamanho cheio,
+              que empurrava preço, tamanho e botão para muito abaixo da dobra.
+              Clicar abre a foto em tela cheia. */}
+          <div className="lg:sticky lg:top-8 lg:self-start">
+            <button
+              type="button"
+              onClick={() => setZoomIndex(activeImg)}
+              aria-label="Ampliar foto"
+              className="group relative block w-full cursor-zoom-in overflow-hidden border border-asc-line bg-asc-bg-raised"
+            >
+              <img
+                src={gallery[activeImg]}
+                alt={`${product.name} — foto ${activeImg + 1}`}
+                className="mx-auto max-h-[44vh] w-full object-contain md:max-h-[62vh]"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+              />
+              <span className="asc-label pointer-events-none absolute bottom-3 right-3 bg-asc-bg-dark/70 px-2 py-1 text-[10px] text-asc-ink opacity-0 backdrop-blur transition-opacity duration-ascfast ease-asc group-hover:opacity-100">
+                Ampliar
+              </span>
+            </button>
+
+            {gallery.length > 1 && (
+              <div className="scrollbar-hide mt-3 flex gap-3 overflow-x-auto">
+                {gallery.map((src, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setActiveImg(i)}
+                    aria-label={`Ver foto ${i + 1}`}
+                    aria-current={activeImg === i}
+                    className={`h-24 w-[68px] shrink-0 overflow-hidden border transition-all duration-ascfast ease-asc ${
+                      activeImg === i
+                        ? "border-asc-gold opacity-100"
+                        : "border-asc-line opacity-60 hover:opacity-100"
+                    }`}
+                  >
+                    <img
+                      src={src}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                ))}
               </div>
-            ))}
+            )}
           </div>
 
           {/* Coluna direita — painel de compra que acompanha a rolagem.
@@ -321,6 +366,16 @@ function ProductView({
       </div>
 
       <SizeGuideModal open={sizeGuideOpen} onClose={() => setSizeGuideOpen(false)} />
+
+      {zoomIndex !== null && (
+        <Lightbox
+          images={gallery}
+          index={zoomIndex}
+          alt={product.name}
+          onIndex={setZoomIndex}
+          onClose={() => setZoomIndex(null)}
+        />
+      )}
     </div>
   );
 }
@@ -332,13 +387,16 @@ function ProductHeader({ cartCount, onCartClick }: { cartCount: number; onCartCl
       <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-5 md:px-12">
         <Link
           to="/"
-          className="inline-flex items-center gap-2 text-[11px] tracking-luxe uppercase text-asc-ink-muted transition-colors duration-ascfast ease-asc hover:text-asc-gold"
+          aria-label="Voltar à loja"
+          className="inline-flex shrink-0 items-center gap-2 text-[11px] tracking-luxe uppercase text-asc-ink-muted transition-colors duration-ascfast ease-asc hover:text-asc-gold"
         >
-          <ChevronLeft className="h-3.5 w-3.5" strokeWidth={1.5} /> Voltar à loja
+          <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
+          {/* Só o ícone no celular: o texto empurrava o wordmark para duas linhas. */}
+          <span className="hidden sm:inline">Voltar à loja</span>
         </Link>
 
         <Link to="/" className="flex flex-col items-center leading-none">
-          <span className="asc-heading-tracked text-base text-asc-gold md:text-lg">
+          <span className="asc-heading-tracked whitespace-nowrap text-sm text-asc-gold sm:text-base md:text-lg">
             A&amp;S Conccept
           </span>
           <span className="asc-tagline mt-1 hidden text-[0.55rem] md:block">
@@ -346,20 +404,111 @@ function ProductHeader({ cartCount, onCartClick }: { cartCount: number; onCartCl
           </span>
         </Link>
 
-        <button
-          onClick={onCartClick}
-          aria-label="Abrir sacola"
-          className="relative text-asc-ink-muted transition-colors duration-ascfast ease-asc hover:text-asc-gold"
-        >
-          <ShoppingBag className="h-5 w-5" strokeWidth={1.5} />
-          {cartCount > 0 && (
-            <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-asc-gold text-[10px] font-medium text-asc-bg">
-              {cartCount}
-            </span>
-          )}
-        </button>
+        <div className="flex items-center gap-4 text-asc-ink-muted">
+          <ThemeToggle />
+          <button
+            onClick={onCartClick}
+            aria-label="Abrir sacola"
+            className="relative transition-colors duration-ascfast ease-asc hover:text-asc-gold"
+          >
+            <ShoppingBag className="h-5 w-5" strokeWidth={1.5} />
+            {cartCount > 0 && (
+              <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-asc-gold text-[10px] font-medium text-asc-bg">
+                {cartCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
     </header>
+  );
+}
+
+/**
+ * Lightbox — a foto em tela cheia, aberta ao clicar na imagem principal.
+ * É aqui que a peça aparece grande; na página ela fica contida para não
+ * empurrar as informações de compra para fora da tela.
+ */
+function Lightbox({
+  images,
+  index,
+  alt,
+  onIndex,
+  onClose,
+}: {
+  images: string[];
+  index: number;
+  alt: string;
+  onIndex: (i: number) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") onIndex((index + 1) % images.length);
+      if (e.key === "ArrowLeft") onIndex((index - 1 + images.length) % images.length);
+    };
+    window.addEventListener("keydown", onKey);
+    // trava a rolagem do fundo enquanto a foto está aberta
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [index, images.length, onIndex, onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-asc-bg-dark/95 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${alt} — foto ampliada`}
+      onClick={onClose}
+    >
+      <img
+        src={images[index]}
+        alt={`${alt} — foto ${index + 1}`}
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-[92vh] max-w-[94vw] cursor-zoom-out object-contain"
+      />
+
+      <button
+        onClick={onClose}
+        aria-label="Fechar"
+        className="absolute right-5 top-5 text-asc-ink transition-colors duration-ascfast ease-asc hover:text-asc-gold"
+      >
+        <X className="h-6 w-6" strokeWidth={1.5} />
+      </button>
+
+      {images.length > 1 && (
+        <>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onIndex((index - 1 + images.length) % images.length);
+            }}
+            aria-label="Foto anterior"
+            className="absolute left-4 flex h-11 w-11 items-center justify-center border border-asc-line text-asc-ink transition-colors duration-ascfast ease-asc hover:border-asc-gold hover:text-asc-gold"
+          >
+            <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onIndex((index + 1) % images.length);
+            }}
+            aria-label="Próxima foto"
+            className="absolute right-4 flex h-11 w-11 items-center justify-center border border-asc-line text-asc-ink transition-colors duration-ascfast ease-asc hover:border-asc-gold hover:text-asc-gold"
+          >
+            <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
+          </button>
+          <span className="asc-label absolute bottom-5 text-[10px] tabular-nums text-asc-ink-muted">
+            {index + 1} / {images.length}
+          </span>
+        </>
+      )}
+    </div>
   );
 }
 

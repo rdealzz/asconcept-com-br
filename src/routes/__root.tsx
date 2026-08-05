@@ -16,7 +16,9 @@ import { CartProvider } from "../lib/cart-context";
 import { CatalogProvider } from "../lib/catalog-context";
 import { OrdersProvider } from "../lib/orders-context";
 import { WhatsAppFab } from "../components/WhatsAppFab";
-
+import { CartDrawer } from "../components/CartDrawer";
+import { AuthModal } from "../components/AuthModal";
+import { THEME_INIT_SCRIPT } from "../components/ThemeToggle";
 
 function NotFoundComponent() {
   return (
@@ -90,14 +92,34 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "A&S Conccept — curated luxury apparel for the next generation. Timeless heritage tailoring, reimagined for the modern connoisseur.",
       },
       { property: "og:title", content: "A&S Conccept — The New Era of Heritage" },
-      { property: "og:description", content: "A&S Conccept Storefront is a luxury e-commerce platform for affluent young consumers." },
+      {
+        property: "og:description",
+        content:
+          "A&S Conccept Storefront is a luxury e-commerce platform for affluent young consumers.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "A&S Conccept — The New Era of Heritage" },
-      { name: "description", content: "A&S Conccept Storefront is a luxury e-commerce platform for affluent young consumers." },
-      { name: "twitter:description", content: "A&S Conccept Storefront is a luxury e-commerce platform for affluent young consumers." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d116b85a-c6c7-4e6d-856c-fad14c27579f/id-preview-a11de409--4a1b6264-e4f2-4bd0-beae-666af6c1801f.lovable.app-1782999840259.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d116b85a-c6c7-4e6d-856c-fad14c27579f/id-preview-a11de409--4a1b6264-e4f2-4bd0-beae-666af6c1801f.lovable.app-1782999840259.png" },
+      {
+        name: "description",
+        content:
+          "A&S Conccept Storefront is a luxury e-commerce platform for affluent young consumers.",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "A&S Conccept Storefront is a luxury e-commerce platform for affluent young consumers.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d116b85a-c6c7-4e6d-856c-fad14c27579f/id-preview-a11de409--4a1b6264-e4f2-4bd0-beae-666af6c1801f.lovable.app-1782999840259.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d116b85a-c6c7-4e6d-856c-fad14c27579f/id-preview-a11de409--4a1b6264-e4f2-4bd0-beae-666af6c1801f.lovable.app-1782999840259.png",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -109,7 +131,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Cinzel:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500;600&display=swap",
       },
-
     ],
   }),
   shellComponent: RootShell,
@@ -122,6 +143,9 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
+        {/* Aplica o tema salvo antes da primeira pintura, para a página não
+            piscar do escuro para o claro na hidratação. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />
         {/*
           Carregado diretamente no HTML (em vez de depender só do
@@ -154,6 +178,10 @@ function RootComponent() {
             <OrdersProvider>
               {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
               <Outlet />
+              {/* Sacola e login ficam aqui, fora do <Outlet />, para abrirem
+                  sobre qualquer rota — inclusive a página de produto. */}
+              <CartDrawer />
+              <AuthModal />
               <WhatsAppFab />
             </OrdersProvider>
           </CatalogProvider>

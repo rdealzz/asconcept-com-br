@@ -93,11 +93,13 @@
   /* Espaçamento editorial */
   --asc-section-y: clamp(5rem, 9vw, 9rem);
   --asc-section-y-sm: clamp(3rem, 6vw, 5rem);
-  /* Movimento */
+  /* Movimento — a elegância vem da curva, não da lentidão. Os valores
+     originais (0.35 / 0.5 / 0.8s) faziam acordeões, abas e menus parecerem
+     travados; estes mantêm o mesmo easing e respondem na hora. */
   --asc-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --asc-duration-fast: 0.35s;
-  --asc-duration: 0.5s;
-  --asc-duration-slow: 0.8s;
+  --asc-duration-fast: 0.15s;
+  --asc-duration: 0.25s;
+  --asc-duration-slow: 0.4s;
   --asc-ring: 0 0 0 1px var(--asc-line);
 
   /* Paleta herdada. Atenção: no tema dark os nomes legados invertem de papel —
@@ -145,6 +147,58 @@
   --sidebar-ring: var(--asc-gold);
 }
 
+/* ═══ Tema claro ═══
+   O escuro é o padrão da marca; este bloco devolve a paleta Quiet Luxury
+   para quem preferir. Só troca valores de token — nenhum componente precisa
+   saber qual tema está ativo. O atributo data-theme é posto no <html> pelo
+   script inline do __root, antes da primeira pintura, para não piscar. */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --asc-bg: #FBF9F6;
+  --asc-bg-raised: #F3F0EA;
+  --asc-bg-dark: #121212;
+  --asc-bg-dark-raised: #1C1C1C;
+
+  --asc-ink: #1A1A1A;
+  --asc-ink-muted: #6B6862;
+  /* Aqui ink-inverse volta a ser claro de verdade: é o texto que fica sobre
+     as superfícies escuras (hero, rodapé, seção de membership). */
+  --asc-ink-inverse: #FBF9F6;
+  --asc-ink-inverse-muted: #A8A49C;
+
+  --asc-line: #E5E1D8;
+  --asc-line-dark: #333333;
+
+  /* Dourado mais fechado que o #A9863F da paleta clara original: aquele dava
+     3.2:1 sobre o creme e reprovava em AA como texto — e dourado é justamente
+     a cor dos rótulos e títulos de seção. Este fica em ~6:1 e, sobre fundo
+     claro, lê como ouro velho, o que combina com a marca. */
+  --asc-gold: #7A5C22;
+  --asc-gold-soft: #9C7C38;
+  --asc-gold-gradient: linear-gradient(135deg, #7A5C22 0%, #9C7C38 100%);
+
+  --asc-error: #8C3D2E;
+  --asc-success: #2F4A38;
+
+  /* No claro os nomes legados voltam ao sentido original: ivory é o fundo. */
+  --ivory: var(--asc-bg);
+  --navy: #2A2F3A;
+
+  --card: #FFFFFF;
+  --popover: #FFFFFF;
+  --primary: var(--navy);
+  --primary-foreground: var(--asc-ink-inverse);
+
+  --sidebar: var(--asc-bg);
+  --sidebar-primary-foreground: var(--asc-bg);
+  --sidebar-accent: var(--asc-bg-raised);
+}
+
+:root {
+  color-scheme: dark;
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -178,6 +232,30 @@
       scroll-behavior: auto !important;
     }
   }
+}
+
+/* Seções que são escuras nos DOIS temas — hero, rodapé, membership.
+   No tema claro o dourado é fechado para ler sobre o creme, e esse mesmo
+   tom fica ilegível sobre preto. Aqui dentro ele volta ao dourado claro, e
+   o texto volta a ser creme. No tema escuro a classe não muda nada.
+
+   Os derivados (--accent, --gold, --foreground…) precisam ser repetidos:
+   `--accent: var(--asc-gold)` é declarado no :root, então já foi resolvido
+   com o valor de lá e não recalcula ao redefinirmos --asc-gold aqui. */
+@utility asc-on-dark {
+  --asc-gold: #C5A059;
+  --asc-gold-soft: #E5C687;
+  --asc-ink: #E8DCC4;
+  --asc-ink-muted: #A8A49C;
+  --asc-line: rgba(197, 160, 89, 0.2);
+
+  --accent: #C5A059;
+  --gold: #C5A059;
+  --ivory: #E8DCC4;
+  --foreground: #E8DCC4;
+  --muted-foreground: #A8A49C;
+  --border: rgba(197, 160, 89, 0.2);
+  color-scheme: dark;
 }
 
 /* Foco de teclado visível — acessibilidade, não decoração.
@@ -313,7 +391,7 @@
 }
 
 @utility animate-fade-up {
-  animation: fade-up 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes fade-in {

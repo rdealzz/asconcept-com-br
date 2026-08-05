@@ -1,12 +1,19 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Search,
   User as UserIcon,
   ShoppingBag,
   X,
   Plus,
-  Minus,
   LogOut,
   Shield,
   Pencil,
@@ -22,14 +29,7 @@ import {
 } from "lucide-react";
 import { useOrders } from "@/lib/orders-context";
 import type { OrderStatus } from "@/lib/types";
-import {
-  useCart,
-  formatBRL,
-  applyPixDiscount,
-  PIX_ENABLED,
-  type Product,
-  type ProductCategory,
-} from "@/lib/cart-context";
+import { useCart, formatBRL, type Product, type ProductCategory } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import {
   useCatalog,
@@ -42,22 +42,19 @@ import {
   type SizeStock,
 } from "@/lib/catalog-context";
 import { supabase } from "@/integrations/supabase/client";
-import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
 
 import { InstallmentsNote } from "@/components/InstallmentsNote";
 import { FavoriteButton, ShareButton } from "@/components/ProductActions";
 import { StitchDivider } from "@/components/StitchDivider";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { EmptyCategoryState } from "@/components/EmptyCategoryState";
 
-import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
-import { AVAILABLE_COUPONS, findCoupon, hasUsedCoupon } from "@/lib/coupons";
 import { SUPPORT_EMAIL, WHATSAPP_DISPLAY, WHATSAPP_LINK } from "@/components/WhatsAppFab";
 
 import heroAsset from "@/assets/hero-amalfi-men.jpg.asset.json";
 const hero = heroAsset.url;
 import editorialAsset from "@/assets/editorial-linen.jpg.asset.json";
 const editorial = editorialAsset.url;
-
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -142,8 +139,6 @@ function Index() {
           <Concept />
           <Newsletter />
           <Footer />
-          <CartDrawer />
-          <AuthModal />
           <WelcomeCouponPopup />
           <SearchOverlay />
           <AdminEditModal />
@@ -272,9 +267,15 @@ function Nav({
             <Menu className="h-4 w-4" strokeWidth={1.5} />
           </button>
           <nav className="hidden items-center gap-9 md:flex">
-            <a href="#collections" className={navLink}>Coleção</a>
-            <a href="#edit" className={navLink}>O Editorial</a>
-            <a href="#about" className={navLink}>Somente por Convite</a>
+            <a href="#collections" className={navLink}>
+              Coleção
+            </a>
+            <a href="#edit" className={navLink}>
+              O Editorial
+            </a>
+            <a href="#about" className={navLink}>
+              Somente por Convite
+            </a>
           </nav>
         </div>
         <a
@@ -303,6 +304,7 @@ function Nav({
           >
             <Search className="h-4 w-4" strokeWidth={1.5} />
           </button>
+          <ThemeToggle className="hidden md:inline-flex [&>svg]:h-4 [&>svg]:w-4" />
           <button
             onClick={() => (user ? onOpenAccount() : openAuth())}
             aria-label={user ? "Minha Conta" : "Entrar"}
@@ -318,7 +320,7 @@ function Nav({
           >
             <ShoppingBag className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.5} />
             {count > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-asc-gold px-1 text-[10px] font-medium text-asc-ink-inverse">
+              <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-asc-gold px-1 text-[10px] font-medium text-asc-bg">
                 {count}
               </span>
             )}
@@ -344,13 +346,11 @@ function Nav({
               </button>
             </>
           )}
-
         </div>
       </div>
     </header>
   );
 }
-
 
 /* ---------- Mobile Menu Drawer ---------- */
 function MobileMenu({
@@ -368,10 +368,7 @@ function MobileMenu({
   const { setTab } = useSearch();
   const goTo = (id: string) => {
     onClose();
-    setTimeout(
-      () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }),
-      180,
-    );
+    setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }), 180);
   };
   return (
     <>
@@ -382,23 +379,24 @@ function MobileMenu({
         }`}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-[90] flex w-[88%] max-w-sm flex-col bg-asc-bg-raised text-foreground transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:hidden ${
+        className={`fixed inset-y-0 left-0 z-[90] flex w-[88%] max-w-sm flex-col bg-asc-bg-raised text-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] md:hidden ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex items-center justify-between border-b border-border px-6 py-5">
           <span className="font-serif text-lg tracking-wider">
-            A<span className="text-accent">&amp;</span>S Concept
+            A<span className="text-accent">&amp;</span>S Conccept
           </span>
-          <button onClick={onClose} aria-label="Fechar menu" className="hover:text-accent">
-            <X className="h-5 w-5" strokeWidth={1.25} />
-          </button>
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <button onClick={onClose} aria-label="Fechar menu" className="hover:text-accent">
+              <X className="h-5 w-5" strokeWidth={1.25} />
+            </button>
+          </div>
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-6 py-8">
-          <p className="mb-3 text-[10px] tracking-luxe uppercase text-muted-foreground">
-            Coleção
-          </p>
+          <p className="mb-3 text-[10px] tracking-luxe uppercase text-muted-foreground">Coleção</p>
           <button
             onClick={() => {
               setTab("clothes");
@@ -466,11 +464,10 @@ function MobileMenu({
   );
 }
 
-
 /* ---------- Hero ---------- */
 function Hero() {
   return (
-    <section className="asc-gravure relative h-[100svh] w-full overflow-hidden bg-asc-bg-dark">
+    <section className="asc-gravure asc-on-dark relative h-[100svh] w-full overflow-hidden bg-asc-bg-dark">
       <img
         src={hero}
         alt="Editorial A&S Conccept"
@@ -488,17 +485,19 @@ function Hero() {
               — Coleção Outono / Inverno
             </p>
             <h1 className="animate-fade-up font-serif text-[2.5rem] leading-[1.05] [animation-delay:100ms] sm:text-5xl md:text-7xl lg:text-[6rem]">
-              A Nova Era<br />da Herança.
+              A Nova Era
+              <br />
+              da Herança.
             </h1>
             <p className="animate-fade-up mt-6 max-w-md text-sm font-light text-ivory/85 [animation-delay:200ms] md:mt-8 md:text-lg">
               Luxo curado para a próxima geração.
             </p>
             <a
               href="#collections"
-              className="group animate-fade-up mt-8 inline-flex items-center gap-4 border border-asc-line px-8 py-3.5 text-[11px] tracking-luxe uppercase text-ivory transition-all duration-500 [animation-delay:300ms] hover:border-accent hover:text-accent md:mt-12 md:px-10 md:py-4"
+              className="group animate-fade-up mt-8 inline-flex items-center gap-4 border border-asc-line px-8 py-3.5 text-[11px] tracking-luxe uppercase text-ivory transition-all duration-300 [animation-delay:300ms] hover:border-accent hover:text-accent md:mt-12 md:px-10 md:py-4"
             >
               Explorar a Coleção
-              <span className="inline-block h-px w-6 bg-current transition-all duration-500 group-hover:w-10 md:w-8" />
+              <span className="inline-block h-px w-6 bg-current transition-all duration-300 group-hover:w-10 md:w-8" />
             </a>
           </div>
         </div>
@@ -511,7 +510,10 @@ function Hero() {
 function CategoryTabs() {
   const { tab, setTab } = useSearch();
   return (
-    <div id="collections" className="sticky top-[68px] z-40 border-y border-border bg-background/95 backdrop-blur">
+    <div
+      id="collections"
+      className="sticky top-[68px] z-40 border-y border-border bg-background/95 backdrop-blur"
+    >
       <div className="mx-auto flex max-w-[1600px] items-center justify-center gap-2 px-6 py-4 md:gap-8 md:px-12">
         {(["clothes", "sneakers"] as ProductCategory[]).map((c) => (
           <button
@@ -522,9 +524,7 @@ function CategoryTabs() {
             }`}
           >
             {c === "clothes" ? "Roupas" : "Sneakers"}
-            {tab === c && (
-              <span className="absolute inset-x-2 -bottom-[1px] h-[2px] bg-accent" />
-            )}
+            {tab === c && <span className="absolute inset-x-2 -bottom-[1px] h-[2px] bg-accent" />}
           </button>
         ))}
       </div>
@@ -655,9 +655,7 @@ function Products() {
         ) : filtered.length === 0 ? (
           query ? (
             <div className="mx-auto max-w-lg py-16 text-center">
-              <p className="font-display text-3xl text-asc-ink">
-                Nenhuma peça para "{query}".
-              </p>
+              <p className="font-display text-3xl text-asc-ink">Nenhuma peça para "{query}".</p>
               <p className="mt-4 font-sans text-sm font-light text-asc-ink-muted">
                 Tente outra palavra-chave ou percorra a coleção completa.
               </p>
@@ -685,7 +683,6 @@ function Products() {
             ))}
           </div>
         )}
-
       </div>
     </section>
   );
@@ -715,7 +712,7 @@ function SneakersComingSoon() {
     { label: "Seg", value: seconds },
   ];
   return (
-    <div className="relative mx-auto max-w-4xl overflow-hidden border border-accent/30 bg-gradient-to-br from-navy via-charcoal to-navy p-10 text-center text-ivory md:p-16">
+    <div className="asc-on-dark relative mx-auto max-w-4xl overflow-hidden border border-accent/30 bg-gradient-to-br from-navy via-charcoal to-navy p-10 text-center text-ivory md:p-16">
       <div className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full bg-accent/20 blur-3xl" />
       <div className="pointer-events-none absolute -right-24 -bottom-24 h-64 w-64 rounded-full bg-accent/10 blur-3xl" />
       <div className="relative">
@@ -723,7 +720,8 @@ function SneakersComingSoon() {
           <Sparkles className="h-3 w-3 animate-pulse" /> Em breve
         </div>
         <h3 className="mt-8 font-serif text-5xl leading-[1.05] md:text-7xl">
-          Sneakers<br />
+          Sneakers
+          <br />
           <em className="text-accent">Coming Soon.</em>
         </h3>
         <p className="mx-auto mt-6 max-w-md text-sm text-ivory/70 font-light">
@@ -731,16 +729,11 @@ function SneakersComingSoon() {
         </p>
         <div className="mt-10 grid grid-cols-4 gap-2 md:gap-4">
           {units.map((u) => (
-            <div
-              key={u.label}
-              className="border border-asc-line bg-charcoal/40 py-4 backdrop-blur"
-            >
+            <div key={u.label} className="border border-asc-line bg-charcoal/40 py-4 backdrop-blur">
               <div className="font-serif text-3xl tabular-nums text-accent md:text-5xl">
                 {String(u.value).padStart(2, "0")}
               </div>
-              <div className="mt-1 text-[9px] tracking-luxe uppercase text-ivory/60">
-                {u.label}
-              </div>
+              <div className="mt-1 text-[9px] tracking-luxe uppercase text-ivory/60">{u.label}</div>
             </div>
           ))}
         </div>
@@ -804,6 +797,7 @@ function ProductCard({ product }: { product: Product }) {
           src={product.image}
           alt={product.name}
           loading="lazy"
+          decoding="async"
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-ascslow ease-asc ${
             soldOut ? "opacity-50 grayscale" : ""
           } ${hoverImg && !soldOut ? "group-hover:opacity-0" : ""}`}
@@ -813,10 +807,10 @@ function ProductCard({ product }: { product: Product }) {
             src={hoverImg}
             alt={`${product.name} — segunda vista`}
             loading="lazy"
+            decoding="async"
             aria-hidden
             className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-ascslow ease-asc group-hover:opacity-100"
           />
-
         )}
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
           {novidade && !soldOut && (
@@ -906,13 +900,59 @@ function ProductCard({ product }: { product: Product }) {
 }
 
 /* ---------- Admin Edit / Create Modal ---------- */
+
+/** Maior lado da foto depois de redimensionada, em pixels. */
+const MAX_IMAGE_EDGE = 1400;
+
+/**
+ * Lê a foto escolhida no admin, redimensiona e devolve como data URL WebP.
+ *
+ * As fotos são guardadas dentro da própria tabela de produtos, então cada
+ * byte aqui é baixado por todo visitante junto com o catálogo — e o base64
+ * ainda infla o tamanho em ~33%. Uma foto de 2 MB direto da câmera vira algo
+ * na casa das centenas de KB depois deste passo, o que muda o tempo de
+ * carregamento da loja inteira.
+ *
+ * Fotos antigas, cadastradas antes disto, continuam do tamanho que já
+ * estavam: só recadastrando é que passam por aqui.
+ */
 async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(String(r.result));
     r.onerror = () => reject(r.error);
     r.readAsDataURL(file);
   });
+
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = dataUrl;
+    });
+
+    const scale = Math.min(1, MAX_IMAGE_EDGE / Math.max(img.width, img.height));
+    const w = Math.round(img.width * scale);
+    const h = Math.round(img.height * scale);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return dataUrl;
+    ctx.drawImage(img, 0, 0, w, h);
+
+    const webp = canvas.toDataURL("image/webp", 0.82);
+    // Navegador sem suporte a WebP devolve PNG, que costuma ser maior que o
+    // original — nesse caso tenta JPEG e, por fim, fica com o arquivo cru.
+    const encoded = webp.startsWith("data:image/webp")
+      ? webp
+      : canvas.toDataURL("image/jpeg", 0.85);
+    return encoded.length < dataUrl.length ? encoded : dataUrl;
+  } catch {
+    return dataUrl;
+  }
 }
 
 function AdminEditModal() {
@@ -921,7 +961,8 @@ function AdminEditModal() {
   const { tab } = useSearch();
   const isAdmin = useIsAdmin();
   const isCreate = editingId === "__new__";
-  const product = !isCreate && editingId ? products.find((p) => p.id === editingId) ?? null : null;
+  const product =
+    !isCreate && editingId ? (products.find((p) => p.id === editingId) ?? null) : null;
   const open = isAdmin && (isCreate || !!product);
 
   const [form, setForm] = useState({
@@ -1021,9 +1062,6 @@ function AdminEditModal() {
       gallery: [f.gallery[idx], ...f.gallery.filter((_, i) => i !== idx)],
     }));
 
-
-
-
   const setSizeQty = (s: Size, v: number) =>
     setForm((f) => ({
       ...f,
@@ -1076,7 +1114,7 @@ function AdminEditModal() {
         className="fixed inset-0 z-[100] bg-charcoal/80 backdrop-blur-sm animate-in fade-in duration-300"
       />
       <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 pointer-events-none">
-        <div className="pointer-events-auto relative w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-background animate-in fade-in zoom-in-95 duration-500">
+        <div className="pointer-events-auto relative w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-background animate-in fade-in zoom-in-95 duration-300">
           <div className="flex items-center justify-between border-b border-border px-6 py-4">
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-accent" strokeWidth={1.5} />
@@ -1104,7 +1142,10 @@ function AdminEditModal() {
               {form.gallery.length > 0 && (
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   {form.gallery.map((g, i) => (
-                    <div key={i} className="relative aspect-[3/4] overflow-hidden border border-border">
+                    <div
+                      key={i}
+                      className="relative aspect-[3/4] overflow-hidden border border-border"
+                    >
                       <img src={g} alt="" className="h-full w-full object-cover" />
                       {i === 0 ? (
                         <span className="absolute inset-x-0 bottom-0 bg-charcoal/80 py-0.5 text-center text-[8px] tracking-luxe uppercase text-ivory">
@@ -1154,14 +1195,11 @@ function AdminEditModal() {
                   className="hidden"
                 />
               </label>
-              {uploadError && (
-                <p className="mt-2 text-[10px] text-destructive">{uploadError}</p>
-              )}
+              {uploadError && <p className="mt-2 text-[10px] text-destructive">{uploadError}</p>}
               <p className="mt-2 text-[9px] tracking-luxe uppercase text-muted-foreground">
                 Até {MAX_PRODUCT_IMAGES} fotos · JPG, PNG ou WEBP · 2 MB cada
               </p>
             </div>
-
 
             <div className="space-y-4">
               <Field label="Categoria">
@@ -1254,7 +1292,6 @@ function AdminEditModal() {
             </div>
           </div>
 
-
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4">
             {!isCreate && product ? (
               <button
@@ -1311,10 +1348,9 @@ function Concept() {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const io = new IntersectionObserver(
-      ([e]) => e.isIntersecting && setVisible(true),
-      { threshold: 0.15 },
-    );
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && setVisible(true), {
+      threshold: 0.15,
+    });
     io.observe(el);
     return () => io.disconnect();
   }, []);
@@ -1327,6 +1363,7 @@ function Concept() {
             src={editorial}
             alt="Editorial A&S Conccept"
             loading="lazy"
+            decoding="async"
             width={1200}
             height={1500}
             className={`h-full min-h-[60vh] w-full object-cover transition-all duration-[1600ms] ${
@@ -1357,7 +1394,7 @@ function Concept() {
               className="group mt-12 inline-flex items-center gap-4 text-[11px] tracking-luxe uppercase text-ivory hover:text-accent transition-colors"
             >
               A Filosofia
-              <span className="inline-block h-px w-8 bg-current transition-all duration-500 group-hover:w-12" />
+              <span className="inline-block h-px w-8 bg-current transition-all duration-300 group-hover:w-12" />
             </a>
           </div>
         </div>
@@ -1391,7 +1428,7 @@ function Newsletter() {
   return (
     <section
       id="about"
-      className="bg-asc-bg-dark py-[var(--asc-section-y)] text-asc-ink-inverse"
+      className="asc-on-dark bg-asc-bg-dark py-[var(--asc-section-y)] text-asc-ink-inverse"
     >
       <div className="mx-auto max-w-xl px-6 text-center">
         <p className="asc-label mb-6 text-asc-gold-soft">Acesso Restrito</p>
@@ -1399,8 +1436,8 @@ function Newsletter() {
           Somente por Convite
         </h2>
         <p className="mx-auto mb-10 max-w-md font-sans text-sm leading-relaxed text-asc-ink-inverse-muted">
-          Peças em edição limitada, acesso antecipado a novos drops e atendimento
-          dedicado — reservado a quem faz parte do círculo A&amp;S Conccept.
+          Peças em edição limitada, acesso antecipado a novos drops e atendimento dedicado —
+          reservado a quem faz parte do círculo A&amp;S Conccept.
         </p>
 
         <StitchDivider className="mb-10 opacity-60" />
@@ -1435,9 +1472,7 @@ function Newsletter() {
             >
               {status === "sending" ? "Enviando..." : "Solicitar Convite"}
             </button>
-            {status === "error" && msg && (
-              <p className="font-sans text-xs text-asc-error">{msg}</p>
-            )}
+            {status === "error" && msg && <p className="font-sans text-xs text-asc-error">{msg}</p>}
           </form>
         )}
       </div>
@@ -1445,11 +1480,19 @@ function Newsletter() {
   );
 }
 
-
 /* ---------- Footer ---------- */
 function InstagramIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
       <rect x="3" y="3" width="18" height="18" rx="5" />
       <circle cx="12" cy="12" r="4" />
       <circle cx="17.5" cy="6.5" r="0.8" fill="currentColor" />
@@ -1519,7 +1562,7 @@ function InstitutionalModal({
         className="fixed inset-0 z-[130] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
       />
       <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 md:p-8 pointer-events-none">
-        <div className="pointer-events-auto relative w-full max-w-2xl max-h-[88vh] overflow-y-auto bg-asc-bg-raised text-asc-ink p-10 md:p-14 animate-in fade-in zoom-in-95 duration-500">
+        <div className="pointer-events-auto relative w-full max-w-2xl max-h-[88vh] overflow-y-auto bg-asc-bg-raised text-asc-ink p-10 md:p-14 animate-in fade-in zoom-in-95 duration-300">
           <button
             onClick={onClose}
             aria-label="Fechar"
@@ -1530,9 +1573,7 @@ function InstitutionalModal({
           <p className="text-[11px] tracking-luxe uppercase text-[color:var(--gold)]">
             {content.eyebrow}
           </p>
-          <h2 className="mt-3 font-serif text-3xl md:text-4xl leading-tight">
-            {content.title}
-          </h2>
+          <h2 className="mt-3 font-serif text-3xl md:text-4xl leading-tight">{content.title}</h2>
           <div className="mt-8 space-y-5 font-serif text-[15px] md:text-base leading-relaxed text-asc-ink/85">
             {content.paragraphs.map((p, i) => (
               <p key={i}>{p}</p>
@@ -1588,7 +1629,7 @@ function Footer() {
     },
   ];
   return (
-    <footer className="asc-gravure border-t border-asc-line bg-charcoal text-ivory">
+    <footer className="asc-gravure asc-on-dark border-t border-asc-line bg-charcoal text-ivory">
       <div className="mx-auto max-w-[1600px] px-6 py-20 md:px-12">
         <div className="grid grid-cols-2 gap-10 md:grid-cols-5">
           <div className="col-span-2 md:col-span-1">
@@ -1603,9 +1644,9 @@ function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Instagram · @asconccept"
-              className="group mt-6 inline-flex items-center gap-3 border border-[color:var(--gold)]/40 bg-[color:var(--gold)]/5 px-4 py-2.5 text-[11px] tracking-luxe uppercase text-[color:var(--gold)] shadow-[0_0_16px_-4px_rgba(212,175,55,0.35)] transition-all duration-500 hover:border-[color:var(--gold)] hover:bg-[color:var(--gold)]/15 hover:shadow-[0_0_24px_-2px_rgba(212,175,55,0.65)]"
+              className="group mt-6 inline-flex items-center gap-3 border border-[color:var(--gold)]/40 bg-[color:var(--gold)]/5 px-4 py-2.5 text-[11px] tracking-luxe uppercase text-[color:var(--gold)] shadow-[0_0_16px_-4px_rgba(212,175,55,0.35)] transition-all duration-300 hover:border-[color:var(--gold)] hover:bg-[color:var(--gold)]/15 hover:shadow-[0_0_24px_-2px_rgba(212,175,55,0.65)]"
             >
-              <InstagramIcon className="h-4 w-4 transition-transform duration-500 group-hover:scale-110" />
+              <InstagramIcon className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
               <span>@asconccept</span>
             </a>
           </div>
@@ -1666,7 +1707,6 @@ function Footer() {
               </li>
             </ul>
           </div>
-
         </div>
         <div className="mt-16 flex flex-col gap-3 border-t border-asc-line pt-8 text-xs font-light text-ivory/70 md:flex-row md:items-center md:justify-between">
           <p>
@@ -1700,183 +1740,7 @@ function Footer() {
   );
 }
 
-
 /* ---------- Cart Drawer ---------- */
-function CartDrawer() {
-  const { isOpen, close, items, remove, updateQty, subtotal, count } = useCart();
-  const { setTab } = useSearch();
-  const { user, openAuth } = useAuth();
-  const navigate = useNavigate();
-  const [checkoutMsg, setCheckoutMsg] = useState<string | null>(null);
-
-  const onCheckout = () => {
-    if (!user) {
-      setCheckoutMsg("Você precisa entrar ou criar uma conta para finalizar a compra.");
-      close();
-      openAuth();
-      return;
-    }
-    close();
-    navigate({ to: "/checkout" });
-  };
-
-  return (
-    <>
-      <div
-        onClick={close}
-        className={`fixed inset-0 z-[60] bg-asc-ink/40 backdrop-blur-sm transition-opacity duration-asc ease-asc ${
-          isOpen ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
-      />
-      <aside
-        className={`fixed inset-y-0 right-0 z-[70] flex w-full flex-col border-l border-asc-line bg-asc-bg transition-transform duration-asc ease-asc sm:max-w-[420px] ${
-          isOpen ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        <div className="flex items-center justify-between border-b border-asc-line px-6 py-6">
-          <div>
-            <h2 className="font-display text-2xl text-asc-ink">Sua Sacola</h2>
-            <p className="asc-label mt-1 text-[10px] text-asc-ink-muted">
-              {count} {count === 1 ? "Peça" : "Peças"}
-            </p>
-          </div>
-          <button
-            onClick={close}
-            aria-label="Fechar sacola"
-            className="text-asc-ink transition-colors duration-ascfast ease-asc hover:text-asc-gold"
-          >
-            <X className="h-5 w-5" strokeWidth={1.5} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-8">
-          {items.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center text-center">
-              <p className="asc-label text-asc-gold">A&amp;S Conccept</p>
-              <p className="mt-6 font-display text-3xl leading-tight text-asc-ink">
-                Sua sacola aguarda<br />a primeira peça.
-              </p>
-              <StitchDivider className="my-8 w-40" />
-              <p className="max-w-[280px] font-sans text-sm font-light leading-relaxed text-asc-ink-muted">
-                Cada edição é limitada e produzida em pequenas séries. Comece pela
-                coleção da estação.
-              </p>
-              <button
-                onClick={() => {
-                  setTab("clothes");
-                  close();
-                  setTimeout(
-                    () => document.getElementById("collections")?.scrollIntoView({ behavior: "smooth" }),
-                    150,
-                  );
-                }}
-                className="asc-label mt-10 border border-asc-ink px-8 py-3 text-asc-ink transition-all duration-asc ease-asc hover:bg-asc-ink hover:text-asc-bg"
-
-              >
-                Ver Novidades
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="mb-8 border border-asc-line bg-asc-bg-raised p-4">
-                <FreeShippingHint subtotal={subtotal} />
-              </div>
-              <ul className="divide-y divide-asc-line">
-                {items.map((i) => (
-                  <li key={`${i.id}-${i.size}`} className="flex gap-4 py-6 first:pt-0">
-                    <img
-                      src={i.image}
-                      alt={i.name}
-                      className="h-24 w-20 shrink-0 bg-asc-bg-raised object-cover"
-                    />
-                    <div className="flex flex-1 flex-col">
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-display text-base leading-snug text-asc-ink">
-                          {i.name}
-                        </h3>
-                        <button
-                          onClick={() => remove(i.id, i.size)}
-                          aria-label="Remover"
-                          className="text-asc-ink-muted transition-colors duration-ascfast ease-asc hover:text-asc-gold"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                      <p className="asc-label mt-1 text-[10px] text-asc-ink-muted">
-                        Tamanho {i.size}
-                      </p>
-                      <div className="mt-auto flex items-center justify-between pt-4">
-                        <div className="flex items-center border border-asc-line">
-                          <button
-                            onClick={() => updateQty(i.id, i.size, -1)}
-                            aria-label="Diminuir"
-                            className="flex h-8 w-8 items-center justify-center transition-colors duration-ascfast ease-asc hover:bg-asc-bg-raised"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          <span className="w-8 text-center font-sans text-sm tabular-nums">
-                            {i.qty}
-                          </span>
-                          <button
-                            onClick={() => updateQty(i.id, i.size, 1)}
-                            aria-label="Aumentar"
-                            className="flex h-8 w-8 items-center justify-center transition-colors duration-ascfast ease-asc hover:bg-asc-bg-raised"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                        </div>
-                        <span className="font-sans text-sm tabular-nums text-asc-ink">
-                          {formatBRL(i.price * i.qty)}
-                        </span>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-8">
-                <ShippingCalculator subtotal={subtotal} />
-              </div>
-            </>
-          )}
-        </div>
-
-        {items.length > 0 && (
-          <div className="space-y-4 border-t border-asc-line px-6 py-6">
-            <CouponRow subtotal={subtotal} />
-            <div className="flex items-center justify-between">
-              <span className="asc-label text-[10px] text-asc-ink-muted">Subtotal</span>
-              <span className="font-display text-xl tabular-nums text-asc-ink">
-                {formatBRL(subtotal)}
-              </span>
-            </div>
-            {PIX_ENABLED && (
-              <p className="font-sans text-[11px] font-light italic tracking-wide text-asc-gold">
-                ou {formatBRL(applyPixDiscount(subtotal))} no Pix (5% de desconto)
-              </p>
-            )}
-            <p className="font-sans text-[11px] font-light text-asc-ink-muted">
-              Frete cortesia acima de {formatBRL(FREE_SHIPPING_THRESHOLD)} · Embalagem do
-              ateliê inclusa.
-            </p>
-            {checkoutMsg && <p className="font-sans text-[11px] text-asc-gold">{checkoutMsg}</p>}
-            <button
-              onClick={onCheckout}
-              className="asc-label w-full bg-asc-ink py-4 text-asc-ink-inverse transition-all duration-asc ease-asc hover:bg-asc-bg-dark-raised"
-            >
-              {user ? "Finalizar Compra" : "Entrar para Finalizar"}
-            </button>
-            {!user && (
-              <p className="text-center font-sans text-[10px] text-asc-ink-muted">
-                É necessário estar autenticado para prosseguir ao pagamento.
-              </p>
-            )}
-          </div>
-        )}
-
-      </aside>
-    </>
-  );
-}
 
 /* ---------- Search Overlay ---------- */
 function SearchOverlay() {
@@ -1906,7 +1770,7 @@ function SearchOverlay() {
         onClick={close}
         className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
       />
-      <div className="fixed inset-x-0 top-0 z-[90] animate-in slide-in-from-top duration-500">
+      <div className="fixed inset-x-0 top-0 z-[90] animate-in slide-in-from-top duration-300">
         <div className="bg-background">
           <div className="mx-auto max-w-3xl px-6 py-10 md:py-14">
             <div className="flex items-center justify-between">
@@ -1915,7 +1779,10 @@ function SearchOverlay() {
                 <X className="h-4 w-4" strokeWidth={1.5} />
               </button>
             </div>
-            <form onSubmit={submit} className="mt-6 flex items-center gap-4 border-b border-foreground/40 pb-3 focus-within:border-accent transition-colors">
+            <form
+              onSubmit={submit}
+              className="mt-6 flex items-center gap-4 border-b border-foreground/40 pb-3 focus-within:border-accent transition-colors"
+            >
               <Search className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
               <input
                 ref={inputRef}
@@ -1942,304 +1809,6 @@ function SearchOverlay() {
 }
 
 /* ---------- Auth Modal ---------- */
-function AuthModal() {
-  const { isOpen, closeAuth, signIn, signUp, resetPassword, user } = useAuth();
-  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (user && isOpen) closeAuth();
-  }, [user, isOpen, closeAuth]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setError(null);
-      setInfo(null);
-      setSignedUpEmail(null);
-      setConfirmPassword("");
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const switchMode = (m: "login" | "signup" | "forgot") => {
-    setMode(m);
-    setError(null);
-    setInfo(null);
-    setConfirmPassword("");
-  };
-
-  const passwordsMismatch =
-    mode === "signup" && confirmPassword.length > 0 && confirmPassword !== password;
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setInfo(null);
-    if (mode === "signup" && password !== confirmPassword) {
-      setError("As senhas não coincidem.");
-      return;
-    }
-    setLoading(true);
-    if (mode === "login") {
-      const { error } = await signIn(email, password);
-      if (error) setError(error);
-    } else if (mode === "signup") {
-      const { error } = await signUp(email, password, name, phone);
-      if (error) setError(error);
-      else setSignedUpEmail(email.trim());
-    } else {
-      const { error } = await resetPassword(email);
-      if (error) setError(error);
-      else setInfo("Enviamos um link de recuperação para o seu e-mail.");
-    }
-    setLoading(false);
-  };
-
-  if (signedUpEmail) {
-    return (
-      <>
-        <div
-          onClick={closeAuth}
-          className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
-        />
-        <div className="fixed inset-0 z-[90] flex items-end justify-center pointer-events-none sm:items-center sm:p-4">
-          <div className="pointer-events-auto relative max-h-[95svh] w-full max-w-md overflow-y-auto bg-background p-6 animate-in fade-in zoom-in-95 duration-500 sm:p-8 md:p-10">
-            <button
-              onClick={closeAuth}
-              aria-label="Fechar"
-              className="absolute right-4 top-4 hover:text-accent"
-            >
-              <X className="h-4 w-4" strokeWidth={1.5} />
-            </button>
-            <p className="text-[11px] tracking-luxe uppercase text-accent">Conta criada</p>
-            <h2 className="mt-2 font-serif text-3xl">Confirme seu e-mail</h2>
-            <p className="mt-4 text-sm font-light leading-relaxed text-muted-foreground">
-              Enviamos um e-mail de confirmação para{" "}
-              <span className="text-foreground">{signedUpEmail}</span>. Verifique sua caixa de
-              entrada (e o spam) e confirme para acessar sua conta.
-            </p>
-            <button
-              onClick={closeAuth}
-              className="mt-8 w-full asc-btn-primary py-4 text-[11px] tracking-luxe uppercase"
-            >
-              Entendi
-            </button>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-
-  const title =
-    mode === "login" ? "Entrar" : mode === "signup" ? "Criar Conta" : "Recuperar acesso";
-  const eyebrow =
-    mode === "login"
-      ? "Bem-vindo de volta"
-      : mode === "signup"
-        ? "Nova conta"
-        : "Esqueci a senha";
-
-  return (
-    <>
-      <div
-        onClick={closeAuth}
-        className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
-      />
-      <div className="fixed inset-0 z-[90] flex items-end justify-center pointer-events-none sm:items-center sm:p-4">
-        <div className="pointer-events-auto relative max-h-[95svh] w-full max-w-md overflow-y-auto bg-background p-6 animate-in fade-in zoom-in-95 duration-500 sm:p-8 md:p-10">
-          <button
-            onClick={closeAuth}
-            aria-label="Fechar"
-            className="absolute right-4 top-4 hover:text-accent"
-          >
-            <X className="h-4 w-4" strokeWidth={1.5} />
-          </button>
-          <p className="text-[11px] tracking-luxe uppercase text-accent">{eyebrow}</p>
-          <h2 className="mt-2 font-serif text-3xl">{title}</h2>
-          <p className="mt-2 text-sm font-light text-muted-foreground">
-            {mode === "login"
-              ? "Acesse sua conta para finalizar a compra."
-              : mode === "signup"
-                ? "Registre-se e ganhe 10% OFF na primeira compra."
-                : "Digite o e-mail cadastrado para receber o link."}
-          </p>
-
-          <form onSubmit={onSubmit} className="mt-8 space-y-4">
-            {mode === "signup" && (
-              <>
-                <div>
-                  <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                    Nome completo
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    autoComplete="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                    Celular (WhatsApp)
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    inputMode="numeric"
-                    autoComplete="tel-national"
-                    placeholder="(11) 98765-4321"
-                    value={phone}
-                    onChange={(e) => {
-                      const d = e.target.value.replace(/\D/g, "").slice(0, 11);
-                      let out = d;
-                      if (d.length > 2 && d.length <= 7) out = `(${d.slice(0, 2)}) ${d.slice(2)}`;
-                      else if (d.length > 7)
-                        out = `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-                      else if (d.length > 0) out = `(${d}`;
-                      setPhone(out);
-                    }}
-                    className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
-                  />
-                  <p className="mt-1 text-[10px] font-light text-muted-foreground/70">
-                    Usaremos apenas para contato do atelier sobre seus pedidos.
-                  </p>
-                </div>
-              </>
-            )}
-            <div>
-              <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                E-mail
-              </label>
-              <input
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
-              />
-            </div>
-            {mode !== "forgot" && (
-              <div>
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                    Senha
-                  </label>
-                  {mode === "login" && (
-                    <button
-                      type="button"
-                      onClick={() => switchMode("forgot")}
-                      className="text-[10px] tracking-luxe uppercase text-accent hover:underline underline-offset-4"
-                    >
-                      Esqueceu a senha?
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="password"
-                  required
-                  minLength={mode === "signup" ? 6 : 4}
-                  autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent transition-colors"
-                />
-              </div>
-            )}
-            {mode === "signup" && (
-              <div>
-                <label className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                  Confirmar senha
-                </label>
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`mt-1 w-full border-b bg-transparent py-2 text-sm outline-none transition-colors focus:border-accent ${
-                    passwordsMismatch ? "border-destructive" : "border-foreground/30"
-                  }`}
-                />
-                {passwordsMismatch && (
-                  <p className="mt-1 text-[10px] text-destructive">As senhas não coincidem.</p>
-                )}
-              </div>
-            )}
-
-            {error && <p className="text-xs text-destructive">{error}</p>}
-            {info && <p className="text-xs text-accent">{info}</p>}
-
-            <button
-              type="submit"
-              disabled={loading || passwordsMismatch}
-              className="w-full asc-btn-primary py-4 text-[11px] tracking-luxe uppercase disabled:opacity-50"
-            >
-
-              {loading
-                ? "Aguarde..."
-                : mode === "login"
-                  ? "Entrar"
-                  : mode === "signup"
-                    ? "Criar Conta"
-                    : "Enviar link de recuperação"}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center text-xs font-light text-muted-foreground">
-            {mode === "login" && (
-              <>
-                Não tem uma conta?{" "}
-                <button
-                  onClick={() => switchMode("signup")}
-                  className="text-foreground hover:text-accent underline underline-offset-4"
-                >
-                  Criar conta
-                </button>
-              </>
-            )}
-            {mode === "signup" && (
-              <>
-                Já tem uma conta?{" "}
-                <button
-                  onClick={() => switchMode("login")}
-                  className="text-foreground hover:text-accent underline underline-offset-4"
-                >
-                  Entrar
-                </button>
-              </>
-            )}
-            {mode === "forgot" && (
-              <>
-                Lembrou a senha?{" "}
-                <button
-                  onClick={() => switchMode("login")}
-                  className="text-foreground hover:text-accent underline underline-offset-4"
-                >
-                  Voltar ao login
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
 
 /* ---------- Filter Sidebar ---------- */
 const SUB_OPTIONS: { id: SubFilter; label: string }[] = [
@@ -2269,15 +1838,13 @@ function FilterSidebar({ open, onClose }: { open: boolean; onClose: () => void }
         }`}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-[90] flex w-full max-w-xs flex-col bg-background transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`fixed inset-y-0 left-0 z-[90] flex w-full max-w-xs flex-col bg-background transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex items-center justify-between border-b border-border px-6 py-5">
           <div>
-            <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-              Filtrar
-            </p>
+            <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">Filtrar</p>
             <h3 className="font-serif text-xl">Categorias</h3>
           </div>
           <button onClick={onClose} aria-label="Fechar" className="hover:text-accent">
@@ -2299,9 +1866,7 @@ function FilterSidebar({ open, onClose }: { open: boolean; onClose: () => void }
               >
                 <span className="font-serif text-base">{o.label}</span>
                 {active && (
-                  <span className="text-[10px] tracking-luxe uppercase text-accent">
-                    Ativo
-                  </span>
+                  <span className="text-[10px] tracking-luxe uppercase text-accent">Ativo</span>
                 )}
               </button>
             );
@@ -2320,11 +1885,7 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
   const { user, updateProfile, getAddress, saveAddress, signOut } = useAuth();
   const { orders, byUser } = useOrders();
   const isDevMaster = !!user?.isAdmin;
-  const myOrders = user
-    ? isDevMaster || user.isAdmin
-      ? orders
-      : byUser(user.email)
-    : [];
+  const myOrders = user ? (isDevMaster || user.isAdmin ? orders : byUser(user.email)) : [];
 
   const [name, setName] = useState(user?.name ?? "");
   const [address, setAddress] = useState(() => getAddress() ?? {});
@@ -2374,7 +1935,9 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
           </button>
           <div className="border-b border-border px-8 py-6">
             <p className="text-[11px] tracking-luxe uppercase text-accent">Minha Conta</p>
-            <h2 className="mt-1 font-serif text-3xl">Olá, {user.name || user.email.split("@")[0]}</h2>
+            <h2 className="mt-1 font-serif text-3xl">
+              Olá, {user.name || user.email.split("@")[0]}
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground">{user.email}</p>
           </div>
 
@@ -2402,7 +1965,9 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
               </h3>
               <div className="grid grid-cols-2 gap-3">
                 <label className="col-span-2 sm:col-span-1 block">
-                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">CEP</span>
+                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    CEP
+                  </span>
                   <input
                     value={address.cep ?? ""}
                     onChange={(e) => setAddress({ ...address, cep: e.target.value })}
@@ -2410,7 +1975,9 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
                   />
                 </label>
                 <label className="col-span-2 sm:col-span-1 block">
-                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">Número</span>
+                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    Número
+                  </span>
                   <input
                     value={address.numero ?? ""}
                     onChange={(e) => setAddress({ ...address, numero: e.target.value })}
@@ -2418,7 +1985,9 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
                   />
                 </label>
                 <label className="col-span-2 block">
-                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">Logradouro</span>
+                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    Logradouro
+                  </span>
                   <input
                     value={address.logradouro ?? ""}
                     onChange={(e) => setAddress({ ...address, logradouro: e.target.value })}
@@ -2426,7 +1995,9 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
                   />
                 </label>
                 <label className="col-span-2 block">
-                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">Complemento</span>
+                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    Complemento
+                  </span>
                   <input
                     value={address.complemento ?? ""}
                     onChange={(e) => setAddress({ ...address, complemento: e.target.value })}
@@ -2434,7 +2005,9 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
                   />
                 </label>
                 <label className="col-span-2 sm:col-span-1 block">
-                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">Bairro</span>
+                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    Bairro
+                  </span>
                   <input
                     value={address.bairro ?? ""}
                     onChange={(e) => setAddress({ ...address, bairro: e.target.value })}
@@ -2442,7 +2015,9 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
                   />
                 </label>
                 <label className="col-span-2 sm:col-span-1 block">
-                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">Cidade / UF</span>
+                  <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">
+                    Cidade / UF
+                  </span>
                   <div className="flex gap-2">
                     <input
                       value={address.cidade ?? ""}
@@ -2563,7 +2138,9 @@ function ConfirmDialog({
       <div onClick={onCancel} className="fixed inset-0 z-[110] bg-charcoal/70 backdrop-blur-sm" />
       <div className="fixed inset-0 z-[115] flex items-center justify-center p-4">
         <div className="pointer-events-auto w-full max-w-md bg-background p-8 animate-in fade-in zoom-in-95 duration-200">
-          <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Conccept · Confirmação</p>
+          <p className="text-[11px] tracking-luxe uppercase text-accent">
+            A&amp;S Conccept · Confirmação
+          </p>
           <h3 className="mt-2 font-serif text-2xl">{title}</h3>
           <p className="mt-4 text-sm text-muted-foreground">{message}</p>
           <div className="mt-8 flex justify-end gap-3">
@@ -2588,7 +2165,6 @@ function ConfirmDialog({
   );
 }
 
-
 const ADMIN_STATUSES: OrderStatus[] = [
   "Aguardando Aprovação",
   "Preparando pedido",
@@ -2597,7 +2173,13 @@ const ADMIN_STATUSES: OrderStatus[] = [
 ];
 
 type NewsletterRow = { id: string; email: string; created_at: string };
-type ManualCustomerRow = { id: string; name: string | null; email: string; phone: string | null; created_at: string };
+type ManualCustomerRow = {
+  id: string;
+  name: string | null;
+  email: string;
+  phone: string | null;
+  created_at: string;
+};
 
 function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, listCustomers, refreshCustomers } = useAuth();
@@ -2609,9 +2191,11 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
   const [showManualOrder, setShowManualOrder] = useState(false);
   const [showManualCustomer, setShowManualCustomer] = useState(false);
   const [confirmOrder, setConfirmOrder] = useState<string | null>(null);
-  const [confirmCustomer, setConfirmCustomer] = useState<
-    { email: string; kind: "auth" | "manual"; name: string } | null
-  >(null);
+  const [confirmCustomer, setConfirmCustomer] = useState<{
+    email: string;
+    kind: "auth" | "manual";
+    name: string;
+  } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const deleteOrderFn = useServerFn(adminDeleteOrder);
   const deleteCustomerFn = useServerFn(adminDeleteCustomer);
@@ -2653,8 +2237,6 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
       setDeleting(false);
     }
   };
-
-
 
   const loadNewsletter = useCallback(async () => {
     const { data } = await supabase
@@ -2765,7 +2347,6 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                           <th className="py-3 pr-3">Status</th>
                           <th className="py-3 pr-3 text-right">Ações</th>
                         </tr>
-
                       </thead>
                       <tbody>
                         {orders.map((o) =>
@@ -2833,7 +2414,6 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                                 )}
                               </td>
                             </tr>
-
                           )),
                         )}
                       </tbody>
@@ -2936,7 +2516,6 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                         ))}
                       </tbody>
                     </table>
-
                   )}
                 </section>
 
@@ -3008,7 +2587,6 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
         busy={deleting}
       />
     </>
-
   );
 }
 
@@ -3104,10 +2682,19 @@ function MarkupCalculator() {
           </div>
 
           <div className="border border-border bg-asc-bg-raised/40 p-6 space-y-4">
-            <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">Resultado</p>
-            <ResultRow label="Preço de Venda Sugerido (Etiqueta)" value={formatBRL(suggestedPrice)} highlight />
+            <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
+              Resultado
+            </p>
+            <ResultRow
+              label="Preço de Venda Sugerido (Etiqueta)"
+              value={formatBRL(suggestedPrice)}
+              highlight
+            />
             <div className="border-t border-border/60" />
-            <ResultRow label="Taxa Stripe Brasil (4,99% + R$ 0,50)" value={`− ${formatBRL(stripeFee)}`} />
+            <ResultRow
+              label="Taxa Stripe Brasil (4,99% + R$ 0,50)"
+              value={`− ${formatBRL(stripeFee)}`}
+            />
             <ResultRow label="Você recebe (líquido)" value={formatBRL(netReceived)} />
             <ResultRow label="Custo do produto" value={`− ${formatBRL(cost)}`} />
             <div className="border-t border-border/60" />
@@ -3202,19 +2789,11 @@ function ResultRow({
   tone?: "gold" | "loss";
 }) {
   const color =
-    highlight && tone === "loss"
-      ? "text-asc-error"
-      : highlight
-        ? "text-[color:var(--gold)]"
-        : "";
+    highlight && tone === "loss" ? "text-asc-error" : highlight ? "text-[color:var(--gold)]" : "";
   return (
     <div className="flex items-baseline justify-between gap-3">
       <span className="text-[11px] tracking-luxe uppercase text-muted-foreground">{label}</span>
-      <span
-        className={`tabular-nums ${
-          highlight ? `font-serif text-xl ${color}` : "text-sm"
-        }`}
-      >
+      <span className={`tabular-nums ${highlight ? `font-serif text-xl ${color}` : "text-sm"}`}>
         {value}
       </span>
     </div>
@@ -3291,7 +2870,6 @@ function FinancialOverview() {
     // Nunca substituímos os dados reais por valores fictícios: o painel
     // sempre reflete o faturamento efetivo, mesmo que seja próximo de zero.
 
-
     return {
       kpis: { gross, grossProfit, netProfit, netMarginPct },
       series: weeks,
@@ -3366,10 +2944,7 @@ function KpiCard({
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
     <span className="inline-flex items-center gap-2">
-      <span
-        className="inline-block h-2 w-2 rounded-full"
-        style={{ backgroundColor: color }}
-      />
+      <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
       {label}
     </span>
   );
@@ -3380,10 +2955,7 @@ function FinanceChart({ data }: { data: FinancePoint[] }) {
   const h = 240;
   const padX = 40;
   const padY = 24;
-  const maxVal = Math.max(
-    ...data.map((d) => Math.max(d.gross, d.grossProfit, d.netProfit)),
-    1,
-  );
+  const maxVal = Math.max(...data.map((d) => Math.max(d.gross, d.grossProfit, d.netProfit)), 1);
   const stepX = (w - padX * 2) / Math.max(1, data.length - 1);
 
   const toPath = (key: keyof Omit<FinancePoint, "label">) =>
@@ -3498,7 +3070,6 @@ function FinanceChart({ data }: { data: FinancePoint[] }) {
     </div>
   );
 }
-
 
 /* ---------- Manual Order Modal ---------- */
 function ManualOrderModal({
@@ -3731,13 +3302,11 @@ function ManualCustomerModal({
       return;
     }
     setSaving(true);
-    const { error } = await supabase
-      .from("manual_customers")
-      .insert({
-        name: name.trim() || null,
-        email: cleanEmail,
-        phone: phone.trim() || null,
-      } as never);
+    const { error } = await supabase.from("manual_customers").insert({
+      name: name.trim() || null,
+      email: cleanEmail,
+      phone: phone.trim() || null,
+    } as never);
     setSaving(false);
     if (error) {
       setErr("Não foi possível salvar o cliente.");
@@ -3763,7 +3332,9 @@ function ManualCustomerModal({
 
           <div className="mt-6 space-y-4">
             <label className="block">
-              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">Nome</span>
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Nome
+              </span>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -3771,7 +3342,9 @@ function ManualCustomerModal({
               />
             </label>
             <label className="block">
-              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">E-mail</span>
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                E-mail
+              </span>
               <input
                 type="email"
                 value={email}
@@ -3792,8 +3365,7 @@ function ManualCustomerModal({
                   const d = e.target.value.replace(/\D/g, "").slice(0, 11);
                   let out = d;
                   if (d.length > 2 && d.length <= 7) out = `(${d.slice(0, 2)}) ${d.slice(2)}`;
-                  else if (d.length > 7)
-                    out = `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+                  else if (d.length > 7) out = `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
                   else if (d.length > 0) out = `(${d}`;
                   setPhone(out);
                 }}
@@ -3825,78 +3397,6 @@ function ManualCustomerModal({
 }
 
 /* ---------- Coupon Row (Cart) ---------- */
-function CouponRow({ subtotal }: { subtotal: number }) {
-  const { user, openAuth } = useAuth();
-  const { couponCode, couponDiscount, setCoupon } = useCart();
-  const [code, setCode] = useState(couponCode ?? "");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const apply = async () => {
-    setError(null);
-    if (!user) {
-      openAuth();
-      return;
-    }
-    const c = findCoupon(code);
-    if (!c) {
-      setError("Cupom inválido.");
-      return;
-    }
-    setLoading(true);
-    const already = await hasUsedCoupon(user.id, c.code);
-    setLoading(false);
-    if (already) {
-      setError("Este cupom já foi utilizado por você.");
-      return;
-    }
-    setCoupon(c);
-  };
-
-  const clear = () => {
-    setCoupon(null);
-    setCode("");
-    setError(null);
-  };
-
-  if (couponCode) {
-    return (
-      <div className="flex items-center justify-between border border-[color:var(--gold)]/50 bg-[color:var(--gold)]/5 px-3 py-2 text-xs">
-        <span className="text-[color:var(--gold)] tracking-luxe uppercase">
-          ✦ {couponCode} · − {formatBRL(couponDiscount)}
-        </span>
-        <button onClick={clear} className="text-[10px] tracking-luxe uppercase text-muted-foreground hover:text-destructive">
-          Remover
-        </button>
-      </div>
-    );
-  }
-  return (
-    <div>
-      <div className="flex items-center gap-2">
-        <input
-          value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
-          placeholder="Cupom"
-          className="flex-1 border border-border bg-transparent px-2 py-1.5 text-xs uppercase outline-none focus:border-accent"
-        />
-        <button
-          onClick={apply}
-          disabled={loading}
-          className="border border-asc-line px-3 py-1.5 text-[10px] tracking-luxe uppercase hover:bg-charcoal hover:text-ivory transition-colors disabled:opacity-50"
-        >
-          Aplicar
-        </button>
-      </div>
-      {error && <p className="mt-1 text-[10px] text-destructive">{error}</p>}
-      {AVAILABLE_COUPONS.length > 0 && (
-        <p className="mt-1 text-[10px] text-muted-foreground">
-          Dica: use <span className="font-mono text-[color:var(--gold)]">10%OFFF</span> — válido uma vez por cliente.
-        </p>
-      )}
-    </div>
-  );
-}
 
 /* ---------- Welcome Coupon Popup (post-signup) ---------- */
 function WelcomeCouponPopup() {
@@ -3908,26 +3408,43 @@ function WelcomeCouponPopup() {
       await navigator.clipboard.writeText("10%OFFF");
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
   return (
     <>
-      <div className="fixed inset-0 z-[120] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300" onClick={clearJustSignedUp} />
+      <div
+        className="fixed inset-0 z-[120] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
+        onClick={clearJustSignedUp}
+      />
       <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 pointer-events-none">
-        <div className="pointer-events-auto relative w-full max-w-md bg-asc-bg-raised p-10 text-asc-ink animate-in fade-in zoom-in-95 duration-500">
-          <button onClick={clearJustSignedUp} aria-label="Fechar" className="absolute right-4 top-4 hover:text-[color:var(--gold)]">
+        <div className="pointer-events-auto relative w-full max-w-md bg-asc-bg-raised p-10 text-asc-ink animate-in fade-in zoom-in-95 duration-300">
+          <button
+            onClick={clearJustSignedUp}
+            aria-label="Fechar"
+            className="absolute right-4 top-4 hover:text-[color:var(--gold)]"
+          >
             <X className="h-4 w-4" strokeWidth={1.5} />
           </button>
-          <p className="text-[11px] tracking-luxe uppercase text-[color:var(--gold)]">Bem-vindo à Maison</p>
+          <p className="text-[11px] tracking-luxe uppercase text-[color:var(--gold)]">
+            Bem-vindo à Maison
+          </p>
           <h2 className="mt-2 font-serif text-3xl leading-tight">
-            Um presente<br />de estreia ✦
+            Um presente
+            <br />
+            de estreia ✦
           </h2>
           <p className="mt-4 text-sm font-light text-asc-ink/80">
             Sua adesão à A&amp;S Conccept desbloqueia 10% de desconto na primeira compra.
           </p>
           <div className="mt-6 border border-dashed border-[color:var(--gold)] bg-asc-bg-raised p-4 text-center">
-            <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">Cupom exclusivo</p>
-            <p className="mt-1 font-mono text-2xl tracking-widest text-[color:var(--gold)]">10%OFFF</p>
+            <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+              Cupom exclusivo
+            </p>
+            <p className="mt-1 font-mono text-2xl tracking-widest text-[color:var(--gold)]">
+              10%OFFF
+            </p>
             <button
               onClick={copy}
               className="mt-3 text-[10px] tracking-luxe uppercase text-asc-ink hover:text-[color:var(--gold)] underline underline-offset-4"
@@ -3936,7 +3453,8 @@ function WelcomeCouponPopup() {
             </button>
           </div>
           <p className="mt-4 text-[10px] leading-relaxed text-muted-foreground">
-            Válido uma única vez por cliente, sobre o subtotal, sem cumulatividade com outras ofertas.
+            Válido uma única vez por cliente, sobre o subtotal, sem cumulatividade com outras
+            ofertas.
           </p>
           <button
             onClick={clearJustSignedUp}
@@ -3963,7 +3481,9 @@ function Stars({ n }: { n: number }) {
   return (
     <span className="inline-flex gap-0.5" aria-label={`${n} de 5 estrelas`}>
       {Array.from({ length: 5 }).map((_, i) => (
-        <span key={i} className={i < n ? "text-[color:var(--gold)]" : "text-muted-foreground/30"}>★</span>
+        <span key={i} className={i < n ? "text-[color:var(--gold)]" : "text-muted-foreground/30"}>
+          ★
+        </span>
       ))}
     </span>
   );
@@ -3984,7 +3504,9 @@ function Testimonials() {
       .order("created_at", { ascending: true });
     if (data) setRows(data as TestimonialRow[]);
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   useEffect(() => {
     if (rows.length < 2) return;
@@ -3997,15 +3519,26 @@ function Testimonials() {
 
   const save = async (t: Partial<TestimonialRow> & { id?: string }) => {
     if (t.id) {
-      await supabase.from("testimonials").update({
-        customer_name: t.customer_name, content: t.content, rating: t.rating, sort_order: t.sort_order ?? 0,
-      } as never).eq("id", t.id);
+      await supabase
+        .from("testimonials")
+        .update({
+          customer_name: t.customer_name,
+          content: t.content,
+          rating: t.rating,
+          sort_order: t.sort_order ?? 0,
+        } as never)
+        .eq("id", t.id);
     } else {
       await supabase.from("testimonials").insert({
-        customer_name: t.customer_name, content: t.content, rating: t.rating ?? 5, sort_order: t.sort_order ?? rows.length,
+        customer_name: t.customer_name,
+        content: t.content,
+        rating: t.rating ?? 5,
+        sort_order: t.sort_order ?? rows.length,
       } as never);
     }
-    setEditing(null); setCreating(false); await load();
+    setEditing(null);
+    setCreating(false);
+    await load();
   };
   const remove = async (id: string) => {
     if (!confirm("Excluir depoimento?")) return;
@@ -4020,7 +3553,7 @@ function Testimonials() {
         <h2 className="font-serif text-3xl md:text-5xl">Vozes da Maison</h2>
 
         {current && (
-          <figure key={current.id} className="mt-12 animate-in fade-in duration-700">
+          <figure key={current.id} className="mt-12 animate-in fade-in duration-300">
             <Stars n={current.rating} />
             <blockquote className="mt-6 font-serif text-xl md:text-2xl italic leading-relaxed text-asc-ink">
               “{current.content}”
@@ -4047,9 +3580,20 @@ function Testimonials() {
         {isAdmin && (
           <div className="mt-10 border-t border-border pt-6 text-left">
             <div className="mb-4 flex items-center justify-between">
-              <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">Admin · Depoimentos</p>
+              <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Admin · Depoimentos
+              </p>
               <button
-                onClick={() => { setCreating(true); setEditing({ id: "", customer_name: "", content: "", rating: 5, sort_order: rows.length }); }}
+                onClick={() => {
+                  setCreating(true);
+                  setEditing({
+                    id: "",
+                    customer_name: "",
+                    content: "",
+                    rating: 5,
+                    sort_order: rows.length,
+                  });
+                }}
                 className="inline-flex items-center gap-1 border border-accent px-3 py-1.5 text-[10px] tracking-luxe uppercase text-accent hover:bg-accent hover:text-asc-ink"
               >
                 <Plus className="h-3 w-3" /> Novo
@@ -4057,14 +3601,32 @@ function Testimonials() {
             </div>
             <ul className="space-y-2">
               {rows.map((r) => (
-                <li key={r.id} className="flex items-center justify-between gap-2 border border-border bg-background px-3 py-2 text-xs">
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between gap-2 border border-border bg-background px-3 py-2 text-xs"
+                >
                   <div className="min-w-0">
-                    <p className="truncate font-serif">{r.customer_name} · <Stars n={r.rating} /></p>
+                    <p className="truncate font-serif">
+                      {r.customer_name} · <Stars n={r.rating} />
+                    </p>
                     <p className="truncate text-muted-foreground">{r.content}</p>
                   </div>
                   <div className="flex flex-none gap-1">
-                    <button onClick={() => { setEditing(r); setCreating(false); }} className="border border-border p-1 hover:border-accent"><Pencil className="h-3 w-3" /></button>
-                    <button onClick={() => remove(r.id)} className="border border-destructive/60 p-1 text-destructive hover:bg-destructive hover:text-ivory"><Trash2 className="h-3 w-3" /></button>
+                    <button
+                      onClick={() => {
+                        setEditing(r);
+                        setCreating(false);
+                      }}
+                      className="border border-border p-1 hover:border-accent"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={() => remove(r.id)}
+                      className="border border-destructive/60 p-1 text-destructive hover:bg-destructive hover:text-ivory"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
                   </div>
                 </li>
               ))}
@@ -4077,7 +3639,10 @@ function Testimonials() {
         <TestimonialEditor
           initial={editing}
           isCreate={creating}
-          onCancel={() => { setEditing(null); setCreating(false); }}
+          onCancel={() => {
+            setEditing(null);
+            setCreating(false);
+          }}
           onSave={save}
         />
       )}
@@ -4086,7 +3651,10 @@ function Testimonials() {
 }
 
 function TestimonialEditor({
-  initial, isCreate, onCancel, onSave,
+  initial,
+  isCreate,
+  onCancel,
+  onSave,
 }: {
   initial: TestimonialRow;
   isCreate: boolean;
@@ -4106,22 +3674,56 @@ function TestimonialEditor({
           </p>
           <div className="mt-4 space-y-3">
             <label className="block">
-              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">Nome</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full border border-border bg-transparent px-2 py-1.5 text-sm outline-none focus:border-accent" />
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Nome
+              </span>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="mt-1 w-full border border-border bg-transparent px-2 py-1.5 text-sm outline-none focus:border-accent"
+              />
             </label>
             <label className="block">
-              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">Depoimento</span>
-              <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={4} className="mt-1 w-full border border-border bg-transparent px-2 py-1.5 text-sm outline-none focus:border-accent" />
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Depoimento
+              </span>
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={4}
+                className="mt-1 w-full border border-border bg-transparent px-2 py-1.5 text-sm outline-none focus:border-accent"
+              />
             </label>
             <label className="block">
-              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">Estrelas (1-5)</span>
-              <input type="number" min={1} max={5} value={rating} onChange={(e) => setRating(Math.max(1, Math.min(5, Number(e.target.value) || 5)))} className="mt-1 w-24 border border-border bg-transparent px-2 py-1.5 text-sm outline-none focus:border-accent" />
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Estrelas (1-5)
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={5}
+                value={rating}
+                onChange={(e) => setRating(Math.max(1, Math.min(5, Number(e.target.value) || 5)))}
+                className="mt-1 w-24 border border-border bg-transparent px-2 py-1.5 text-sm outline-none focus:border-accent"
+              />
             </label>
           </div>
           <div className="mt-6 flex justify-end gap-2">
-            <button onClick={onCancel} className="border border-border px-4 py-2 text-[11px] tracking-luxe uppercase hover:bg-secondary">Cancelar</button>
             <button
-              onClick={() => onSave({ id: isCreate ? undefined : initial.id, customer_name: name.trim(), content: content.trim(), rating })}
+              onClick={onCancel}
+              className="border border-border px-4 py-2 text-[11px] tracking-luxe uppercase hover:bg-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() =>
+                onSave({
+                  id: isCreate ? undefined : initial.id,
+                  customer_name: name.trim(),
+                  content: content.trim(),
+                  rating,
+                })
+              }
               className="bg-accent px-4 py-2 text-[11px] tracking-luxe uppercase text-asc-ink hover:bg-accent/90"
             >
               Salvar
