@@ -62,7 +62,13 @@ function ProductPage() {
   const { id } = Route.useParams();
   const loaded = Route.useLoaderData();
   const { add, count, open: openCart } = useCart();
-  const { products, stock: liveStock, loading: catalogLoading } = useCatalog();
+  const { products, stock: liveStock, loading: catalogLoading, loadGallery } = useCatalog();
+
+  // A vitrine traz só a foto de capa; aqui buscamos o resto da galeria.
+  // Se o cliente passou o mouse pelo card antes de clicar, já veio.
+  useEffect(() => {
+    void loadGallery(id);
+  }, [id, loadGallery]);
 
   // O loader entrega o produto no HTML do servidor (título, og:image). Depois
   // que o catálogo do cliente hidrata, ele passa a ser a fonte de verdade —

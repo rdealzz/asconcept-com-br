@@ -555,7 +555,7 @@ function isNewArrival(p: Product): boolean {
 
 function Products() {
   const { query, setQuery, tab, subFilter, setSubFilter } = useSearch();
-  const { products, stock, refresh: resetCatalog } = useCatalog();
+  const { products, stock, loading: catalogLoading, refresh: resetCatalog } = useCatalog();
   const { openCreate } = useProduct();
   const isAdmin = useIsAdmin();
 
@@ -652,6 +652,19 @@ function Products() {
 
         {showSneakersComingSoon ? (
           <SneakersComingSoon />
+        ) : catalogLoading ? (
+          /* Esqueletos enquanto o catálogo chega: a grade já ocupa o espaço
+             final das peças, então nada pula de lugar quando as fotos
+             aparecem — e a página não parece vazia. */
+          <div className="grid grid-cols-2 gap-x-6 gap-y-14 md:grid-cols-3 md:gap-x-8 md:gap-y-20 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="aspect-[3/4] w-full bg-asc-bg-raised" />
+                <div className="mt-4 h-4 w-2/3 bg-asc-bg-raised" />
+                <div className="mt-2 h-3 w-1/3 bg-asc-bg-raised" />
+              </div>
+            ))}
+          </div>
         ) : filtered.length === 0 ? (
           query ? (
             <div className="mx-auto max-w-lg py-16 text-center">
@@ -768,7 +781,7 @@ function StockBadge({ qty }: { qty: number }) {
 /* ---------- Product Card ---------- */
 function ProductCard({ product }: { product: Product }) {
   const { openEdit } = useProduct();
-  const { stock, deleteProduct } = useCatalog();
+  const { stock, deleteProduct, loadGallery } = useCatalog();
   const isAdmin = useIsAdmin();
   const sizeStock = stock[product.id];
   const total = totalStock(sizeStock);
@@ -780,7 +793,13 @@ function ProductCard({ product }: { product: Product }) {
   const novidade = isNewArrival(product);
 
   return (
-    <article className="group flex flex-col">
+    // Encostar no card já busca as fotos restantes da peça: serve para a troca
+    // de imagem no hover e adianta o que a página de produto vai precisar.
+    <article
+      className="group flex flex-col"
+      onMouseEnter={() => void loadGallery(product.id)}
+      onTouchStart={() => void loadGallery(product.id)}
+    >
       <div className="relative aspect-[3/4] w-full overflow-hidden bg-asc-bg-raised">
         {/* Link real (rastreável, abre em nova aba com o meio do mouse) em
             overlay. Fica em z-20, abaixo dos botões de ação em z-30, para
@@ -957,12 +976,37 @@ async function fileToBase64(file: File): Promise<string> {
 
 function AdminEditModal() {
   const { editingId, closeEdit, creatingCategory } = useProduct();
-  const { products, updateProduct, addProduct, stock, setStock, deleteProduct } = useCatalog();
+  const { products, updateProduct, addProduct, stock, setStock, deleteProduct, loadGallery } =
+    useCatalog();
   const { tab } = useSearch();
   const isAdmin = useIsAdmin();
   const isCreate = editingId === "__new__";
   const product =
     !isCreate && editingId ? (products.find((p) => p.id === editingId) ?? null) : null;
+
+  // A vitrine carrega só a foto de capa. Aqui é obrigatório ter a galeria
+  // inteira antes de mostrar o formulário: salvar com a lista incompleta
+  // apagaria as demais fotos da peça no banco.
+  const [galleryReady, setGalleryReady] = useState(false);
+  useEffect(() => {
+    if (isCreate) {
+      setGalleryReady(true);
+      return;
+    }
+    if (!editingId) {
+      setGalleryReady(false);
+      return;
+    }
+    setGalleryReady(false);
+    let vivo = true;
+    void loadGallery(editingId).then(() => {
+      if (vivo) setGalleryReady(true);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [editingId, isCreate, loadGallery]);
+
   const open = isAdmin && (isCreate || !!product);
 
   const [form, setForm] = useState({
@@ -1011,6 +1055,16 @@ function AdminEditModal() {
   }, [editingId, product, stock, isCreate, creatingCategory, tab]);
 
   if (!open) return null;
+
+  // Sem a galeria completa em mãos, não abre o formulário — evita que um save
+  // grave a lista de fotos pela metade.
+  if (!galleryReady) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-asc-bg-dark/80 backdrop-blur-sm">
+        <p className="asc-label text-asc-ink-muted">Carregando fotos da peça…</p>
+      </div>
+    );
+  }
 
   const onPickFiles = async (fileList: FileList | null) => {
     setUploadError(null);

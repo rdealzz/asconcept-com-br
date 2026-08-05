@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Product, ProductCategory } from "@/lib/cart-context";
 
@@ -19,10 +19,28 @@ export const hasLastSize = (s: SizeStock | undefined) =>
 
 type ProductInput = Omit<Product, "id">;
 
+/**
+ * Colunas da listagem da vitrine.
+ *
+ * De propósito sem `gallery` e `long_description`: as fotos são gravadas como
+ * base64 dentro da própria linha do produto, então um `select("*")` baixava
+ * todas as fotos de todas as peças (até 5 por peça) só para a grade mostrar
+ * uma. Era isso que fazia os produtos demorarem a aparecer. As demais fotos
+ * chegam depois, sob demanda, por `loadGallery`.
+ */
+const LIST_COLUMNS =
+  "id,name,description,price,category,image,sizes,force_last_item,sort_order,created_at";
+
 type CatalogCtx = {
   products: Product[];
   stock: Record<string, SizeStock>;
   loading: boolean;
+  /**
+   * Busca as fotos restantes (e a descrição longa) de uma peça e as funde ao
+   * catálogo. Chamada ao passar o mouse num card e ao abrir a página do
+   * produto. Repetir a chamada é barato: só a primeira vai à rede.
+   */
+  loadGallery: (id: string) => Promise<void>;
   updateProduct: (id: string, patch: Partial<Product>) => Promise<void>;
   addProduct: (p: ProductInput, stock: SizeStock) => Promise<string | null>;
   deleteProduct: (id: string) => Promise<void>;
@@ -48,11 +66,12 @@ export type ProductRow = {
   id: string;
   name: string;
   description: string | null;
-  long_description: string | null;
+  /** Ausentes na consulta leve da vitrine; chegam em `loadGallery`. */
+  long_description?: string | null;
   price: string | number;
   category: string;
   image: string | null;
-  gallery: unknown;
+  gallery?: unknown;
   sizes: unknown;
   force_last_item: boolean;
   sort_order: number;
@@ -83,10 +102,15 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [stock, setStockMap] = useState<Record<string, SizeStock>>({});
   const [loading, setLoading] = useState(true);
 
+  // Quais peças já tiveram a galeria buscada. Fica em ref, e não em estado,
+  // para que duas chamadas seguidas (passar o mouse e clicar) não disparem
+  // duas requisições por causa de closure desatualizada.
+  const galleryRequested = useRef<Record<string, boolean>>({});
+
   const refresh = useCallback(async () => {
     const { data, error } = await supabase
       .from("products")
-      .select("*")
+      .select(LIST_COLUMNS)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
     setLoading(false);
@@ -94,11 +118,47 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       console.error("[catalog] fetch failed", error);
       return;
     }
-    const rows = (data ?? []) as ProductRow[];
+    const rows = (data ?? []) as unknown as ProductRow[];
+    galleryRequested.current = {};
     setProducts(rows.map(rowToProduct));
     const nextStock: Record<string, SizeStock> = {};
     for (const r of rows) nextStock[r.id] = coerceSizeStock(r.sizes);
     setStockMap(nextStock);
+  }, []);
+
+  const loadGallery: CatalogCtx["loadGallery"] = useCallback(async (id) => {
+    if (!id || galleryRequested.current[id]) return;
+    galleryRequested.current[id] = true;
+
+    const { data, error } = await supabase
+      .from("products")
+      .select("id,gallery,long_description")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error || !data) {
+      // Libera para tentar de novo — a peça pode ter sido só uma falha de rede.
+      galleryRequested.current[id] = false;
+      if (error) console.error("[catalog] loadGallery failed", error);
+      return;
+    }
+
+    const row = data as { gallery?: unknown; long_description?: string | null };
+    const gal = Array.isArray(row.gallery)
+      ? (row.gallery as unknown[]).filter((g): g is string => typeof g === "string")
+      : [];
+
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              gallery: gal.length ? gal : p.gallery,
+              longDescription: row.long_description ?? p.longDescription,
+            }
+          : p,
+      ),
+    );
   }, []);
 
   useEffect(() => {
@@ -188,6 +248,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         products,
         stock,
         loading,
+        loadGallery,
         updateProduct,
         addProduct,
         deleteProduct,
