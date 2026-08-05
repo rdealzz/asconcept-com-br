@@ -9,6 +9,9 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+    // Ao passar o mouse (ou encostar o dedo) num link, o código da rota já vai
+    // sendo buscado — quando o clique acontece, não há o que esperar.
+    defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
   });
 

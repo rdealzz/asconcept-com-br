@@ -116,9 +116,7 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
     let couponDiscount = 0;
     let acceptedCoupon: string | null = null;
     if (data.couponCode) {
-      const coupon = AVAILABLE_COUPONS.find(
-        (c) => c.code.toUpperCase() === data.couponCode,
-      );
+      const coupon = AVAILABLE_COUPONS.find((c) => c.code.toUpperCase() === data.couponCode);
       if (!coupon) throw new Error("Cupom inválido.");
       const { data: prior } = await supabase
         .from("coupon_uses")
@@ -133,9 +131,7 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
 
     const netAfterCoupon = Math.max(0, subtotal - couponDiscount);
     const pixDiscount =
-      data.paymentMethod === "pix"
-        ? Math.round(netAfterCoupon * PIX_DISCOUNT_RATE * 100) / 100
-        : 0;
+      data.paymentMethod === "pix" ? Math.round(netAfterCoupon * PIX_DISCOUNT_RATE * 100) / 100 : 0;
     const discount = Math.min(subtotal, couponDiscount + pixDiscount);
     const total = Math.max(0, subtotal - discount + shippingCost);
 
@@ -180,7 +176,6 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
       throw new Error(insertErr?.message ?? "Não foi possível registrar o pedido.");
     }
 
-
     return {
       orderNumber: (inserted as { order_number: string }).order_number,
       total: Number((inserted as { total: number | string }).total),
@@ -216,13 +211,36 @@ type HostedCheckoutInput = {
   customer: CustomerPayload;
 };
 
-type HostedCheckoutResult =
-  | { url: string; orderNumber: string }
-  | { error: string };
+type HostedCheckoutResult = { url: string; orderNumber: string } | { error: string };
 
 const UF_SET = new Set([
-  "AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT",
-  "PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO",
+  "AC",
+  "AL",
+  "AM",
+  "AP",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MG",
+  "MS",
+  "MT",
+  "PA",
+  "PB",
+  "PE",
+  "PI",
+  "PR",
+  "RJ",
+  "RN",
+  "RO",
+  "RR",
+  "RS",
+  "SC",
+  "SE",
+  "SP",
+  "TO",
 ]);
 
 function validateCustomer(raw: unknown): CustomerPayload {
@@ -307,14 +325,23 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
       .select("id, name, price, image")
       .in("id", ids);
     if (fetchErr) throw new Error("Falha ao validar preços dos produtos.");
-    if (!rows || rows.length !== ids.length) throw new Error("Um ou mais produtos não foram encontrados.");
+    if (!rows || rows.length !== ids.length)
+      throw new Error("Um ou mais produtos não foram encontrados.");
 
     const priceMap = new Map<string, { name: string; price: number; image: string | null }>();
-    for (const r of rows) priceMap.set(r.id, { name: r.name, price: Number(r.price), image: r.image });
+    for (const r of rows)
+      priceMap.set(r.id, { name: r.name, price: Number(r.price), image: r.image });
 
     const orderItems = data.items.map((it) => {
       const p = priceMap.get(it.id)!;
-      return { id: it.id, name: p.name, price: p.price, image: p.image ?? "", quantity: it.quantity, size: it.size };
+      return {
+        id: it.id,
+        name: p.name,
+        price: p.price,
+        image: p.image ?? "",
+        quantity: it.quantity,
+        size: it.size,
+      };
     });
 
     // Validação estrita antes de chamar Stripe (evita erro genérico do provedor).
@@ -403,9 +430,7 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
       .insert({ ...baseInsert, customer_phone: data.customer.phone } as never);
     if (insertErr) {
       // Fallback caso a coluna customer_phone ainda não exista no schema.
-      const { error: retryErr } = await supabaseAdmin
-        .from("orders")
-        .insert(baseInsert as never);
+      const { error: retryErr } = await supabaseAdmin.from("orders").insert(baseInsert as never);
       if (retryErr) {
         console.error("[checkout] insert order failed:", insertErr, retryErr);
         if (acceptedCoupon) {
@@ -415,7 +440,6 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
         return { error: retryErr.message };
       }
     }
-
 
     try {
       const { createStripeClient, getStripeErrorMessage } = await import("@/lib/stripe.server");
@@ -522,7 +546,6 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
       const { getStripeErrorMessage } = await import("@/lib/stripe.server");
       return { error: getStripeErrorMessage(error) };
     }
-
   });
 
 // Confirma o pagamento no retorno do Stripe (fallback ao webhook).
@@ -531,56 +554,72 @@ export const confirmStripePayment = createServerFn({ method: "POST" })
   .inputValidator((raw: unknown) => {
     const d = raw as { sessionId?: string; environment?: "sandbox" | "live" };
     if (!d?.sessionId || typeof d.sessionId !== "string") throw new Error("Sessão inválida.");
-    if (d.environment !== "sandbox" && d.environment !== "live") throw new Error("Ambiente inválido.");
+    if (d.environment !== "sandbox" && d.environment !== "live")
+      throw new Error("Ambiente inválido.");
     return { sessionId: d.sessionId, environment: d.environment };
   })
-  .handler(async ({ data, context }): Promise<{ orderNumber: string; status: string; paid: boolean }> => {
-    const { supabase, userId } = context;
-    const { data: order, error } = await supabase
-      .from("orders")
-      .select("order_number, status, stock_decremented, user_id")
-      .eq("stripe_session_id", data.sessionId)
-      .maybeSingle();
-    if (error || !order) throw new Error("Pedido não encontrado para essa sessão.");
-    if (order.user_id !== userId) throw new Error("Pedido não pertence a este usuário.");
+  .handler(
+    async ({ data, context }): Promise<{ orderNumber: string; status: string; paid: boolean }> => {
+      const { supabase, userId } = context;
+      const { data: order, error } = await supabase
+        .from("orders")
+        .select("order_number, status, stock_decremented, user_id")
+        .eq("stripe_session_id", data.sessionId)
+        .maybeSingle();
+      if (error || !order) throw new Error("Pedido não encontrado para essa sessão.");
+      if (order.user_id !== userId) throw new Error("Pedido não pertence a este usuário.");
 
-    if (order.status !== "Aguardando Pagamento") {
-      return { orderNumber: order.order_number, status: order.status, paid: true };
-    }
-
-    const { createStripeClient } = await import("@/lib/stripe.server");
-    const stripe = createStripeClient(data.environment);
-    const session = await stripe.checkout.sessions.retrieve(data.sessionId, {
-      expand: ["customer_details", "shipping_details", "total_details"],
-    });
-    const paid = session.payment_status === "paid" || session.status === "complete";
-    if (!paid) return { orderNumber: order.order_number, status: order.status, paid: false };
-
-    const shippingCost = ((session.total_details?.amount_shipping ?? 0) as number) / 100;
-    const totalPaid = ((session.amount_total ?? 0) as number) / 100;
-
-    // Endereço e nome já foram capturados na Etapa 1 do checkout; aqui apenas
-    // atualizamos status, frete e total confirmados pelo Stripe.
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin
-      .from("orders")
-      .update({
-        status: "Preparando pedido",
-        shipping_cost: shippingCost,
-        total: totalPaid,
-        updated_at: new Date().toISOString(),
-      } as never)
-      .eq("order_number", order.order_number);
-
-    if (!order.stock_decremented) {
-      try {
-        await (supabaseAdmin.rpc as unknown as (name: string, args: Record<string, unknown>) => Promise<unknown>)(
-          "consume_order_stock",
-          { _order_number: order.order_number },
-        );
-      } catch (e) {
-        console.error("consume_order_stock failed:", e);
+      if (order.status !== "Aguardando Pagamento") {
+        return { orderNumber: order.order_number, status: order.status, paid: true };
       }
-    }
-    return { orderNumber: order.order_number, status: "Preparando pedido", paid: true };
-  });
+
+      const { createStripeClient } = await import("@/lib/stripe.server");
+      const stripe = createStripeClient(data.environment);
+      const session = await stripe.checkout.sessions.retrieve(data.sessionId, {
+        expand: ["customer_details", "shipping_details", "total_details"],
+      });
+      const paid = session.payment_status === "paid" || session.status === "complete";
+      if (!paid) return { orderNumber: order.order_number, status: order.status, paid: false };
+
+      const shippingCost = ((session.total_details?.amount_shipping ?? 0) as number) / 100;
+      const totalPaid = ((session.amount_total ?? 0) as number) / 100;
+
+      // Endereço e nome já foram capturados na Etapa 1 do checkout; aqui apenas
+      // atualizamos status, frete e total confirmados pelo Stripe.
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin
+        .from("orders")
+        .update({
+          status: "Preparando pedido",
+          shipping_cost: shippingCost,
+          total: totalPaid,
+          updated_at: new Date().toISOString(),
+        } as never)
+        .eq("order_number", order.order_number);
+
+      if (!order.stock_decremented) {
+        // .rpc() não lança quando o Postgres recusa — devolve { error }. Ignorar
+        // isso mantinha a baixa de estoque falhando sem deixar rastro.
+        try {
+          const { error: stockError } = (await (
+            supabaseAdmin.rpc as unknown as (
+              name: string,
+              args: Record<string, unknown>,
+            ) => Promise<{ error: unknown }>
+          )("consume_order_stock", { _order_number: order.order_number })) ?? { error: null };
+          if (stockError) {
+            console.error(
+              `[stripe] consume_order_stock recusado para o pedido ${order.order_number} — estoque NÃO baixou`,
+              stockError,
+            );
+          }
+        } catch (e) {
+          console.error(
+            `[stripe] consume_order_stock falhou para o pedido ${order.order_number}`,
+            e,
+          );
+        }
+      }
+      return { orderNumber: order.order_number, status: "Preparando pedido", paid: true };
+    },
+  );

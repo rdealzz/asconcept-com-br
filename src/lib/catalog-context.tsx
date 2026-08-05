@@ -27,7 +27,6 @@ type CatalogCtx = {
   addProduct: (p: ProductInput, stock: SizeStock) => Promise<string | null>;
   deleteProduct: (id: string) => Promise<void>;
   setStock: (id: string, stock: SizeStock) => Promise<void>;
-  decrementStock: (id: string, size: Size, by?: number) => void;
   refresh: () => Promise<void>;
 };
 const CatalogContext = createContext<CatalogCtx | null>(null);
@@ -183,16 +182,6 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Optimistic local decrement — DB decrement runs server-side on checkout via RPC.
-  const decrementStock: CatalogCtx["decrementStock"] = (id, size, by = 1) =>
-    setStockMap((prev) => {
-      const cur = prev[id] ?? emptyStock();
-      return {
-        ...prev,
-        [id]: { ...cur, [size]: Math.max(0, (cur[size] ?? 0) - by) },
-      };
-    });
-
   return (
     <CatalogContext.Provider
       value={{
@@ -203,7 +192,6 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         addProduct,
         deleteProduct,
         setStock,
-        decrementStock,
         refresh,
       }}
     >

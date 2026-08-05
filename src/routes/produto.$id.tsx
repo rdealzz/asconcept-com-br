@@ -25,10 +25,15 @@ import { ContactStrip } from "@/components/ContactStrip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const Route = createFileRoute("/produto/$id")({
-  // O loader é best-effort: serve para o HTML do servidor já sair com título e
-  // og:image (prévia do link). Se falhar, a página ainda abre com o catálogo
-  // que o cliente carrega — por isso não lança aqui.
-  loader: ({ params }) => getProductById({ data: { id: params.id } }),
+  // O loader existe só para o HTML do servidor sair com título e og:image
+  // (prévia do link ao compartilhar). No navegador ele é puro atraso: o
+  // catálogo já está em memória, então buscar o mesmo produto no servidor
+  // antes de pintar a tela era o que fazia o clique demorar. Aqui ele é
+  // pulado, e a navegação fica instantânea.
+  loader: ({ params }) => {
+    if (typeof window !== "undefined") return null;
+    return getProductById({ data: { id: params.id } });
+  },
   head: ({ loaderData }) => {
     if (!loaderData) return {};
     const { product } = loaderData;
@@ -57,11 +62,11 @@ function ProductPage() {
   const { id } = Route.useParams();
   const loaded = Route.useLoaderData();
   const { add, count, open: openCart } = useCart();
-  const { products, stock: liveStock, loading: catalogLoading, decrementStock } = useCatalog();
+  const { products, stock: liveStock, loading: catalogLoading } = useCatalog();
 
   // O loader entrega o produto no HTML do servidor (título, og:image). Depois
   // que o catálogo do cliente hidrata, ele passa a ser a fonte de verdade —
-  // é o que reflete uma edição do admin ou um decremento de estoque local.
+  // é o que reflete uma edição feita no painel do admin.
   const product: Product | null = products.find((p) => p.id === id) ?? loaded?.product ?? null;
   const sizeStock: SizeStock = liveStock[id] ?? loaded?.stock ?? emptyStock();
 
@@ -89,10 +94,10 @@ function ProductPage() {
       products={products}
       cartCount={count}
       onCartClick={openCart}
-      onAdd={(s) => {
-        add(product, s);
-        decrementStock(product.id, s, 1);
-      }}
+      // Só põe na sacola. O estoque não se mexe aqui: reservar peça na hora
+      // de adicionar fazia a peça aparecer como esgotada sem ninguém ter
+      // pago. A baixa acontece no servidor, quando o pagamento é aprovado.
+      onAdd={(s) => add(product, s)}
     />
   );
 }
@@ -140,6 +145,13 @@ function ProductView({
     setActiveImg(0);
     setZoomIndex(null);
   }, [product.id]);
+
+  // Como o loader não roda no navegador, o `head` da rota não tem dados para
+  // montar o título numa navegação interna — então ele é ajustado aqui. No
+  // carregamento direto e para os robôs, quem manda continua sendo o `head`.
+  useEffect(() => {
+    document.title = `${product.name} — A&S Conccept`;
+  }, [product.name]);
 
   function handleAdd() {
     if (!canAdd || !size) return;

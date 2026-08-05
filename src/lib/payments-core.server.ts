@@ -36,7 +36,6 @@ type OrderRow = {
   mp_payment_id: string | null;
   mp_status: string | null;
   coupon_code: string | null;
-
 };
 
 // Etapas que só existem depois do pagamento confirmado.
@@ -104,19 +103,31 @@ export async function persistPayment(
   if (approved) {
     const { data: row } = await supabaseAdmin
       .from("orders")
-      .select("stock_decremented, customer_email, customer_name, total, items, mail_sent, preparation_mail_sent")
+      .select(
+        "stock_decremented, customer_email, customer_name, total, items, mail_sent, preparation_mail_sent",
+      )
       .eq("order_number", orderNumber)
       .maybeSingle();
     if (row && !(row as { stock_decremented: boolean }).stock_decremented) {
+      // Atenção: .rpc() não lança quando o Postgres recusa — devolve { error }.
+      // Ignorar esse retorno foi o que deixou a baixa de estoque falhar em
+      // silêncio. O erro não pode derrubar o pagamento (que já foi aprovado),
+      // mas precisa aparecer no log com o número do pedido para ser corrigido.
       try {
-        await (
+        const { error: stockError } = (await (
           supabaseAdmin.rpc as unknown as (
             n: string,
             a: Record<string, unknown>,
-          ) => Promise<unknown>
-        )("consume_order_stock", { _order_number: orderNumber });
+          ) => Promise<{ error: unknown }>
+        )("consume_order_stock", { _order_number: orderNumber })) ?? { error: null };
+        if (stockError) {
+          console.error(
+            `[mp] consume_order_stock recusado para o pedido ${orderNumber} — estoque NÃO baixou`,
+            stockError,
+          );
+        }
       } catch (e) {
-        console.error("[mp] consume_order_stock failed", e);
+        console.error(`[mp] consume_order_stock falhou para o pedido ${orderNumber}`, e);
       }
     }
 
@@ -149,7 +160,6 @@ export async function persistPayment(
         console.error("[mail] falha ao enviar e-mail de pedido confirmado", e);
       }
     }
-
   }
 }
 
@@ -266,7 +276,6 @@ export async function createPendingOrderCore(
     }
     return { error: "Não foi possível registrar o pedido." };
   }
-
 
   return { orderNumber, total, subtotal, shippingCost, discount };
 }
