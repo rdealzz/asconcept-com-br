@@ -12,6 +12,7 @@ import {
 } from "@/lib/payments.functions";
 import { formatCpf, isValidCpf } from "@/lib/mercadopago";
 import { CardBrick, type CardFormData } from "@/components/CardBrick";
+import { InstallmentsBadge, InstallmentsTable } from "@/components/InstallmentsNote";
 import { PixPanel, type PixCharge } from "@/components/PixPanel";
 import { quoteShipping, formatCep, normalizeCep } from "@/lib/shipping";
 import { ContactStrip } from "@/components/ContactStrip";
@@ -742,7 +743,7 @@ function StepTwo({
             onClick={() => setMethod("card")}
             icon={<CreditCard className="h-4 w-4" strokeWidth={1.5} />}
             title="Cartão de crédito"
-            subtitle={`até 12× · ${formatBRL(totalCard)}`}
+            subtitle={`até 3× sem juros · ${formatBRL(totalCard)}`}
           />
           <MethodTile
             active={method === "pix"}
