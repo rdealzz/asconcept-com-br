@@ -35,26 +35,32 @@ export async function bestInterestFreeInstallment(
 
   let value: InstallmentOption | null = null;
   try {
-    const url = `${MP_API}/v1/payment_methods/installments?public_key=${encodeURIComponent(
-      publicKey,
-    )}&amount=${encodeURIComponent(key)}&locale=pt-BR`;
-    const res = await fetch(url);
-    if (res.ok) {
-      const json = (await res.json()) as Array<{ payer_costs?: PayerCost[] }>;
-      const costs = json.flatMap((m) => m.payer_costs ?? []);
-      const free = costs
-        .filter((c) => Number(c.installment_rate) === 0 && c.installments > 1)
-        .sort((a, b) => b.installments - a.installments)[0];
-      if (free) {
-        value = {
-          installments: free.installments,
-          installmentAmount: Number(free.installment_amount),
-          totalAmount: Number(free.total_amount),
-          interestFree: true,
-        };
+    // A API exige payment_method_id (ou bin). Consultamos as bandeiras mais
+    // comuns e ficamos com o melhor parcelamento sem juros entre elas.
+    const brands = ["visa", "master", "elo"];
+    const costs: PayerCost[] = [];
+    for (const brand of brands) {
+      const url = `${MP_API}/v1/payment_methods/installments?public_key=${encodeURIComponent(
+        publicKey,
+      )}&amount=${encodeURIComponent(key)}&payment_method_id=${brand}&locale=pt-BR`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const json = (await res.json()) as Array<{ payer_costs?: PayerCost[] }>;
+        costs.push(...json.flatMap((m) => m.payer_costs ?? []));
+      } else {
+        console.error("[mp] installments failed", brand, res.status);
       }
-    } else {
-      console.error("[mp] installments failed", res.status);
+    }
+    const free = costs
+      .filter((c) => Number(c.installment_rate) === 0 && c.installments > 1)
+      .sort((a, b) => b.installments - a.installments)[0];
+    if (free) {
+      value = {
+        installments: free.installments,
+        installmentAmount: Number(free.installment_amount),
+        totalAmount: Number(free.total_amount),
+        interestFree: true,
+      };
     }
   } catch (e) {
     console.error("[mp] installments error", e);
