@@ -49,7 +49,12 @@ import { StitchDivider } from "@/components/StitchDivider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { EmptyCategoryState } from "@/components/EmptyCategoryState";
 
-import { SUPPORT_EMAIL, WHATSAPP_DISPLAY, WHATSAPP_LINK } from "@/components/WhatsAppFab";
+import {
+  SUPPORT_EMAIL,
+  WHATSAPP_DISPLAY,
+  WHATSAPP_LINK,
+  openWhatsApp,
+} from "@/components/WhatsAppFab";
 
 import heroAsset from "@/assets/hero-amalfi-men.jpg.asset.json";
 const hero = heroAsset.url;
@@ -118,6 +123,18 @@ function Index() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Quem chega na home com #produtos (voltando da página de produto, ou pelo
+  // rodapé) precisa da mesma folga do cabeçalho fixo — o pulo nativo do
+  // navegador deixaria o topo da seção escondido atrás dele.
+  useEffect(() => {
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+    // Um respiro para a grade montar antes de medir a posição.
+    const t = setTimeout(() => scrollToSection(hash), 250);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <SearchProvider>
       <ProductProvider>
@@ -266,16 +283,19 @@ function Nav({
           >
             <Menu className="h-4 w-4" strokeWidth={1.5} />
           </button>
+          {/* Botões, e não <a href="#id">: o pulo nativo esconde a seção atrás
+              do cabeçalho fixo e, no caso da barra de abas (sticky), nem
+              chegava a sair do lugar. */}
           <nav className="hidden items-center gap-9 md:flex">
-            <a href="#collections" className={navLink}>
+            <button onClick={() => scrollToSection("produtos")} className={navLink}>
               Coleção
-            </a>
-            <a href="#edit" className={navLink}>
+            </button>
+            <button onClick={() => scrollToSection("edit")} className={navLink}>
               O Editorial
-            </a>
-            <a href="#about" className={navLink}>
+            </button>
+            <button onClick={() => scrollToSection("about")} className={navLink}>
               Somente por Convite
-            </a>
+            </button>
           </nav>
         </div>
         <a
@@ -368,7 +388,8 @@ function MobileMenu({
   const { setTab } = useSearch();
   const goTo = (id: string) => {
     onClose();
-    setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }), 180);
+    // Espera o painel fechar antes de rolar, senão a animação atropela.
+    setTimeout(() => scrollToSection(id), 180);
   };
   return (
     <>
@@ -400,7 +421,7 @@ function MobileMenu({
           <button
             onClick={() => {
               setTab("clothes");
-              goTo("collections");
+              goTo("produtos");
             }}
             className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
           >
@@ -409,7 +430,7 @@ function MobileMenu({
           <button
             onClick={() => {
               setTab("sneakers");
-              goTo("collections");
+              goTo("produtos");
             }}
             className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
           >
@@ -492,13 +513,13 @@ function Hero() {
             <p className="animate-fade-up mt-6 max-w-md text-sm font-light text-ivory/85 [animation-delay:200ms] md:mt-8 md:text-lg">
               Luxo curado para a próxima geração.
             </p>
-            <a
-              href="#collections"
+            <button
+              onClick={() => scrollToSection("produtos")}
               className="group animate-fade-up mt-8 inline-flex items-center gap-4 border border-asc-line px-8 py-3.5 text-[11px] tracking-luxe uppercase text-ivory transition-all duration-300 [animation-delay:300ms] hover:border-accent hover:text-accent md:mt-12 md:px-10 md:py-4"
             >
               Explorar a Coleção
               <span className="inline-block h-px w-6 bg-current transition-all duration-300 group-hover:w-10 md:w-8" />
-            </a>
+            </button>
           </div>
         </div>
       </div>
@@ -507,6 +528,31 @@ function Hero() {
 }
 
 /* ---------- Category Tabs ---------- */
+/**
+ * Altura reservada para o cabeçalho fixo ao rolar até uma seção.
+ * Sem essa folga o topo da seção fica escondido atrás dele.
+ */
+const HEADER_OFFSET = 96;
+
+/**
+ * Rola até uma seção respeitando o cabeçalho fixo.
+ *
+ * Substitui os `<a href="#id">`: o pulo nativo do navegador ignora o
+ * cabeçalho fixo e, no caso da barra de abas — que é `sticky` —, chegava a
+ * não sair do lugar, porque ela já estava presa no topo.
+ */
+function scrollToSection(id: string) {
+  if (typeof document === "undefined") return;
+  // Espera o próximo quadro: quando a troca de aba muda o conteúdo, a altura
+  // da página só está correta depois de o React pintar.
+  requestAnimationFrame(() => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const y = el.getBoundingClientRect().top + window.scrollY - HEADER_OFFSET;
+    window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+  });
+}
+
 function CategoryTabs() {
   const { tab, setTab } = useSearch();
   return (
@@ -518,7 +564,12 @@ function CategoryTabs() {
         {(["clothes", "sneakers"] as ProductCategory[]).map((c) => (
           <button
             key={c}
-            onClick={() => setTab(c)}
+            // Trocar a aba também leva o cliente até as peças. Antes o conteúdo
+            // mudava lá embaixo e quem estava no topo não via nada acontecer.
+            onClick={() => {
+              setTab(c);
+              scrollToSection("produtos");
+            }}
             className={`relative px-4 py-2 text-[11px] tracking-luxe uppercase transition-colors ${
               tab === c ? "text-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
@@ -584,7 +635,7 @@ function Products() {
   const showSneakersComingSoon = tab === "sneakers" && !isAdmin && base.length === 0;
 
   return (
-    <section className="py-20 md:py-28">
+    <section id="produtos" className="py-20 md:py-28">
       <div className="mx-auto max-w-[1600px] px-6 md:px-12">
         <div className="mb-12 flex flex-col items-center text-center md:mb-20">
           <p className="mb-4 text-[11px] tracking-luxe uppercase text-accent">
@@ -1676,7 +1727,7 @@ function Footer() {
     {
       title: "Descobrir",
       links: [
-        { label: "A Coleção", hash: "/#collections" },
+        { label: "A Coleção", hash: "/#produtos" },
         { label: "O Editorial", hash: "/#edit" },
         { label: "Sobre Nós", hash: "/#about" },
       ],
@@ -1776,6 +1827,7 @@ function Footer() {
             Suporte via WhatsApp:{" "}
             <a
               href={WHATSAPP_LINK}
+              onClick={openWhatsApp}
               target="_blank"
               rel="noopener noreferrer"
               className="text-[color:var(--gold)] underline-offset-4 transition-colors hover:underline"
@@ -1815,7 +1867,7 @@ function SearchOverlay() {
     e.preventDefault();
     setQuery(term.trim());
     close();
-    document.getElementById("collections")?.scrollIntoView({ behavior: "smooth" });
+    scrollToSection("produtos");
   };
 
   return (
@@ -1878,10 +1930,7 @@ function FilterSidebar({ open, onClose }: { open: boolean; onClose: () => void }
     setTab("clothes");
     setSubFilter(id);
     onClose();
-    setTimeout(
-      () => document.getElementById("collections")?.scrollIntoView({ behavior: "smooth" }),
-      120,
-    );
+    setTimeout(() => scrollToSection("produtos"), 120);
   };
   return (
     <>

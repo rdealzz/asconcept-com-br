@@ -1,4 +1,4 @@
-import { SUPPORT_EMAIL, WHATSAPP_DISPLAY, WHATSAPP_LINK } from "./WhatsAppFab";
+import { SUPPORT_EMAIL, WHATSAPP_DISPLAY, WHATSAPP_LINK, openWhatsApp } from "./WhatsAppFab";
 
 /** Faixa discreta de contato para páginas sem rodapé completo. */
 export function ContactStrip() {
@@ -18,6 +18,7 @@ export function ContactStrip() {
           Suporte via WhatsApp:{" "}
           <a
             href={WHATSAPP_LINK}
+            onClick={openWhatsApp}
             target="_blank"
             rel="noopener noreferrer"
             className="text-foreground underline-offset-4 transition-colors hover:text-[color:var(--gold)] hover:underline"

@@ -81,7 +81,7 @@ export function CartDrawer() {
                   não pode depender do estado de abas que só existe na home. */}
               <Link
                 to="/"
-                hash="collections"
+                hash="produtos"
                 onClick={close}
                 className="asc-label mt-10 border border-asc-ink px-8 py-3 text-asc-ink transition-all duration-asc ease-asc hover:bg-asc-ink hover:text-asc-bg"
               >

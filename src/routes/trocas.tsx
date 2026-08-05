@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageShell, Prose } from "@/components/PageShell";
-import { SUPPORT_EMAIL, WHATSAPP_DISPLAY, WHATSAPP_LINK } from "@/components/WhatsAppFab";
+import {
+  SUPPORT_EMAIL,
+  WHATSAPP_DISPLAY,
+  WHATSAPP_LINK,
+  openWhatsApp,
+} from "@/components/WhatsAppFab";
 
 export const Route = createFileRoute("/trocas")({
   head: () => ({
@@ -33,9 +38,8 @@ function TrocasPage() {
       <Prose title="Direito de arrependimento — 7 dias">
         <p>
           Em compras realizadas pela internet, você tem até <strong>7 dias corridos</strong> a
-          partir do recebimento para desistir da compra, conforme o artigo 49 do Código de
-          Defesa do Consumidor. Nesse caso, devolvemos o valor pago integralmente, incluindo o
-          frete.
+          partir do recebimento para desistir da compra, conforme o artigo 49 do Código de Defesa do
+          Consumidor. Nesse caso, devolvemos o valor pago integralmente, incluindo o frete.
         </p>
       </Prose>
       <Prose title="Condições para troca ou devolução">
@@ -64,6 +68,7 @@ function TrocasPage() {
           ou pelo WhatsApp{" "}
           <a
             href={WHATSAPP_LINK}
+            onClick={openWhatsApp}
             target="_blank"
             rel="noopener noreferrer"
             className="text-[color:var(--gold)] underline-offset-4 hover:underline"
@@ -71,8 +76,8 @@ function TrocasPage() {
             {WHATSAPP_DISPLAY}
           </a>
           . Respondemos com as instruções de postagem em até 2 dias úteis. Após recebermos e
-          conferirmos a peça, o reembolso é processado pelo mesmo meio de pagamento em até 10
-          dias úteis.
+          conferirmos a peça, o reembolso é processado pelo mesmo meio de pagamento em até 10 dias
+          úteis.
         </p>
       </Prose>
     </PageShell>

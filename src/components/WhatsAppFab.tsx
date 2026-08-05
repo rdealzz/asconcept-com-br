@@ -1,7 +1,31 @@
 export const WHATSAPP_NUMBER = "5541999964035";
 export const WHATSAPP_DISPLAY = "(41) 99996-4035";
 export const SUPPORT_EMAIL = "asconccept@gmail.com";
-export const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER}`;
+
+/**
+ * Link de conversa do WhatsApp.
+ *
+ * Formato internacional só com dígitos: 55 (Brasil) + 41 (DDD) + o número.
+ * A mensagem já vai preenchida para a conversa começar com contexto.
+ */
+export const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+  "Olá! Vim pelo site da A&S Conccept e gostaria de falar sobre uma peça.",
+)}`;
+
+/**
+ * Abre o WhatsApp de forma confiável.
+ *
+ * Navegadores embutidos de aplicativo (Instagram, Facebook, TikTok) — de onde
+ * vem boa parte do tráfego de uma loja de roupa — costumam engolir
+ * `target="_blank"`, e o toque simplesmente não fazia nada. Aqui a abertura é
+ * por script e, se a nova aba for bloqueada, a navegação acontece na própria
+ * aba em vez de falhar em silêncio.
+ */
+export function openWhatsApp(e?: { preventDefault: () => void }) {
+  e?.preventDefault();
+  const nova = window.open(WHATSAPP_LINK, "_blank", "noopener,noreferrer");
+  if (!nova || nova.closed) window.location.href = WHATSAPP_LINK;
+}
 
 /** Botão flutuante de WhatsApp, presente em todas as páginas. */
 export function WhatsAppFab() {
@@ -10,12 +34,15 @@ export function WhatsAppFab() {
       href={WHATSAPP_LINK}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={openWhatsApp}
       aria-label={`Falar no WhatsApp ${WHATSAPP_DISPLAY}`}
       className="fixed bottom-5 right-5 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-[color:var(--gold)]/50 bg-charcoal text-[color:var(--gold)] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] transition-all duration-300 hover:scale-105 hover:border-[color:var(--gold)] hover:shadow-[0_10px_28px_-6px_rgba(212,175,55,0.45)] md:h-14 md:w-14"
     >
-      <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6 md:h-7 md:w-7">
-        <path d="M17.47 14.38c-.3-.15-1.75-.86-2.02-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.47-.88-.78-1.47-1.75-1.64-2.05-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.6-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.01-1.04 2.470 1.07 2.53c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.09 1.75-.72 2-1.41.25-.69.25-1.28.17-1.41-.07-.13-.27-.2-.57-.35z" />
-        <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.32 4.96L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 18.02h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24 2.2 0 4.27.86 5.83 2.42a8.19 8.19 0 0 1 2.41 5.83c0 4.54-3.7 8.23-8.24 8.23z" />
+      {/* Ícone redesenhado: o path anterior tinha dados corrompidos
+          ("…2.470 1.07…"), que deformavam o fone dentro do balão. */}
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className="h-6 w-6 md:h-7 md:w-7">
+        <path d="M12.04 2.02c-5.5 0-9.96 4.46-9.96 9.96 0 1.76.46 3.48 1.34 5L2 22l5.16-1.35a9.94 9.94 0 0 0 4.88 1.24h.01c5.5 0 9.96-4.46 9.96-9.96 0-2.66-1.04-5.16-2.92-7.04a9.9 9.9 0 0 0-7.05-2.87zm0 18.17h-.01a8.26 8.26 0 0 1-4.21-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.24 8.24 0 0 1-1.26-4.4c0-4.56 3.72-8.28 8.28-8.28a8.2 8.2 0 0 1 5.85 2.43 8.22 8.22 0 0 1 2.42 5.86c0 4.56-3.71 8.25-8.28 8.25z" />
+        <path d="M16.57 14.38c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.13-.16.25-.64.81-.79.98-.14.16-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.15-.25-.02-.39.11-.51.11-.11.25-.29.37-.44.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.48-.4-.42-.56-.42h-.47c-.17 0-.44.06-.66.31-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.02 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.11-.22-.17-.47-.29z" />
       </svg>
     </a>
   );

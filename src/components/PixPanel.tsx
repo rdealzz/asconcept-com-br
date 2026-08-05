@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, Loader2, QrCode, ShieldCheck } from "lucide-react";
 
-import { WHATSAPP_LINK } from "@/components/WhatsAppFab";
+import { WHATSAPP_LINK, openWhatsApp } from "@/components/WhatsAppFab";
 
 import { formatBRL } from "@/lib/cart-context";
 
@@ -30,13 +30,7 @@ function useCountdown(expiresAt: string | null) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export function PixPanel({
-  charge,
-  awaiting,
-}: {
-  charge: PixCharge;
-  awaiting: boolean;
-}) {
+export function PixPanel({ charge, awaiting }: { charge: PixCharge; awaiting: boolean }) {
   const [copied, setCopied] = useState(false);
   const countdown = useCountdown(charge.expiresAt);
 
@@ -55,9 +49,7 @@ export function PixPanel({
       <p className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
         <QrCode className="h-3.5 w-3.5" strokeWidth={1.5} /> Pagamento via Pix
       </p>
-      <h2 className="mt-3 font-serif text-2xl text-asc-ink">
-        {formatBRL(charge.amount)}
-      </h2>
+      <h2 className="mt-3 font-serif text-2xl text-asc-ink">{formatBRL(charge.amount)}</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         Abra o app do seu banco, escaneie o código e confirme. A aprovação é automática.
       </p>
@@ -99,11 +91,11 @@ export function PixPanel({
           Por que o Pix aparece em outro nome?
         </p>
         <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
-          Como a A&S Conccept ainda não possui CNPJ próprio, os pagamentos via Pix são
-          processados pela conta pessoal do fundador da marca, verificada e protegida pelo
-          Mercado Pago. Por isso, o comprovante pode aparecer em nome de{" "}
-          <strong className="text-asc-ink">Erick</strong>, CEO e fundador da A&S Conccept.
-          Assim que formalizarmos nosso CNPJ, essa informação será atualizada.
+          Como a A&S Conccept ainda não possui CNPJ próprio, os pagamentos via Pix são processados
+          pela conta pessoal do fundador da marca, verificada e protegida pelo Mercado Pago. Por
+          isso, o comprovante pode aparecer em nome de{" "}
+          <strong className="text-asc-ink">Erick</strong>, CEO e fundador da A&S Conccept. Assim que
+          formalizarmos nosso CNPJ, essa informação será atualizada.
         </p>
         <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
           Seus dados de pagamento não são armazenados pela A&S Conccept — são processados
@@ -111,6 +103,7 @@ export function PixPanel({
           Latina, garantindo total segurança e privacidade. Qualquer dúvida,{" "}
           <a
             href={WHATSAPP_LINK}
+            onClick={openWhatsApp}
             target="_blank"
             rel="noopener noreferrer"
             className="underline underline-offset-2 hover:text-asc-ink"

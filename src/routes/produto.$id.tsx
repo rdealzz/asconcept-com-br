@@ -180,7 +180,7 @@ function ProductView({
           <span className="text-xs text-asc-ink-muted">/</span>
           <Link
             to="/"
-            hash="collections"
+            hash="produtos"
             className="text-xs text-asc-ink-muted transition-colors duration-ascfast ease-asc hover:text-asc-ink"
           >
             {product.category === "sneakers" ? "Sneakers" : "Roupas"}

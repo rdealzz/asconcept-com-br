@@ -1,7 +1,12 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
-import { SUPPORT_EMAIL, WHATSAPP_DISPLAY, WHATSAPP_LINK } from "@/components/WhatsAppFab";
+import {
+  SUPPORT_EMAIL,
+  WHATSAPP_DISPLAY,
+  WHATSAPP_LINK,
+  openWhatsApp,
+} from "@/components/WhatsAppFab";
 import { TrustSeals } from "@/components/TrustSeals";
 
 /** Moldura editorial das páginas institucionais. */
@@ -54,6 +59,7 @@ export function PageShell({
             ou WhatsApp{" "}
             <a
               href={WHATSAPP_LINK}
+              onClick={openWhatsApp}
               target="_blank"
               rel="noopener noreferrer"
               className="text-[color:var(--gold)] underline-offset-4 hover:underline"

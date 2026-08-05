@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
-import { WHATSAPP_LINK } from "@/components/WhatsAppFab";
+import { WHATSAPP_LINK, openWhatsApp } from "@/components/WhatsAppFab";
 
 export const SIZE_GUIDE_ROWS = [
   { size: "P", comprimento: 57, busto: 53, ombro: 49, manga: 54 },
@@ -37,10 +37,11 @@ export function SizeGuideTable() {
         </table>
       </div>
       <p className="mt-4 text-[11px] font-light leading-relaxed text-muted-foreground">
-        Medidas em centímetros, com a peça deitada. Podem variar levemente entre modelos. Em
-        caso de dúvida sobre qual tamanho escolher,{" "}
+        Medidas em centímetros, com a peça deitada. Podem variar levemente entre modelos. Em caso de
+        dúvida sobre qual tamanho escolher,{" "}
         <a
           href={WHATSAPP_LINK}
+          onClick={openWhatsApp}
           target="_blank"
           rel="noopener noreferrer"
           className="text-[color:var(--gold)] underline-offset-4 hover:underline"
