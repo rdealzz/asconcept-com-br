@@ -69,7 +69,7 @@ export function SizeGuideModal({ open, onClose }: { open: boolean; onClose: () =
         className="fixed inset-0 z-[120] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-200"
       />
       <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
-        <div className="relative w-full max-w-lg bg-background p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-300 md:p-8">
+        <div className="relative w-full max-w-lg bg-background p-6 animate-in fade-in zoom-in-95 duration-300 md:p-8">
           <button
             onClick={onClose}
             aria-label="Fechar guia de tamanhos"

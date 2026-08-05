@@ -32,26 +32,29 @@ export const Route = createFileRoute("/pedidos/")({
   component: OrdersPage,
 });
 
+// Os quatro estados formam uma progressão de intensidade dentro da paleta —
+// do taupe apagado ao dourado preenchido — em vez de quatro pastéis distintos,
+// que no fundo escuro viravam ilhas claras e saíam da identidade.
 const STATUS_META: Record<OrderStatus, { label: string; icon: string; className: string }> = {
   "Aguardando Aprovação": {
     label: "Aguardando Aprovação",
     icon: "⏳",
-    className: "bg-[#FDF6E3] text-[#7A5B10] border-[#E9CE79]",
+    className: "border-asc-line bg-asc-bg-raised text-asc-ink-muted",
   },
   "Preparando pedido": {
     label: "Preparando Pedido",
     icon: "📦",
-    className: "bg-[#EDE6D3] text-[#5A4A1F] border-[#B8944F]",
+    className: "border-asc-gold/40 bg-asc-bg-raised text-asc-gold",
   },
   "Em trânsito": {
     label: "Em Trânsito",
     icon: "🚚",
-    className: "bg-[#EEE7FA] text-[#3B1F63] border-[#B9A3E6]",
+    className: "border-asc-gold-soft/60 bg-asc-bg-raised text-asc-gold-soft",
   },
   Entregue: {
     label: "Entregue",
     icon: "✅",
-    className: "bg-[#E2F1E9] text-[#134E36] border-[#77C2A0]",
+    className: "border-transparent bg-asc-gold text-asc-bg",
   },
 };
 
@@ -120,7 +123,7 @@ function OrdersPage() {
             action={
               <button
                 onClick={openAuth}
-                className="mt-6 bg-charcoal px-8 py-3 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
+                className="mt-6 asc-btn-primary px-8 py-3 text-[11px] tracking-luxe uppercase"
               >
                 Entrar / Cadastrar
               </button>
@@ -141,7 +144,7 @@ function OrdersPage() {
             action={
               <Link
                 to="/"
-                className="mt-6 inline-block bg-charcoal px-8 py-3 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
+                className="mt-6 inline-block asc-btn-primary px-8 py-3 text-[11px] tracking-luxe uppercase"
               >
                 Explorar a coleção
               </Link>
@@ -173,7 +176,7 @@ function EmptyCard({
 }) {
   return (
     <div className="mt-16 border border-dashed border-border bg-background p-12 text-center">
-      <p className="font-serif text-xl text-charcoal">{title}</p>
+      <p className="font-serif text-xl text-asc-ink">{title}</p>
       {subtitle && <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>}
       {action}
     </div>
@@ -335,7 +338,7 @@ function AdminClientsPanel() {
             <ul className="divide-y divide-border">
               {leads.map((l) => (
                 <li key={l.id} className="flex items-center justify-between gap-4 px-5 py-3">
-                  <p className="truncate text-sm text-charcoal">{l.email}</p>
+                  <p className="truncate text-sm text-asc-ink">{l.email}</p>
                   <span className="shrink-0 text-[10px] tracking-luxe uppercase text-muted-foreground">
                     {new Date(l.created_at).toLocaleDateString("pt-BR")}
                   </span>
@@ -398,7 +401,7 @@ function MarkupCalculator() {
               onChange={(e) => setCost(e.target.value.replace(/[^\d.,]/g, ""))}
               inputMode="decimal"
               placeholder="Ex: 180,00"
-              className="mt-2 w-full border border-border bg-background px-3 py-2 text-lg tabular-nums outline-none focus:border-charcoal"
+              className="mt-2 w-full border border-border bg-background px-3 py-2 text-lg tabular-nums outline-none focus:border-asc-line"
             />
           </label>
           <label className="block">
@@ -410,7 +413,7 @@ function MarkupCalculator() {
               onChange={(e) => setMargin(e.target.value.replace(/[^\d.,]/g, ""))}
               inputMode="decimal"
               placeholder="Ex: 60"
-              className="mt-2 w-full border border-border bg-background px-3 py-2 text-lg tabular-nums outline-none focus:border-charcoal"
+              className="mt-2 w-full border border-border bg-background px-3 py-2 text-lg tabular-nums outline-none focus:border-asc-line"
             />
           </label>
         </div>
@@ -453,11 +456,11 @@ function MarkupCalculator() {
 
 function ResultCell({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className={`bg-card px-6 py-5 ${accent ? "bg-[color:var(--ivory)]" : ""}`}>
+    <div className={`bg-card px-6 py-5 ${accent ? "bg-asc-bg-raised" : ""}`}>
       <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">{label}</p>
       <p
         className={`mt-1 font-serif tabular-nums ${
-          accent ? "text-[color:var(--gold)] text-3xl" : "text-2xl text-charcoal"
+          accent ? "text-[color:var(--gold)] text-3xl" : "text-2xl text-asc-ink"
         }`}
       >
         {value}
@@ -502,8 +505,8 @@ function AdminOrdersList({ orders }: { orders: Order[] }) {
             }
             className={`flex flex-col items-start gap-1 border px-4 py-3 text-left transition-all ${
               statusFilter === t.status
-                ? "border-charcoal bg-charcoal text-ivory"
-                : "border-border bg-background hover:border-charcoal"
+                ? "border-asc-line bg-charcoal text-ivory"
+                : "border-border bg-background hover:border-asc-line"
             }`}
           >
             <span className="text-[10px] tracking-luxe uppercase opacity-80">
@@ -521,7 +524,7 @@ function AdminOrdersList({ orders }: { orders: Order[] }) {
             value={term}
             onChange={(e) => setTerm(e.target.value)}
             placeholder="Buscar por ID, cliente ou e-mail"
-            className="w-full border border-border bg-background px-9 py-2 text-sm outline-none focus:border-charcoal"
+            className="w-full border border-border bg-background px-9 py-2 text-sm outline-none focus:border-asc-line"
           />
         </div>
         <button
@@ -529,7 +532,7 @@ function AdminOrdersList({ orders }: { orders: Order[] }) {
             setStatusFilter("todos");
             setTerm("");
           }}
-          className="border border-border px-4 py-2 text-[11px] tracking-luxe uppercase text-muted-foreground transition-colors hover:border-charcoal hover:text-foreground"
+          className="border border-border px-4 py-2 text-[11px] tracking-luxe uppercase text-muted-foreground transition-colors hover:border-asc-line hover:text-foreground"
         >
           Limpar filtros
         </button>
@@ -614,12 +617,12 @@ function AdminOrderCard({ order }: { order: Order }) {
             </p>
             {order.address?.logradouro || order.address?.cidade || order.address?.cep ? (
               <>
-                <p className="text-charcoal">
+                <p className="text-asc-ink">
                   {order.address.logradouro}
                   {order.address.numero ? `, ${order.address.numero}` : ""}
                   {order.address.complemento ? ` — ${order.address.complemento}` : ""}
                 </p>
-                <p className="text-charcoal">
+                <p className="text-asc-ink">
                   {[order.address.bairro, [order.address.cidade, order.address.uf].filter(Boolean).join("/")]
                     .filter(Boolean)
                     .join(" · ")}
@@ -651,12 +654,12 @@ function AdminOrderCard({ order }: { order: Order }) {
                 <div className="flex-1 min-w-0">
                   <p className="truncate font-serif text-sm">{i.name}</p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    Tam. <span className="text-charcoal">{i.size}</span> · Qtd.{" "}
-                    <span className="text-charcoal">{i.quantity}</span> ·{" "}
-                    <span className="text-charcoal">{formatBRL(i.price)}</span> un.
+                    Tam. <span className="text-asc-ink">{i.size}</span> · Qtd.{" "}
+                    <span className="text-asc-ink">{i.quantity}</span> ·{" "}
+                    <span className="text-asc-ink">{formatBRL(i.price)}</span> un.
                   </p>
                 </div>
-                <span className="text-xs tabular-nums text-charcoal">
+                <span className="text-xs tabular-nums text-asc-ink">
                   {formatBRL(i.price * i.quantity)}
                 </span>
               </li>
@@ -667,7 +670,7 @@ function AdminOrderCard({ order }: { order: Order }) {
               Subtotal {formatBRL(order.subtotal)} · Frete{" "}
               {order.shippingCost === 0 ? "Grátis" : formatBRL(order.shippingCost)}
             </span>
-            <span className="font-serif text-base text-charcoal tabular-nums">
+            <span className="font-serif text-base text-asc-ink tabular-nums">
               {formatBRL(order.total)}
             </span>
           </div>
@@ -700,7 +703,7 @@ function AdminOrderCard({ order }: { order: Order }) {
                     active
                       ? `${STATUS_META[s].className} font-medium`
                       : selectable
-                        ? "border-border bg-background hover:border-charcoal"
+                        ? "border-border bg-background hover:border-asc-line"
                         : "cursor-not-allowed border-border/60 bg-background/40 text-muted-foreground/60"
                   }`}
                 >
@@ -716,7 +719,7 @@ function AdminOrderCard({ order }: { order: Order }) {
           </div>
 
           {showTracking && (
-            <div className="mt-4 border border-dashed border-[color:var(--gold)] bg-[color:var(--ivory)] p-3">
+            <div className="mt-4 border border-dashed border-[color:var(--gold)] bg-asc-bg-raised p-3">
               <label className="block text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
                 Código de rastreio
               </label>
@@ -725,11 +728,11 @@ function AdminOrderCard({ order }: { order: Order }) {
                   value={tracking}
                   onChange={(e) => setTracking(e.target.value.toUpperCase())}
                   placeholder="AS123BR"
-                  className="w-full border border-border bg-background px-2 py-1.5 font-mono text-xs uppercase outline-none focus:border-charcoal"
+                  className="w-full border border-border bg-background px-2 py-1.5 font-mono text-xs uppercase outline-none focus:border-asc-line"
                 />
                 <button
                   onClick={saveTracking}
-                  className="bg-charcoal px-3 text-[10px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
+                  className="asc-btn-primary px-3 text-[10px] tracking-luxe uppercase"
                 >
                   Salvar
                 </button>
@@ -738,12 +741,12 @@ function AdminOrderCard({ order }: { order: Order }) {
           )}
 
           {savedFlash && (
-            <p className="mt-3 border border-[color:var(--gold)]/60 bg-[color:var(--ivory)] px-3 py-2 text-[11px] text-charcoal animate-[fade-in_0.3s_ease-out]">
+            <p className="mt-3 border border-[color:var(--gold)]/60 bg-asc-bg-raised px-3 py-2 text-[11px] text-asc-ink animate-[fade-in_0.3s_ease-out]">
               ✦ {savedFlash}
             </p>
           )}
           <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
-            Pagamento: <span className="text-charcoal">{paymentLabel(order.paymentMethod)}</span>
+            Pagamento: <span className="text-asc-ink">{paymentLabel(order.paymentMethod)}</span>
             <br />
             Toda alteração dispara e-mail transacional para {order.customerEmail}
           </p>

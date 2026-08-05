@@ -92,7 +92,7 @@ function ResetPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory hover:bg-navy disabled:opacity-50"
+              className="w-full asc-btn-primary py-4 text-[11px] tracking-luxe uppercase disabled:opacity-50"
             >
               {loading ? "Salvando…" : "Salvar nova senha"}
             </button>
