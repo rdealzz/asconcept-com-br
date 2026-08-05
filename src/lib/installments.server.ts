@@ -17,23 +17,24 @@ type PayerCost = {
   total_amount: number;
 };
 
-type CacheEntry = { at: number; value: InstallmentOption | null };
+type CacheEntry = { at: number; value: InstallmentOption[] };
 const cache = new Map<string, CacheEntry>();
 const TTL_MS = 10 * 60 * 1000;
 
-/** Melhor parcelamento SEM JUROS disponível para o valor informado. */
-export async function bestInterestFreeInstallment(
-  amount: number,
-): Promise<InstallmentOption | null> {
-  if (!Number.isFinite(amount) || amount <= 0) return null;
+/**
+ * Todas as opções de parcelamento (sem e com juros) para o valor informado,
+ * exatamente como a conta do Mercado Pago está configurada.
+ */
+export async function installmentOptions(amount: number): Promise<InstallmentOption[]> {
+  if (!Number.isFinite(amount) || amount <= 0) return [];
   const key = amount.toFixed(2);
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
 
   const publicKey = process.env["MP_PUBLIC_KEY"];
-  if (!publicKey) return null;
+  if (!publicKey) return [];
 
-  let value: InstallmentOption | null = null;
+  let value: InstallmentOption[] = [];
   try {
     // A API exige payment_method_id (ou bin). Consultamos as bandeiras mais
     // comuns e ficamos com o melhor parcelamento sem juros entre elas.
