@@ -337,7 +337,7 @@ function CheckoutPage() {
         action={
           <button
             onClick={() => openAuth()}
-            className="border border-asc-line bg-charcoal px-8 py-3 text-[11px] uppercase tracking-luxe text-background"
+            className="asc-btn-primary px-8 py-3 text-[11px] uppercase tracking-luxe"
           >
             Entrar
           </button>
@@ -354,7 +354,7 @@ function CheckoutPage() {
         action={
           <Link
             to="/"
-            className="border border-asc-line bg-charcoal px-8 py-3 text-[11px] uppercase tracking-luxe text-background"
+            className="asc-btn-primary px-8 py-3 text-[11px] uppercase tracking-luxe"
           >
             Ver coleção
           </Link>

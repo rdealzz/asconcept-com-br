@@ -19,8 +19,6 @@ import {
   Settings,
   MapPin,
   Package,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { useOrders } from "@/lib/orders-context";
 import type { OrderStatus } from "@/lib/types";
@@ -45,8 +43,6 @@ import {
 } from "@/lib/catalog-context";
 import { supabase } from "@/integrations/supabase/client";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
-import { ProductInfoAccordion } from "@/components/ProductInfoAccordion";
-import { ZoomableImage } from "@/components/ZoomableImage";
 
 import { InstallmentsNote } from "@/components/InstallmentsNote";
 import { FavoriteButton, ShareButton } from "@/components/ProductActions";
@@ -147,7 +143,6 @@ function Index() {
           <Newsletter />
           <Footer />
           <CartDrawer />
-          <ProductModal />
           <AuthModal />
           <WelcomeCouponPopup />
           <SearchOverlay />
@@ -174,10 +169,11 @@ function Index() {
 }
 
 /* ---------- Product Modal Context ---------- */
+/**
+ * Contexto do fluxo de admin (editar / criar produto). A visualização do
+ * produto deixou de morar aqui: agora é a rota /produto/$id.
+ */
 const ProductCtx = createContext<{
-  activeId: string | null;
-  open: (id: string) => void;
-  close: () => void;
   editingId: string | null;
   openEdit: (id: string) => void;
   closeEdit: () => void;
@@ -186,15 +182,11 @@ const ProductCtx = createContext<{
 } | null>(null);
 
 function ProductProvider({ children }: { children: React.ReactNode }) {
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creatingCategory, setCreating] = useState<ProductCategory | null>(null);
   return (
     <ProductCtx.Provider
       value={{
-        activeId,
-        open: (id) => setActiveId(id),
-        close: () => setActiveId(null),
         editingId,
         openEdit: (id) => {
           setEditingId(id);
@@ -782,7 +774,7 @@ function StockBadge({ qty }: { qty: number }) {
 
 /* ---------- Product Card ---------- */
 function ProductCard({ product }: { product: Product }) {
-  const { open, openEdit } = useProduct();
+  const { openEdit } = useProduct();
   const { stock, deleteProduct } = useCatalog();
   const isAdmin = useIsAdmin();
   const sizeStock = stock[product.id];
@@ -796,12 +788,18 @@ function ProductCard({ product }: { product: Product }) {
 
   return (
     <article className="group flex flex-col">
-      <div
-        className={`relative aspect-[3/4] w-full overflow-hidden bg-asc-bg-raised ${
-          soldOut ? "" : "cursor-pointer"
-        }`}
-        onClick={() => !soldOut && open(product.id)}
-      >
+      <div className="relative aspect-[3/4] w-full overflow-hidden bg-asc-bg-raised">
+        {/* Link real (rastreável, abre em nova aba com o meio do mouse) em
+            overlay. Fica em z-20, abaixo dos botões de ação em z-30, para
+            não aninhar <button> dentro de <a>. */}
+        {!soldOut && (
+          <Link
+            to="/produto/$id"
+            params={{ id: product.id }}
+            aria-label={`Ver ${product.name}`}
+            className="absolute inset-0 z-20"
+          />
+        )}
         <img
           src={product.image}
           alt={product.name}
@@ -874,7 +872,15 @@ function ProductCard({ product }: { product: Product }) {
       </div>
       <div className="mt-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-display text-lg leading-snug text-asc-ink">{product.name}</h3>
+          <h3 className="font-display text-lg leading-snug text-asc-ink">
+            <Link
+              to="/produto/$id"
+              params={{ id: product.id }}
+              className="transition-colors duration-ascfast ease-asc hover:text-asc-gold"
+            >
+              {product.name}
+            </Link>
+          </h3>
           <p className="mt-1 line-clamp-1 font-sans text-xs font-light text-asc-ink-muted">
             {product.description}
           </p>
@@ -896,229 +902,6 @@ function ProductCard({ product }: { product: Product }) {
         </p>
       )}
     </article>
-  );
-}
-
-
-/* ---------- Product Modal ---------- */
-function ProductModal() {
-  const { activeId, close } = useProduct();
-  const { add } = useCart();
-  const { products, stock, decrementStock } = useCatalog();
-  const [size, setSize] = useState<Size>("M");
-  const [activeImg, setActiveImg] = useState(0);
-  const active = activeId ? products.find((p) => p.id === activeId) ?? null : null;
-
-  const sizeStock = active ? stock[active.id] : undefined;
-  const total = totalStock(sizeStock);
-  const soldOut = total === 0;
-  const availableQty = sizeStock?.[size] ?? 0;
-  const sizeSoldOut = availableQty === 0;
-  const lastItem =
-    !soldOut &&
-    !!active &&
-    (active.forceLastItem === true || hasLastSize(sizeStock) || total === 1);
-
-  useEffect(() => {
-    // Ao abrir um produto, selecionar automaticamente o primeiro tamanho com estoque.
-    if (!active) return;
-    setActiveImg(0);
-    const s = stock[active.id];
-    const firstAvailable = SIZES.find((sz) => (s?.[sz] ?? 0) > 0) ?? "M";
-    setSize(firstAvailable);
-  }, [activeId, active, stock]);
-
-  if (!active) return null;
-  const gallery = active.gallery && active.gallery.length ? active.gallery : [active.image];
-
-  return (
-    <>
-      <div
-        onClick={close}
-        className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
-      />
-      <div className="fixed inset-0 z-[90] flex items-stretch justify-center pointer-events-none md:items-center md:p-8">
-        <div className="pointer-events-auto relative flex h-[100svh] w-full max-w-5xl flex-col overflow-hidden bg-background animate-in fade-in zoom-in-95 duration-500 md:h-[88vh]">
-          <button
-            onClick={close}
-            aria-label="Fechar"
-            className="absolute right-4 top-4 z-20 rounded-full bg-background/80 p-2 backdrop-blur hover:text-accent"
-          >
-            <X className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.5} />
-          </button>
-          <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] md:pb-0">
-            <div className="flex flex-col bg-secondary md:sticky md:top-0 md:h-[88vh]">
-              <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-secondary max-md:aspect-[4/5]">
-                <ZoomableImage
-                  src={gallery[activeImg]}
-                  alt={active.name}
-                  className="object-contain"
-                />
-
-                {gallery.length > 1 && (
-                  <>
-                    <button
-                      onClick={() =>
-                        setActiveImg((i) => (i - 1 + gallery.length) % gallery.length)
-                      }
-                      aria-label="Foto anterior"
-                      className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-background/85 p-2 shadow-sm backdrop-blur transition-colors hover:text-accent"
-                    >
-                      <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
-                    </button>
-                    <button
-                      onClick={() => setActiveImg((i) => (i + 1) % gallery.length)}
-                      aria-label="Próxima foto"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-background/85 p-2 shadow-sm backdrop-blur transition-colors hover:text-accent"
-                    >
-                      <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
-                    </button>
-                    <span className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-charcoal/70 px-2 py-0.5 text-[10px] tracking-luxe text-ivory tabular-nums">
-                      {activeImg + 1}/{gallery.length}
-                    </span>
-                  </>
-                )}
-              </div>
-              {gallery.length > 1 && (
-                <div className="flex shrink-0 items-center justify-center gap-3 border-t border-border/40 bg-secondary px-4 py-4">
-                  {gallery.map((g, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setActiveImg(i)}
-                      aria-label={`Ver foto ${i + 1}`}
-                      className={`h-24 w-[68px] shrink-0 overflow-hidden border transition-all duration-300 ${
-                        activeImg === i
-                          ? "border-accent opacity-100"
-                          : "border-border/50 opacity-60 hover:opacity-100"
-                      }`}
-                    >
-                      <img src={g} alt="" className="h-full w-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-
-
-            <div className="flex flex-col p-6 md:p-12">
-              <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Conccept</p>
-              <h2 className="mt-3 font-serif text-2xl leading-tight md:text-4xl">{active.name}</h2>
-              <p className="mt-3 text-lg tabular-nums">{formatBRL(active.price)}</p>
-              {(soldOut || lastItem) && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {lastItem ? (
-                    <span className="inline-flex items-center gap-1 border border-[color:var(--gold)]/70 bg-[color:var(--gold)]/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
-                      ✦ Último Item
-                    </span>
-                  ) : (
-                    <StockBadge qty={total} />
-                  )}
-                </div>
-              )}
-
-
-
-              <div className="mt-8">
-                <p className="mb-3 text-[11px] tracking-luxe uppercase text-muted-foreground">
-                  Tamanho
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {SIZES.map((s) => {
-                    const q = sizeStock?.[s] ?? 0;
-                    const isOut = q === 0;
-                    return (
-                      <button
-                        key={s}
-                        onClick={() => !isOut && setSize(s)}
-                        disabled={isOut}
-                        title={isOut ? "Tamanho esgotado" : `${q} em estoque`}
-                        className={`relative h-12 w-16 border text-sm transition-all md:h-11 md:w-14 ${
-                          size === s
-                            ? "border-foreground bg-foreground text-ivory"
-                            : "border-border hover:border-foreground"
-                        } ${
-                          isOut
-                            ? "cursor-not-allowed opacity-40 line-through"
-                            : ""
-                        }`}
-                      >
-                        {s}
-                        {q === 1 && !isOut && (
-                          <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[color:var(--gold)]" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-                {(sizeSoldOut || availableQty === 1 || availableQty === 2) && (
-                  <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
-                    {sizeSoldOut
-                      ? "Tamanho selecionado sem disponibilidade."
-                      : availableQty === 1
-                        ? "Última peça em estoque neste tamanho."
-                        : `${availableQty} unidades disponíveis no tamanho ${size}.`}
-                  </p>
-                )}
-              </div>
-
-              {/* Desktop CTA */}
-              <button
-                onClick={() => {
-                  if (soldOut || sizeSoldOut) return;
-                  add(active, size);
-                  decrementStock(active.id, size, 1);
-                  close();
-                }}
-                disabled={soldOut || sizeSoldOut}
-                className="mt-10 hidden asc-btn-primary py-4 text-[11px] tracking-luxe uppercase disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground md:block"
-              >
-                {soldOut
-                  ? "Produto Esgotado"
-                  : sizeSoldOut
-                    ? `Tamanho ${size} esgotado`
-                    : "Adicionar à Sacola"}
-              </button>
-
-              <ProductInfoAccordion
-                productId={active.id}
-                productName={active.name}
-                description={active.longDescription ?? active.description}
-              />
-
-              <div className="mt-8">
-                <ShippingCalculator subtotal={active.price} />
-              </div>
-
-
-              <div className="mt-8 space-y-2 border-t border-border pt-6 text-xs font-light text-muted-foreground">
-                <p>Frete grátis em pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}.</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Mobile sticky CTA */}
-          <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-10 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:hidden">
-            <button
-              onClick={() => {
-                if (soldOut || sizeSoldOut) return;
-                add(active, size);
-                decrementStock(active.id, size, 1);
-                close();
-              }}
-              disabled={soldOut || sizeSoldOut}
-              className="w-full asc-btn-primary py-4 text-[11px] tracking-luxe uppercase disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
-            >
-              {soldOut
-                ? "Produto Esgotado"
-                : sizeSoldOut
-                  ? `Tamanho ${size} esgotado`
-                  : `Adicionar — ${formatBRL(active.price)}`}
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
   );
 }
 
@@ -1390,7 +1173,7 @@ function AdminEditModal() {
                       onClick={() => setForm({ ...form, category: c })}
                       className={`border px-3 py-1.5 text-[10px] tracking-luxe uppercase transition-colors ${
                         form.category === c
-                          ? "border-foreground bg-foreground text-ivory"
+                          ? "border-foreground bg-foreground text-asc-bg"
                           : "border-border hover:border-foreground"
                       }`}
                     >

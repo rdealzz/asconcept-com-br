@@ -9,24 +9,12 @@
  *  - sem label → fio + diamante central
  *  - com label → fio — LABEL — fio
  */
-export function StitchDivider({
-  className = "",
-  label,
-}: {
-  className?: string;
-  label?: string;
-}) {
+export function StitchDivider({ className = "", label }: { className?: string; label?: string }) {
   return (
     <div className={`flex items-center gap-4 ${className}`} role="separator">
       <GoldLine />
-      {label ? (
-        <>
-          <span className="asc-label shrink-0 text-asc-gold">{label}</span>
-          <GoldLine />
-        </>
-      ) : (
-        <Diamond />
-      )}
+      {label ? <span className="asc-label shrink-0 text-asc-gold">{label}</span> : <Diamond />}
+      <GoldLine />
     </div>
   );
 }
@@ -47,10 +35,7 @@ function Diamond() {
       aria-hidden
       className="shrink-0 text-asc-gold"
     >
-      <path
-        d="M5 0 L5.6 4.4 L10 5 L5.6 5.6 L5 10 L4.4 5.6 L0 5 L4.4 4.4 Z"
-        fill="currentColor"
-      />
+      <path d="M5 0 L5.6 4.4 L10 5 L5.6 5.6 L5 10 L4.4 5.6 L0 5 L4.4 4.4 Z" fill="currentColor" />
     </svg>
   );
 }

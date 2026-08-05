@@ -84,9 +84,12 @@
   --asc-gold: #C5A059;
   --asc-gold-soft: #E5C687;
   --asc-gold-gradient: linear-gradient(135deg, #C5A059 0%, #E5C687 100%);
-  /* Estado */
-  --asc-error: #B5544A;
-  --asc-success: #5A7A63;
+  /* Estado — clareados em relação ao #B5544A / #5A7A63 do guia da marca.
+     Naqueles valores, mensagem de erro e de sucesso ficavam em 3.7:1 sobre
+     as superfícies escuras, abaixo do mínimo AA de 4.5:1 para texto. Estes
+     ficam em ~5.3:1 e ~7:1, mantendo a mesma família de cor. */
+  --asc-error: #C9736A;
+  --asc-success: #7FA98B;
   /* Espaçamento editorial */
   --asc-section-y: clamp(5rem, 9vw, 9rem);
   --asc-section-y-sm: clamp(3rem, 6vw, 5rem);
@@ -165,12 +168,6 @@
     letter-spacing: -0.01em;
   }
 
-  /* Foco de teclado visível — acessibilidade, não decoração. */
-  :focus-visible {
-    outline: 1px solid var(--asc-gold);
-    outline-offset: 3px;
-  }
-
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -181,6 +178,15 @@
       scroll-behavior: auto !important;
     }
   }
+}
+
+/* Foco de teclado visível — acessibilidade, não decoração.
+   Fica FORA de @layer de propósito: regra sem camada vence qualquer camada,
+   e há 47 usos de `outline-none` no app que senão apagariam o contorno.
+   Só :focus-visible, então o anel não aparece em clique de mouse. */
+:focus-visible {
+  outline: 1px solid var(--asc-gold);
+  outline-offset: 3px;
 }
 
 /* — Rótulos: nav, botões, eyebrows —

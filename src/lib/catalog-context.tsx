@@ -116,8 +116,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     if (patch.image !== undefined) dbPatch.image = patch.image;
     if (patch.gallery !== undefined) dbPatch.gallery = patch.gallery;
     if (patch.category !== undefined) dbPatch.category = patch.category;
-    if (patch.forceLastItem !== undefined)
-      dbPatch.force_last_item = patch.forceLastItem === true;
+    if (patch.forceLastItem !== undefined) dbPatch.force_last_item = patch.forceLastItem === true;
 
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
     const { error } = await supabase
