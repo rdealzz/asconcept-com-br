@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "../lib/auth-context";
 import { CartProvider } from "../lib/cart-context";
+import { CatalogProvider } from "../lib/catalog-context";
 import { OrdersProvider } from "../lib/orders-context";
 import { WhatsAppFab } from "../components/WhatsAppFab";
 
@@ -147,12 +148,15 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <CartProvider>
-          <OrdersProvider>
-            
-            {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-            <Outlet />
-            <WhatsAppFab />
-          </OrdersProvider>
+          {/* CatalogProvider vive aqui, e não dentro da home, para que a
+              rota de produto também alcance produtos e estoque. */}
+          <CatalogProvider>
+            <OrdersProvider>
+              {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+              <Outlet />
+              <WhatsAppFab />
+            </OrdersProvider>
+          </CatalogProvider>
         </CartProvider>
       </AuthProvider>
     </QueryClientProvider>

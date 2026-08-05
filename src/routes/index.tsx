@@ -33,6 +33,16 @@ import {
   type ProductCategory,
 } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
+import {
+  useCatalog,
+  SIZES,
+  emptyStock,
+  totalStock,
+  hasLastSize,
+  coerceSizeStock,
+  type Size,
+  type SizeStock,
+} from "@/lib/catalog-context";
 import { supabase } from "@/integrations/supabase/client";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
 import { ProductInfoAccordion } from "@/components/ProductInfoAccordion";
@@ -57,16 +67,6 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const SIZES = ["P", "M", "G", "GG"] as const;
-export type Size = (typeof SIZES)[number];
-export type SizeStock = Record<Size, number>;
-
-const emptyStock = (): SizeStock => ({ P: 0, M: 0, G: 0, GG: 0 });
-const totalStock = (s: SizeStock | undefined) =>
-  s ? s.P + s.M + s.G + s.GG : 0;
-const hasLastSize = (s: SizeStock | undefined) =>
-  !!s && (s.P === 1 || s.M === 1 || s.G === 1 || s.GG === 1);
-
 const SNEAKERS_LAUNCH = new Date("2026-09-01T00:00:00-03:00").getTime();
 
 /** Máximo de fotos por produto no formulário do admin. */
@@ -76,200 +76,6 @@ function useIsAdmin() {
   const { user } = useAuth();
   return !!user?.isAdmin;
 }
-
-/* ---------- Catalog Context (Supabase-backed) ---------- */
-type ProductInput = Omit<Product, "id">;
-
-type CatalogCtx = {
-  products: Product[];
-  stock: Record<string, SizeStock>;
-  loading: boolean;
-  updateProduct: (id: string, patch: Partial<Product>) => Promise<void>;
-  addProduct: (p: ProductInput, stock: SizeStock) => Promise<string | null>;
-  deleteProduct: (id: string) => Promise<void>;
-  setStock: (id: string, stock: SizeStock) => Promise<void>;
-  decrementStock: (id: string, size: Size, by?: number) => void;
-  refresh: () => Promise<void>;
-};
-const CatalogContext = createContext<CatalogCtx | null>(null);
-
-function coerceSizeStock(v: unknown): SizeStock {
-  if (v && typeof v === "object") {
-    const src = v as Partial<Record<Size, unknown>>;
-    return {
-      P: Math.max(0, Math.floor(Number(src.P) || 0)),
-      M: Math.max(0, Math.floor(Number(src.M) || 0)),
-      G: Math.max(0, Math.floor(Number(src.G) || 0)),
-      GG: Math.max(0, Math.floor(Number(src.GG) || 0)),
-    };
-  }
-  return emptyStock();
-}
-
-type ProductRow = {
-  id: string;
-  name: string;
-  description: string | null;
-  long_description: string | null;
-  price: string | number;
-  category: string;
-  image: string | null;
-  gallery: unknown;
-  sizes: unknown;
-  force_last_item: boolean;
-  sort_order: number;
-  created_at?: string | null;
-};
-
-function rowToProduct(r: ProductRow): Product {
-  const image = r.image ?? "";
-  const galleryArr = Array.isArray(r.gallery)
-    ? (r.gallery as unknown[]).filter((g): g is string => typeof g === "string")
-    : [];
-  return {
-    id: r.id,
-    name: r.name,
-    description: r.description ?? "",
-    longDescription: r.long_description ?? undefined,
-    price: Number(r.price),
-    image,
-    gallery: galleryArr.length ? galleryArr : image ? [image] : [],
-    category: (r.category === "sneakers" ? "sneakers" : "clothes") as ProductCategory,
-    forceLastItem: r.force_last_item || undefined,
-    createdAt: r.created_at ?? undefined,
-  };
-}
-
-function CatalogProvider({ children }: { children: React.ReactNode }) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [stock, setStockMap] = useState<Record<string, SizeStock>>({});
-  const [loading, setLoading] = useState(true);
-
-  const refresh = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true });
-    setLoading(false);
-    if (error) {
-      console.error("[catalog] fetch failed", error);
-      return;
-    }
-    const rows = (data ?? []) as ProductRow[];
-    setProducts(rows.map(rowToProduct));
-    const nextStock: Record<string, SizeStock> = {};
-    for (const r of rows) nextStock[r.id] = coerceSizeStock(r.sizes);
-    setStockMap(nextStock);
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  const updateProduct: CatalogCtx["updateProduct"] = async (id, patch) => {
-    const dbPatch: Record<string, unknown> = {};
-    if (patch.name !== undefined) dbPatch.name = patch.name;
-    if (patch.description !== undefined) dbPatch.description = patch.description;
-    if (patch.longDescription !== undefined) dbPatch.long_description = patch.longDescription ?? null;
-    if (patch.price !== undefined) dbPatch.price = patch.price;
-    if (patch.image !== undefined) dbPatch.image = patch.image;
-    if (patch.gallery !== undefined) dbPatch.gallery = patch.gallery;
-    if (patch.category !== undefined) dbPatch.category = patch.category;
-    if (patch.forceLastItem !== undefined)
-      dbPatch.force_last_item = patch.forceLastItem === true;
-
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-    const { error } = await supabase
-      .from("products")
-      .update(dbPatch as never)
-      .eq("id", id);
-    if (error) {
-      console.error("[catalog] update failed", error);
-      await refresh();
-    }
-  };
-
-  const addProduct: CatalogCtx["addProduct"] = async (p, s) => {
-    const payload = {
-      name: p.name,
-      description: p.description,
-      long_description: p.longDescription ?? null,
-      price: p.price,
-      image: p.image,
-      gallery: p.gallery ?? [p.image],
-      category: p.category ?? "clothes",
-      force_last_item: p.forceLastItem === true,
-      sizes: coerceSizeStock(s),
-    };
-    const { data, error } = await supabase
-      .from("products")
-      .insert(payload as never)
-      .select("*")
-      .single();
-    if (error || !data) {
-      console.error("[catalog] insert failed", error);
-      return null;
-    }
-    const row = data as ProductRow;
-    const product = rowToProduct(row);
-    setProducts((prev) => [...prev, product]);
-    setStockMap((prev) => ({ ...prev, [product.id]: coerceSizeStock(row.sizes) }));
-    return product.id;
-  };
-
-  const deleteProduct: CatalogCtx["deleteProduct"] = async (id) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    setStockMap((prev) => {
-      const { [id]: _drop, ...rest } = prev;
-      return rest;
-    });
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    if (error) {
-      console.error("[catalog] delete failed", error);
-      await refresh();
-    }
-  };
-
-  const setStock: CatalogCtx["setStock"] = async (id, s) => {
-    const next = coerceSizeStock(s);
-    setStockMap((prev) => ({ ...prev, [id]: next }));
-    const { error } = await supabase
-      .from("products")
-      .update({ sizes: next } as never)
-      .eq("id", id);
-    if (error) {
-      console.error("[catalog] setStock failed", error);
-      await refresh();
-    }
-  };
-
-  // Optimistic local decrement — DB decrement runs server-side on checkout via RPC.
-  const decrementStock: CatalogCtx["decrementStock"] = (id, size, by = 1) =>
-    setStockMap((prev) => {
-      const cur = prev[id] ?? emptyStock();
-      return {
-        ...prev,
-        [id]: { ...cur, [size]: Math.max(0, (cur[size] ?? 0) - by) },
-      };
-    });
-
-  return (
-    <CatalogContext.Provider
-      value={{ products, stock, loading, updateProduct, addProduct, deleteProduct, setStock, decrementStock, refresh }}
-    >
-      {children}
-    </CatalogContext.Provider>
-  );
-}
-function useCatalog() {
-  const c = useContext(CatalogContext);
-  if (!c) throw new Error("CatalogProvider missing");
-  return c;
-}
-
-
-
 
 /* ---------- Search + Tabs Context ---------- */
 export type SubFilter = "todos" | "blusa" | "camiseta" | "calca";
@@ -320,52 +126,50 @@ function Index() {
   const [adminOpen, setAdminOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   return (
-    <CatalogProvider>
-      <SearchProvider>
-        <ProductProvider>
-          <div className="min-h-screen bg-background text-foreground">
-            <Nav
-              onOpenFilter={() => setFilterOpen(true)}
-              onOpenAccount={() => setAccountOpen(true)}
-              onOpenAdmin={() => setAdminOpen(true)}
-              onOpenMobileMenu={() => setMobileMenuOpen(true)}
-            />
-            <Hero />
-            <div className="mx-auto max-w-[1600px] px-6 pt-10 md:px-12 md:pt-14">
-              <StitchDivider label="The New Era of Heritage" />
-            </div>
-            <CategoryTabs />
-            <Products />
-
-            <Testimonials />
-            <Concept />
-            <Newsletter />
-            <Footer />
-            <CartDrawer />
-            <ProductModal />
-            <AuthModal />
-            <WelcomeCouponPopup />
-            <SearchOverlay />
-            <AdminEditModal />
-            <FilterSidebar open={filterOpen} onClose={() => setFilterOpen(false)} />
-            <MinhaContaModal open={accountOpen} onClose={() => setAccountOpen(false)} />
-            <AdminPanelModal open={adminOpen} onClose={() => setAdminOpen(false)} />
-            <MobileMenu
-              open={mobileMenuOpen}
-              onClose={() => setMobileMenuOpen(false)}
-              onOpenAccount={() => {
-                setMobileMenuOpen(false);
-                setAccountOpen(true);
-              }}
-              onOpenFilter={() => {
-                setMobileMenuOpen(false);
-                setFilterOpen(true);
-              }}
-            />
+    <SearchProvider>
+      <ProductProvider>
+        <div className="min-h-screen bg-background text-foreground">
+          <Nav
+            onOpenFilter={() => setFilterOpen(true)}
+            onOpenAccount={() => setAccountOpen(true)}
+            onOpenAdmin={() => setAdminOpen(true)}
+            onOpenMobileMenu={() => setMobileMenuOpen(true)}
+          />
+          <Hero />
+          <div className="mx-auto max-w-[1600px] px-6 pt-10 md:px-12 md:pt-14">
+            <StitchDivider label="The New Era of Heritage" />
           </div>
-        </ProductProvider>
-      </SearchProvider>
-    </CatalogProvider>
+          <CategoryTabs />
+          <Products />
+
+          <Testimonials />
+          <Concept />
+          <Newsletter />
+          <Footer />
+          <CartDrawer />
+          <ProductModal />
+          <AuthModal />
+          <WelcomeCouponPopup />
+          <SearchOverlay />
+          <AdminEditModal />
+          <FilterSidebar open={filterOpen} onClose={() => setFilterOpen(false)} />
+          <MinhaContaModal open={accountOpen} onClose={() => setAccountOpen(false)} />
+          <AdminPanelModal open={adminOpen} onClose={() => setAdminOpen(false)} />
+          <MobileMenu
+            open={mobileMenuOpen}
+            onClose={() => setMobileMenuOpen(false)}
+            onOpenAccount={() => {
+              setMobileMenuOpen(false);
+              setAccountOpen(true);
+            }}
+            onOpenFilter={() => {
+              setMobileMenuOpen(false);
+              setFilterOpen(true);
+            }}
+          />
+        </div>
+      </ProductProvider>
+    </SearchProvider>
   );
 }
 
