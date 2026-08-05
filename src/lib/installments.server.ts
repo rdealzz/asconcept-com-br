@@ -37,7 +37,7 @@ export async function installmentOptions(amount: number): Promise<InstallmentOpt
   let value: InstallmentOption[] = [];
   try {
     // A API exige payment_method_id (ou bin). Consultamos as bandeiras mais
-    // comuns e ficamos com o melhor parcelamento sem juros entre elas.
+    // comuns e consolidamos a melhor condição por número de parcelas.
     const brands = ["visa", "master", "elo"];
     const costs: PayerCost[] = [];
     for (const brand of brands) {
@@ -52,17 +52,22 @@ export async function installmentOptions(amount: number): Promise<InstallmentOpt
         console.error("[mp] installments failed", brand, res.status);
       }
     }
-    const free = costs
-      .filter((c) => Number(c.installment_rate) === 0 && c.installments > 1)
-      .sort((a, b) => b.installments - a.installments)[0];
-    if (free) {
-      value = {
-        installments: free.installments,
-        installmentAmount: Number(free.installment_amount),
-        totalAmount: Number(free.total_amount),
-        interestFree: true,
-      };
+    // Para cada quantidade de parcelas mantemos a condição mais barata.
+    const byInstallments = new Map<number, PayerCost>();
+    for (const c of costs) {
+      const prev = byInstallments.get(c.installments);
+      if (!prev || Number(c.total_amount) < Number(prev.total_amount)) {
+        byInstallments.set(c.installments, c);
+      }
     }
+    value = [...byInstallments.values()]
+      .sort((a, b) => a.installments - b.installments)
+      .map((c) => ({
+        installments: c.installments,
+        installmentAmount: Number(c.installment_amount),
+        totalAmount: Number(c.total_amount),
+        interestFree: Number(c.installment_rate) === 0,
+      }));
   } catch (e) {
     console.error("[mp] installments error", e);
   }
@@ -70,3 +75,13 @@ export async function installmentOptions(amount: number): Promise<InstallmentOpt
   cache.set(key, { at: Date.now(), value });
   return value;
 }
+
+/** Melhor parcelamento SEM JUROS disponível para o valor informado. */
+export async function bestInterestFreeInstallment(
+  amount: number,
+): Promise<InstallmentOption | null> {
+  const options = await installmentOptions(amount);
+  const free = options.filter((o) => o.interestFree && o.installments > 1);
+  return free.length ? free[free.length - 1]! : null;
+}
+
