@@ -1,8 +1,13 @@
 /**
  * StitchDivider — elemento de assinatura da A&S Conccept.
  *
- * Uma linha de costura dourada (ponto de alfaiate) no lugar de um <hr />
- * genérico. Usar com moderação: 1-2 por página.
+ * Reproduz o motivo da logo oficial: fio dourado de 1px com um diamante
+ * (starburst de 4 pontas) ao centro, no lugar de um <hr /> genérico.
+ * Usar com moderação: 1-2 por página.
+ *
+ * Variantes:
+ *  - sem label → fio + diamante central
+ *  - com label → fio — LABEL — fio
  */
 export function StitchDivider({
   className = "",
@@ -11,32 +16,41 @@ export function StitchDivider({
   className?: string;
   label?: string;
 }) {
-  const line = (
-    <svg
-      className="h-[9px] flex-1 text-asc-gold-soft"
-      preserveAspectRatio="none"
-      viewBox="0 0 400 9"
-      fill="none"
-      aria-hidden
-    >
-      <line
-        x1="0"
-        y1="4.5"
-        x2="400"
-        y2="4.5"
-        stroke="currentColor"
-        strokeWidth="1"
-        strokeDasharray="7 6"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-
   return (
     <div className={`flex items-center gap-4 ${className}`} role="separator">
-      {line}
-      {label && <span className="asc-label shrink-0 text-asc-gold">{label}</span>}
-      {label && line}
+      <GoldLine />
+      {label ? (
+        <>
+          <span className="asc-label shrink-0 text-asc-gold">{label}</span>
+          <GoldLine />
+        </>
+      ) : (
+        <Diamond />
+      )}
     </div>
+  );
+}
+
+function GoldLine() {
+  return (
+    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-asc-gold/40 to-transparent" />
+  );
+}
+
+function Diamond() {
+  return (
+    <svg
+      width="10"
+      height="10"
+      viewBox="0 0 10 10"
+      fill="none"
+      aria-hidden
+      className="shrink-0 text-asc-gold"
+    >
+      <path
+        d="M5 0 L5.6 4.4 L10 5 L5.6 5.6 L5 10 L4.4 5.6 L0 5 L4.4 4.4 Z"
+        fill="currentColor"
+      />
+    </svg>
   );
 }
