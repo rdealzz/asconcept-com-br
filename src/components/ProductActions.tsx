@@ -75,7 +75,7 @@ export function ShareButton({
       {open && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-0 top-11 z-40 w-52 border border-border bg-background p-2 shadow-xl"
+          className="absolute right-0 top-11 z-40 w-52 border border-border bg-background p-2"
         >
           <a
             href={`https://wa.me/?text=${encodeURIComponent(

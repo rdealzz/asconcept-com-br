@@ -81,7 +81,7 @@ function SucessoPage() {
         {state.kind === "loading" && (
           <>
             <Loader2 className="mx-auto mt-6 h-8 w-8 animate-spin text-accent" strokeWidth={1.5} />
-            <h1 className="mt-4 font-serif text-2xl text-charcoal">Confirmando seu pagamento…</h1>
+            <h1 className="mt-4 font-serif text-2xl text-asc-ink">Confirmando seu pagamento…</h1>
             <p className="mt-3 text-sm text-muted-foreground">Aguarde um instante.</p>
           </>
         )}
@@ -90,14 +90,14 @@ function SucessoPage() {
             <div className="mx-auto mt-6 flex h-14 w-14 items-center justify-center rounded-full border border-accent/50 bg-accent/10">
               <Check className="h-6 w-6 text-accent" strokeWidth={1.5} />
             </div>
-            <h1 className="mt-4 font-serif text-2xl text-charcoal">Pagamento aprovado</h1>
+            <h1 className="mt-4 font-serif text-2xl text-asc-ink">Pagamento aprovado</h1>
             <p className="mt-3 text-sm text-muted-foreground">
               Pedido <strong>{state.orderNumber}</strong> confirmado. Você receberá um e-mail com os detalhes.
             </p>
             <Link
               to="/pedidos/$id"
               params={{ id: state.orderNumber }}
-              className="mt-8 inline-block bg-charcoal px-8 py-3 text-[11px] tracking-luxe uppercase text-ivory hover:bg-navy"
+              className="mt-8 inline-block asc-btn-primary px-8 py-3 text-[11px] tracking-luxe uppercase"
             >
               Acompanhar Pedido
             </Link>
@@ -105,7 +105,7 @@ function SucessoPage() {
         )}
         {state.kind === "pending" && (
           <>
-            <h1 className="mt-6 font-serif text-2xl text-charcoal">Pagamento em processamento</h1>
+            <h1 className="mt-6 font-serif text-2xl text-asc-ink">Pagamento em processamento</h1>
             <p className="mt-3 text-sm text-muted-foreground">
               Assim que confirmarmos, o pedido <strong>{state.orderNumber}</strong> será atualizado.
               Pix pode levar alguns minutos.
@@ -113,7 +113,7 @@ function SucessoPage() {
             <Link
               to="/pedidos/$id"
               params={{ id: state.orderNumber }}
-              className="mt-6 inline-block border border-border px-6 py-3 text-[11px] uppercase tracking-luxe text-charcoal"
+              className="mt-6 inline-block border border-border px-6 py-3 text-[11px] uppercase tracking-luxe text-asc-ink"
             >
               Ver pedido
             </Link>
@@ -121,11 +121,11 @@ function SucessoPage() {
         )}
         {state.kind === "error" && (
           <>
-            <h1 className="mt-6 font-serif text-2xl text-charcoal">Não foi possível confirmar</h1>
-            <p className="mt-3 text-sm text-red-700">{state.message}</p>
+            <h1 className="mt-6 font-serif text-2xl text-asc-ink">Não foi possível confirmar</h1>
+            <p className="mt-3 text-sm text-asc-error">{state.message}</p>
             <button
               onClick={() => navigate({ to: "/" })}
-              className="mt-6 inline-block border border-border px-6 py-3 text-[11px] uppercase tracking-luxe text-charcoal"
+              className="mt-6 inline-block border border-border px-6 py-3 text-[11px] uppercase tracking-luxe text-asc-ink"
             >
               Voltar à loja
             </button>

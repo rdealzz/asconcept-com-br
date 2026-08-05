@@ -53,7 +53,7 @@ export function ShippingCalculator({ subtotal, compact = false }: Props) {
         <button
           type="submit"
           disabled={loading || normalizeCep(cep).length !== 8}
-          className="bg-charcoal px-5 py-2 text-[10px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:opacity-40"
+          className="asc-btn-primary px-5 py-2 text-[10px] tracking-luxe uppercase disabled:opacity-40"
         >
           {loading ? "..." : "Calcular"}
         </button>

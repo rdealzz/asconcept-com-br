@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "../lib/auth-context";
 import { CartProvider } from "../lib/cart-context";
+import { CatalogProvider } from "../lib/catalog-context";
 import { OrdersProvider } from "../lib/orders-context";
 import { WhatsAppFab } from "../components/WhatsAppFab";
 
@@ -106,7 +107,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500;600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Cinzel:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500;600&display=swap",
       },
 
     ],
@@ -147,12 +148,15 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <CartProvider>
-          <OrdersProvider>
-            
-            {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-            <Outlet />
-            <WhatsAppFab />
-          </OrdersProvider>
+          {/* CatalogProvider vive aqui, e não dentro da home, para que a
+              rota de produto também alcance produtos e estoque. */}
+          <CatalogProvider>
+            <OrdersProvider>
+              {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+              <Outlet />
+              <WhatsAppFab />
+            </OrdersProvider>
+          </CatalogProvider>
         </CartProvider>
       </AuthProvider>
     </QueryClientProvider>

@@ -337,7 +337,7 @@ function CheckoutPage() {
         action={
           <button
             onClick={() => openAuth()}
-            className="border border-charcoal bg-charcoal px-8 py-3 text-[11px] uppercase tracking-luxe text-background"
+            className="asc-btn-primary px-8 py-3 text-[11px] uppercase tracking-luxe"
           >
             Entrar
           </button>
@@ -354,7 +354,7 @@ function CheckoutPage() {
         action={
           <Link
             to="/"
-            className="border border-charcoal bg-charcoal px-8 py-3 text-[11px] uppercase tracking-luxe text-background"
+            className="asc-btn-primary px-8 py-3 text-[11px] uppercase tracking-luxe"
           >
             Ver coleção
           </Link>
@@ -369,11 +369,11 @@ function CheckoutPage() {
         <header className="mb-10 flex items-center justify-between">
           <Link
             to="/"
-            className="inline-flex items-center gap-1 text-[11px] uppercase tracking-luxe text-muted-foreground hover:text-charcoal"
+            className="inline-flex items-center gap-1 text-[11px] uppercase tracking-luxe text-muted-foreground hover:text-asc-ink"
           >
             <ChevronLeft className="h-3.5 w-3.5" /> Continuar comprando
           </Link>
-          <p className="font-serif text-lg tracking-widest text-charcoal">A&S Conccept</p>
+          <p className="font-serif text-lg tracking-widest text-asc-ink">A&S Conccept</p>
           <span className="w-40" />
         </header>
 
@@ -383,7 +383,7 @@ function CheckoutPage() {
             <Link
               to="/pedidos/$id"
               params={{ id: pix.orderNumber }}
-              className="mt-6 inline-block border border-border px-6 py-3 text-[11px] uppercase tracking-luxe text-charcoal"
+              className="mt-6 inline-block border border-border px-6 py-3 text-[11px] uppercase tracking-luxe text-asc-ink"
             >
               Acompanhar pedido
             </Link>
@@ -493,14 +493,14 @@ function CheckoutPage() {
 function Stepper({ step }: { step: 1 | 2 }) {
   return (
     <ol className="flex items-center justify-center gap-6 text-[11px] uppercase tracking-luxe">
-      <li className={step === 1 ? "text-charcoal" : "text-accent"}>
+      <li className={step === 1 ? "text-asc-ink" : "text-accent"}>
         <span className="mr-2 inline-flex h-6 w-6 items-center justify-center border border-current tabular-nums">
           1
         </span>
         Dados & Entrega
       </li>
       <span className="h-px w-10 bg-border" />
-      <li className={step === 2 ? "text-charcoal" : "text-muted-foreground"}>
+      <li className={step === 2 ? "text-asc-ink" : "text-muted-foreground"}>
         <span className="mr-2 inline-flex h-6 w-6 items-center justify-center border border-current tabular-nums">
           2
         </span>
@@ -559,7 +559,7 @@ function StepOne({
       className="space-y-8"
     >
       <div>
-        <h1 className="font-serif text-2xl text-charcoal">Seus dados</h1>
+        <h1 className="font-serif text-2xl text-asc-ink">Seus dados</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Precisamos dessas informações para preparar sua peça com o cuidado de sempre.
         </p>
@@ -606,7 +606,7 @@ function StepOne({
       </div>
 
       <div>
-        <h2 className="font-serif text-xl text-charcoal">Endereço de entrega</h2>
+        <h2 className="font-serif text-xl text-asc-ink">Endereço de entrega</h2>
       </div>
 
       <div className="grid gap-5 sm:grid-cols-6">
@@ -673,7 +673,7 @@ function StepOne({
 
       <button
         type="submit"
-        className="w-full bg-charcoal px-8 py-4 text-[11px] uppercase tracking-luxe text-ivory transition-colors hover:bg-navy sm:w-auto"
+        className="w-full asc-btn-primary px-8 py-4 text-[11px] uppercase tracking-luxe sm:w-auto"
       >
         Ir para o pagamento →
       </button>
@@ -708,7 +708,7 @@ function StepTwo({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-serif text-2xl text-charcoal">Pagamento</h1>
+        <h1 className="font-serif text-2xl text-asc-ink">Pagamento</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Todo o pagamento acontece aqui mesmo, sem sair do site.
         </p>
@@ -791,13 +791,13 @@ function StepTwo({
           <p className="mt-2 text-sm text-muted-foreground">
             Geramos o QR Code na próxima tela, aqui mesmo no site. A confirmação é automática.
           </p>
-          <p className="mt-4 font-serif text-2xl tabular-nums text-charcoal">
+          <p className="mt-4 font-serif text-2xl tabular-nums text-asc-ink">
             {formatBRL(totalPix)}
           </p>
           <button
             onClick={onPixSubmit}
             disabled={submitting}
-            className="mt-6 inline-flex w-full items-center justify-center gap-2 bg-charcoal px-8 py-4 text-[11px] uppercase tracking-luxe text-ivory transition-colors hover:bg-navy disabled:opacity-60 sm:w-auto"
+            className="mt-6 inline-flex w-full items-center justify-center gap-2 asc-btn-primary px-8 py-4 text-[11px] uppercase tracking-luxe disabled:opacity-60 sm:w-auto"
           >
             {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {submitting ? "Gerando QR Code…" : "Gerar QR Code Pix"}
@@ -832,7 +832,7 @@ function MethodTile({
     >
       <span className={active ? "text-accent" : "text-muted-foreground"}>{icon}</span>
       <span>
-        <span className="block text-[11px] uppercase tracking-luxe text-charcoal">{title}</span>
+        <span className="block text-[11px] uppercase tracking-luxe text-asc-ink">{title}</span>
         <span className="block text-[11px] text-muted-foreground">{subtitle}</span>
       </span>
     </button>
@@ -853,7 +853,7 @@ function CheckoutNotice({
     <main className="flex min-h-[70vh] items-center justify-center bg-background px-6">
       <div className="max-w-md text-center">
         <p className="text-[11px] uppercase tracking-luxe text-muted-foreground">A&S Conccept</p>
-        <h1 className="mt-4 font-serif text-3xl text-charcoal">{title}</h1>
+        <h1 className="mt-4 font-serif text-3xl text-asc-ink">{title}</h1>
         <p className="mt-3 text-sm text-muted-foreground">{text}</p>
         <div className="mt-8 flex justify-center">{action}</div>
       </div>

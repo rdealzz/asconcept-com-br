@@ -19,8 +19,6 @@ import {
   Settings,
   MapPin,
   Package,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { useOrders } from "@/lib/orders-context";
 import type { OrderStatus } from "@/lib/types";
@@ -33,10 +31,18 @@ import {
   type ProductCategory,
 } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
+import {
+  useCatalog,
+  SIZES,
+  emptyStock,
+  totalStock,
+  hasLastSize,
+  coerceSizeStock,
+  type Size,
+  type SizeStock,
+} from "@/lib/catalog-context";
 import { supabase } from "@/integrations/supabase/client";
 import { ShippingCalculator, FreeShippingHint } from "@/components/ShippingCalculator";
-import { ProductInfoAccordion } from "@/components/ProductInfoAccordion";
-import { ZoomableImage } from "@/components/ZoomableImage";
 
 import { InstallmentsNote } from "@/components/InstallmentsNote";
 import { FavoriteButton, ShareButton } from "@/components/ProductActions";
@@ -57,16 +63,6 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const SIZES = ["P", "M", "G", "GG"] as const;
-export type Size = (typeof SIZES)[number];
-export type SizeStock = Record<Size, number>;
-
-const emptyStock = (): SizeStock => ({ P: 0, M: 0, G: 0, GG: 0 });
-const totalStock = (s: SizeStock | undefined) =>
-  s ? s.P + s.M + s.G + s.GG : 0;
-const hasLastSize = (s: SizeStock | undefined) =>
-  !!s && (s.P === 1 || s.M === 1 || s.G === 1 || s.GG === 1);
-
 const SNEAKERS_LAUNCH = new Date("2026-09-01T00:00:00-03:00").getTime();
 
 /** Máximo de fotos por produto no formulário do admin. */
@@ -76,200 +72,6 @@ function useIsAdmin() {
   const { user } = useAuth();
   return !!user?.isAdmin;
 }
-
-/* ---------- Catalog Context (Supabase-backed) ---------- */
-type ProductInput = Omit<Product, "id">;
-
-type CatalogCtx = {
-  products: Product[];
-  stock: Record<string, SizeStock>;
-  loading: boolean;
-  updateProduct: (id: string, patch: Partial<Product>) => Promise<void>;
-  addProduct: (p: ProductInput, stock: SizeStock) => Promise<string | null>;
-  deleteProduct: (id: string) => Promise<void>;
-  setStock: (id: string, stock: SizeStock) => Promise<void>;
-  decrementStock: (id: string, size: Size, by?: number) => void;
-  refresh: () => Promise<void>;
-};
-const CatalogContext = createContext<CatalogCtx | null>(null);
-
-function coerceSizeStock(v: unknown): SizeStock {
-  if (v && typeof v === "object") {
-    const src = v as Partial<Record<Size, unknown>>;
-    return {
-      P: Math.max(0, Math.floor(Number(src.P) || 0)),
-      M: Math.max(0, Math.floor(Number(src.M) || 0)),
-      G: Math.max(0, Math.floor(Number(src.G) || 0)),
-      GG: Math.max(0, Math.floor(Number(src.GG) || 0)),
-    };
-  }
-  return emptyStock();
-}
-
-type ProductRow = {
-  id: string;
-  name: string;
-  description: string | null;
-  long_description: string | null;
-  price: string | number;
-  category: string;
-  image: string | null;
-  gallery: unknown;
-  sizes: unknown;
-  force_last_item: boolean;
-  sort_order: number;
-  created_at?: string | null;
-};
-
-function rowToProduct(r: ProductRow): Product {
-  const image = r.image ?? "";
-  const galleryArr = Array.isArray(r.gallery)
-    ? (r.gallery as unknown[]).filter((g): g is string => typeof g === "string")
-    : [];
-  return {
-    id: r.id,
-    name: r.name,
-    description: r.description ?? "",
-    longDescription: r.long_description ?? undefined,
-    price: Number(r.price),
-    image,
-    gallery: galleryArr.length ? galleryArr : image ? [image] : [],
-    category: (r.category === "sneakers" ? "sneakers" : "clothes") as ProductCategory,
-    forceLastItem: r.force_last_item || undefined,
-    createdAt: r.created_at ?? undefined,
-  };
-}
-
-function CatalogProvider({ children }: { children: React.ReactNode }) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [stock, setStockMap] = useState<Record<string, SizeStock>>({});
-  const [loading, setLoading] = useState(true);
-
-  const refresh = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true });
-    setLoading(false);
-    if (error) {
-      console.error("[catalog] fetch failed", error);
-      return;
-    }
-    const rows = (data ?? []) as ProductRow[];
-    setProducts(rows.map(rowToProduct));
-    const nextStock: Record<string, SizeStock> = {};
-    for (const r of rows) nextStock[r.id] = coerceSizeStock(r.sizes);
-    setStockMap(nextStock);
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  const updateProduct: CatalogCtx["updateProduct"] = async (id, patch) => {
-    const dbPatch: Record<string, unknown> = {};
-    if (patch.name !== undefined) dbPatch.name = patch.name;
-    if (patch.description !== undefined) dbPatch.description = patch.description;
-    if (patch.longDescription !== undefined) dbPatch.long_description = patch.longDescription ?? null;
-    if (patch.price !== undefined) dbPatch.price = patch.price;
-    if (patch.image !== undefined) dbPatch.image = patch.image;
-    if (patch.gallery !== undefined) dbPatch.gallery = patch.gallery;
-    if (patch.category !== undefined) dbPatch.category = patch.category;
-    if (patch.forceLastItem !== undefined)
-      dbPatch.force_last_item = patch.forceLastItem === true;
-
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-    const { error } = await supabase
-      .from("products")
-      .update(dbPatch as never)
-      .eq("id", id);
-    if (error) {
-      console.error("[catalog] update failed", error);
-      await refresh();
-    }
-  };
-
-  const addProduct: CatalogCtx["addProduct"] = async (p, s) => {
-    const payload = {
-      name: p.name,
-      description: p.description,
-      long_description: p.longDescription ?? null,
-      price: p.price,
-      image: p.image,
-      gallery: p.gallery ?? [p.image],
-      category: p.category ?? "clothes",
-      force_last_item: p.forceLastItem === true,
-      sizes: coerceSizeStock(s),
-    };
-    const { data, error } = await supabase
-      .from("products")
-      .insert(payload as never)
-      .select("*")
-      .single();
-    if (error || !data) {
-      console.error("[catalog] insert failed", error);
-      return null;
-    }
-    const row = data as ProductRow;
-    const product = rowToProduct(row);
-    setProducts((prev) => [...prev, product]);
-    setStockMap((prev) => ({ ...prev, [product.id]: coerceSizeStock(row.sizes) }));
-    return product.id;
-  };
-
-  const deleteProduct: CatalogCtx["deleteProduct"] = async (id) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    setStockMap((prev) => {
-      const { [id]: _drop, ...rest } = prev;
-      return rest;
-    });
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    if (error) {
-      console.error("[catalog] delete failed", error);
-      await refresh();
-    }
-  };
-
-  const setStock: CatalogCtx["setStock"] = async (id, s) => {
-    const next = coerceSizeStock(s);
-    setStockMap((prev) => ({ ...prev, [id]: next }));
-    const { error } = await supabase
-      .from("products")
-      .update({ sizes: next } as never)
-      .eq("id", id);
-    if (error) {
-      console.error("[catalog] setStock failed", error);
-      await refresh();
-    }
-  };
-
-  // Optimistic local decrement — DB decrement runs server-side on checkout via RPC.
-  const decrementStock: CatalogCtx["decrementStock"] = (id, size, by = 1) =>
-    setStockMap((prev) => {
-      const cur = prev[id] ?? emptyStock();
-      return {
-        ...prev,
-        [id]: { ...cur, [size]: Math.max(0, (cur[size] ?? 0) - by) },
-      };
-    });
-
-  return (
-    <CatalogContext.Provider
-      value={{ products, stock, loading, updateProduct, addProduct, deleteProduct, setStock, decrementStock, refresh }}
-    >
-      {children}
-    </CatalogContext.Provider>
-  );
-}
-function useCatalog() {
-  const c = useContext(CatalogContext);
-  if (!c) throw new Error("CatalogProvider missing");
-  return c;
-}
-
-
-
 
 /* ---------- Search + Tabs Context ---------- */
 export type SubFilter = "todos" | "blusa" | "camiseta" | "calca";
@@ -320,60 +122,58 @@ function Index() {
   const [adminOpen, setAdminOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   return (
-    <CatalogProvider>
-      <SearchProvider>
-        <ProductProvider>
-          <div className="min-h-screen bg-background text-foreground">
-            <Nav
-              onOpenFilter={() => setFilterOpen(true)}
-              onOpenAccount={() => setAccountOpen(true)}
-              onOpenAdmin={() => setAdminOpen(true)}
-              onOpenMobileMenu={() => setMobileMenuOpen(true)}
-            />
-            <Hero />
-            <div className="mx-auto max-w-[1600px] px-6 pt-10 md:px-12 md:pt-14">
-              <StitchDivider label="The New Era of Heritage" />
-            </div>
-            <CategoryTabs />
-            <Products />
-
-            <Testimonials />
-            <Concept />
-            <Newsletter />
-            <Footer />
-            <CartDrawer />
-            <ProductModal />
-            <AuthModal />
-            <WelcomeCouponPopup />
-            <SearchOverlay />
-            <AdminEditModal />
-            <FilterSidebar open={filterOpen} onClose={() => setFilterOpen(false)} />
-            <MinhaContaModal open={accountOpen} onClose={() => setAccountOpen(false)} />
-            <AdminPanelModal open={adminOpen} onClose={() => setAdminOpen(false)} />
-            <MobileMenu
-              open={mobileMenuOpen}
-              onClose={() => setMobileMenuOpen(false)}
-              onOpenAccount={() => {
-                setMobileMenuOpen(false);
-                setAccountOpen(true);
-              }}
-              onOpenFilter={() => {
-                setMobileMenuOpen(false);
-                setFilterOpen(true);
-              }}
-            />
+    <SearchProvider>
+      <ProductProvider>
+        <div className="min-h-screen bg-background text-foreground">
+          <Nav
+            onOpenFilter={() => setFilterOpen(true)}
+            onOpenAccount={() => setAccountOpen(true)}
+            onOpenAdmin={() => setAdminOpen(true)}
+            onOpenMobileMenu={() => setMobileMenuOpen(true)}
+          />
+          <Hero />
+          <div className="mx-auto max-w-[1600px] px-6 pt-10 md:px-12 md:pt-14">
+            <StitchDivider label="The New Era of Heritage" />
           </div>
-        </ProductProvider>
-      </SearchProvider>
-    </CatalogProvider>
+          <CategoryTabs />
+          <Products />
+
+          <Testimonials />
+          <Concept />
+          <Newsletter />
+          <Footer />
+          <CartDrawer />
+          <AuthModal />
+          <WelcomeCouponPopup />
+          <SearchOverlay />
+          <AdminEditModal />
+          <FilterSidebar open={filterOpen} onClose={() => setFilterOpen(false)} />
+          <MinhaContaModal open={accountOpen} onClose={() => setAccountOpen(false)} />
+          <AdminPanelModal open={adminOpen} onClose={() => setAdminOpen(false)} />
+          <MobileMenu
+            open={mobileMenuOpen}
+            onClose={() => setMobileMenuOpen(false)}
+            onOpenAccount={() => {
+              setMobileMenuOpen(false);
+              setAccountOpen(true);
+            }}
+            onOpenFilter={() => {
+              setMobileMenuOpen(false);
+              setFilterOpen(true);
+            }}
+          />
+        </div>
+      </ProductProvider>
+    </SearchProvider>
   );
 }
 
 /* ---------- Product Modal Context ---------- */
+/**
+ * Contexto do fluxo de admin (editar / criar produto). A visualização do
+ * produto deixou de morar aqui: agora é a rota /produto/$id.
+ */
 const ProductCtx = createContext<{
-  activeId: string | null;
-  open: (id: string) => void;
-  close: () => void;
   editingId: string | null;
   openEdit: (id: string) => void;
   closeEdit: () => void;
@@ -382,15 +182,11 @@ const ProductCtx = createContext<{
 } | null>(null);
 
 function ProductProvider({ children }: { children: React.ReactNode }) {
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creatingCategory, setCreating] = useState<ProductCategory | null>(null);
   return (
     <ProductCtx.Provider
       value={{
-        activeId,
-        open: (id) => setActiveId(id),
-        close: () => setActiveId(null),
         editingId,
         openEdit: (id) => {
           setEditingId(id);
@@ -586,7 +382,7 @@ function MobileMenu({
         }`}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-[90] flex w-[88%] max-w-sm flex-col bg-[color:var(--ivory)] text-foreground shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:hidden ${
+        className={`fixed inset-y-0 left-0 z-[90] flex w-[88%] max-w-sm flex-col bg-asc-bg-raised text-foreground transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:hidden ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -674,7 +470,7 @@ function MobileMenu({
 /* ---------- Hero ---------- */
 function Hero() {
   return (
-    <section className="relative h-[100svh] w-full overflow-hidden">
+    <section className="asc-gravure relative h-[100svh] w-full overflow-hidden bg-asc-bg-dark">
       <img
         src={hero}
         alt="Editorial A&S Conccept"
@@ -682,22 +478,24 @@ function Hero() {
         height={1280}
         className="absolute inset-0 h-full w-full object-cover object-[65%_center] md:object-center"
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-charcoal/50 via-charcoal/25 to-charcoal/80" />
+      <div className="absolute inset-0 bg-gradient-to-b from-charcoal/60 via-charcoal/25 to-charcoal/85" />
       <div className="relative z-10 flex h-full items-end pb-16 md:items-center md:pb-0">
         <div className="mx-auto w-full max-w-[1600px] px-5 md:px-12">
-          <div className="max-w-2xl animate-fade-up text-ivory">
-            <p className="mb-4 text-[10px] tracking-luxe uppercase text-accent md:mb-6 md:text-[11px]">
+          {/* Entrada em cascata — eyebrow → título → subtítulo → CTA. É o
+              "momento" da página: não repetir esse padrão em outras seções. */}
+          <div className="max-w-2xl text-ivory">
+            <p className="animate-fade-up mb-4 text-[10px] tracking-luxe uppercase text-accent md:mb-6 md:text-[11px]">
               — Coleção Outono / Inverno
             </p>
-            <h1 className="font-serif text-[2.5rem] leading-[1.05] sm:text-5xl md:text-7xl lg:text-[6rem]">
+            <h1 className="animate-fade-up font-serif text-[2.5rem] leading-[1.05] [animation-delay:100ms] sm:text-5xl md:text-7xl lg:text-[6rem]">
               A Nova Era<br />da Herança.
             </h1>
-            <p className="mt-6 max-w-md text-sm font-light text-ivory/85 md:mt-8 md:text-lg">
+            <p className="animate-fade-up mt-6 max-w-md text-sm font-light text-ivory/85 [animation-delay:200ms] md:mt-8 md:text-lg">
               Luxo curado para a próxima geração.
             </p>
             <a
               href="#collections"
-              className="group mt-8 inline-flex items-center gap-4 border border-ivory/70 px-8 py-3.5 text-[11px] tracking-luxe uppercase text-ivory transition-all duration-500 hover:border-accent hover:text-accent md:mt-12 md:px-10 md:py-4"
+              className="group animate-fade-up mt-8 inline-flex items-center gap-4 border border-asc-line px-8 py-3.5 text-[11px] tracking-luxe uppercase text-ivory transition-all duration-500 [animation-delay:300ms] hover:border-accent hover:text-accent md:mt-12 md:px-10 md:py-4"
             >
               Explorar a Coleção
               <span className="inline-block h-px w-6 bg-current transition-all duration-500 group-hover:w-10 md:w-8" />
@@ -835,7 +633,7 @@ function Products() {
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <button
                 onClick={() => openCreate(tab)}
-                className="inline-flex items-center gap-2 bg-accent px-4 py-2 text-[10px] tracking-luxe uppercase text-charcoal transition-colors hover:bg-accent/90"
+                className="inline-flex items-center gap-2 bg-accent px-4 py-2 text-[10px] tracking-luxe uppercase text-asc-ink transition-colors hover:bg-accent/90"
               >
                 <Plus className="h-3.5 w-3.5" strokeWidth={2} /> Adicionar Novo Produto
               </button>
@@ -917,7 +715,7 @@ function SneakersComingSoon() {
     { label: "Seg", value: seconds },
   ];
   return (
-    <div className="relative mx-auto max-w-4xl overflow-hidden border border-accent/30 bg-gradient-to-br from-navy via-charcoal to-navy p-10 text-center text-ivory shadow-2xl md:p-16">
+    <div className="relative mx-auto max-w-4xl overflow-hidden border border-accent/30 bg-gradient-to-br from-navy via-charcoal to-navy p-10 text-center text-ivory md:p-16">
       <div className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full bg-accent/20 blur-3xl" />
       <div className="pointer-events-none absolute -right-24 -bottom-24 h-64 w-64 rounded-full bg-accent/10 blur-3xl" />
       <div className="relative">
@@ -935,7 +733,7 @@ function SneakersComingSoon() {
           {units.map((u) => (
             <div
               key={u.label}
-              className="border border-ivory/15 bg-charcoal/40 py-4 backdrop-blur"
+              className="border border-asc-line bg-charcoal/40 py-4 backdrop-blur"
             >
               <div className="font-serif text-3xl tabular-nums text-accent md:text-5xl">
                 {String(u.value).padStart(2, "0")}
@@ -948,7 +746,7 @@ function SneakersComingSoon() {
         </div>
         <a
           href="#about"
-          className="mt-12 inline-flex items-center gap-3 border border-accent px-8 py-3 text-[11px] tracking-luxe uppercase text-accent transition-all hover:bg-accent hover:text-charcoal"
+          className="mt-12 inline-flex items-center gap-3 border border-accent px-8 py-3 text-[11px] tracking-luxe uppercase text-accent transition-all hover:bg-accent hover:text-asc-ink"
         >
           Ser Avisado no Lançamento
         </a>
@@ -976,7 +774,7 @@ function StockBadge({ qty }: { qty: number }) {
 
 /* ---------- Product Card ---------- */
 function ProductCard({ product }: { product: Product }) {
-  const { open, openEdit } = useProduct();
+  const { openEdit } = useProduct();
   const { stock, deleteProduct } = useCatalog();
   const isAdmin = useIsAdmin();
   const sizeStock = stock[product.id];
@@ -990,12 +788,18 @@ function ProductCard({ product }: { product: Product }) {
 
   return (
     <article className="group flex flex-col">
-      <div
-        className={`relative aspect-[3/4] w-full overflow-hidden bg-asc-bg-raised ${
-          soldOut ? "" : "cursor-pointer"
-        }`}
-        onClick={() => !soldOut && open(product.id)}
-      >
+      <div className="relative aspect-[3/4] w-full overflow-hidden bg-asc-bg-raised">
+        {/* Link real (rastreável, abre em nova aba com o meio do mouse) em
+            overlay. Fica em z-20, abaixo dos botões de ação em z-30, para
+            não aninhar <button> dentro de <a>. */}
+        {!soldOut && (
+          <Link
+            to="/produto/$id"
+            params={{ id: product.id }}
+            aria-label={`Ver ${product.name}`}
+            className="absolute inset-0 z-20"
+          />
+        )}
         <img
           src={product.image}
           alt={product.name}
@@ -1068,7 +872,15 @@ function ProductCard({ product }: { product: Product }) {
       </div>
       <div className="mt-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-display text-lg leading-snug text-asc-ink">{product.name}</h3>
+          <h3 className="font-display text-lg leading-snug text-asc-ink">
+            <Link
+              to="/produto/$id"
+              params={{ id: product.id }}
+              className="transition-colors duration-ascfast ease-asc hover:text-asc-gold"
+            >
+              {product.name}
+            </Link>
+          </h3>
           <p className="mt-1 line-clamp-1 font-sans text-xs font-light text-asc-ink-muted">
             {product.description}
           </p>
@@ -1090,229 +902,6 @@ function ProductCard({ product }: { product: Product }) {
         </p>
       )}
     </article>
-  );
-}
-
-
-/* ---------- Product Modal ---------- */
-function ProductModal() {
-  const { activeId, close } = useProduct();
-  const { add } = useCart();
-  const { products, stock, decrementStock } = useCatalog();
-  const [size, setSize] = useState<Size>("M");
-  const [activeImg, setActiveImg] = useState(0);
-  const active = activeId ? products.find((p) => p.id === activeId) ?? null : null;
-
-  const sizeStock = active ? stock[active.id] : undefined;
-  const total = totalStock(sizeStock);
-  const soldOut = total === 0;
-  const availableQty = sizeStock?.[size] ?? 0;
-  const sizeSoldOut = availableQty === 0;
-  const lastItem =
-    !soldOut &&
-    !!active &&
-    (active.forceLastItem === true || hasLastSize(sizeStock) || total === 1);
-
-  useEffect(() => {
-    // Ao abrir um produto, selecionar automaticamente o primeiro tamanho com estoque.
-    if (!active) return;
-    setActiveImg(0);
-    const s = stock[active.id];
-    const firstAvailable = SIZES.find((sz) => (s?.[sz] ?? 0) > 0) ?? "M";
-    setSize(firstAvailable);
-  }, [activeId, active, stock]);
-
-  if (!active) return null;
-  const gallery = active.gallery && active.gallery.length ? active.gallery : [active.image];
-
-  return (
-    <>
-      <div
-        onClick={close}
-        className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
-      />
-      <div className="fixed inset-0 z-[90] flex items-stretch justify-center pointer-events-none md:items-center md:p-8">
-        <div className="pointer-events-auto relative flex h-[100svh] w-full max-w-5xl flex-col overflow-hidden bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-500 md:h-[88vh]">
-          <button
-            onClick={close}
-            aria-label="Fechar"
-            className="absolute right-4 top-4 z-20 rounded-full bg-background/80 p-2 backdrop-blur hover:text-accent"
-          >
-            <X className="h-5 w-5 md:h-4 md:w-4" strokeWidth={1.5} />
-          </button>
-          <div className="grid flex-1 grid-cols-1 overflow-y-auto pb-28 md:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] md:pb-0">
-            <div className="flex flex-col bg-secondary md:sticky md:top-0 md:h-[88vh]">
-              <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-secondary max-md:aspect-[4/5]">
-                <ZoomableImage
-                  src={gallery[activeImg]}
-                  alt={active.name}
-                  className="object-contain"
-                />
-
-                {gallery.length > 1 && (
-                  <>
-                    <button
-                      onClick={() =>
-                        setActiveImg((i) => (i - 1 + gallery.length) % gallery.length)
-                      }
-                      aria-label="Foto anterior"
-                      className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-background/85 p-2 shadow-sm backdrop-blur transition-colors hover:text-accent"
-                    >
-                      <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
-                    </button>
-                    <button
-                      onClick={() => setActiveImg((i) => (i + 1) % gallery.length)}
-                      aria-label="Próxima foto"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-background/85 p-2 shadow-sm backdrop-blur transition-colors hover:text-accent"
-                    >
-                      <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
-                    </button>
-                    <span className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-charcoal/70 px-2 py-0.5 text-[10px] tracking-luxe text-ivory tabular-nums">
-                      {activeImg + 1}/{gallery.length}
-                    </span>
-                  </>
-                )}
-              </div>
-              {gallery.length > 1 && (
-                <div className="flex shrink-0 items-center justify-center gap-3 border-t border-border/40 bg-secondary px-4 py-4">
-                  {gallery.map((g, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setActiveImg(i)}
-                      aria-label={`Ver foto ${i + 1}`}
-                      className={`h-24 w-[68px] shrink-0 overflow-hidden border transition-all duration-300 ${
-                        activeImg === i
-                          ? "border-accent opacity-100"
-                          : "border-border/50 opacity-60 hover:opacity-100"
-                      }`}
-                    >
-                      <img src={g} alt="" className="h-full w-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-
-
-            <div className="flex flex-col p-6 md:p-12">
-              <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Conccept</p>
-              <h2 className="mt-3 font-serif text-2xl leading-tight md:text-4xl">{active.name}</h2>
-              <p className="mt-3 text-lg tabular-nums">{formatBRL(active.price)}</p>
-              {(soldOut || lastItem) && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {lastItem ? (
-                    <span className="inline-flex items-center gap-1 border border-[color:var(--gold)]/70 bg-[color:var(--gold)]/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
-                      ✦ Último Item
-                    </span>
-                  ) : (
-                    <StockBadge qty={total} />
-                  )}
-                </div>
-              )}
-
-
-
-              <div className="mt-8">
-                <p className="mb-3 text-[11px] tracking-luxe uppercase text-muted-foreground">
-                  Tamanho
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {SIZES.map((s) => {
-                    const q = sizeStock?.[s] ?? 0;
-                    const isOut = q === 0;
-                    return (
-                      <button
-                        key={s}
-                        onClick={() => !isOut && setSize(s)}
-                        disabled={isOut}
-                        title={isOut ? "Tamanho esgotado" : `${q} em estoque`}
-                        className={`relative h-12 w-16 border text-sm transition-all md:h-11 md:w-14 ${
-                          size === s
-                            ? "border-foreground bg-foreground text-ivory"
-                            : "border-border hover:border-foreground"
-                        } ${
-                          isOut
-                            ? "cursor-not-allowed opacity-40 line-through"
-                            : ""
-                        }`}
-                      >
-                        {s}
-                        {q === 1 && !isOut && (
-                          <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[color:var(--gold)]" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-                {(sizeSoldOut || availableQty === 1 || availableQty === 2) && (
-                  <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
-                    {sizeSoldOut
-                      ? "Tamanho selecionado sem disponibilidade."
-                      : availableQty === 1
-                        ? "Última peça em estoque neste tamanho."
-                        : `${availableQty} unidades disponíveis no tamanho ${size}.`}
-                  </p>
-                )}
-              </div>
-
-              {/* Desktop CTA */}
-              <button
-                onClick={() => {
-                  if (soldOut || sizeSoldOut) return;
-                  add(active, size);
-                  decrementStock(active.id, size, 1);
-                  close();
-                }}
-                disabled={soldOut || sizeSoldOut}
-                className="mt-10 hidden bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground md:block"
-              >
-                {soldOut
-                  ? "Produto Esgotado"
-                  : sizeSoldOut
-                    ? `Tamanho ${size} esgotado`
-                    : "Adicionar à Sacola"}
-              </button>
-
-              <ProductInfoAccordion
-                productId={active.id}
-                productName={active.name}
-                description={active.longDescription ?? active.description}
-              />
-
-              <div className="mt-8">
-                <ShippingCalculator subtotal={active.price} />
-              </div>
-
-
-              <div className="mt-8 space-y-2 border-t border-border pt-6 text-xs font-light text-muted-foreground">
-                <p>Frete grátis em pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}.</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Mobile sticky CTA */}
-          <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-10 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:hidden">
-            <button
-              onClick={() => {
-                if (soldOut || sizeSoldOut) return;
-                add(active, size);
-                decrementStock(active.id, size, 1);
-                close();
-              }}
-              disabled={soldOut || sizeSoldOut}
-              className="w-full bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
-            >
-              {soldOut
-                ? "Produto Esgotado"
-                : sizeSoldOut
-                  ? `Tamanho ${size} esgotado`
-                  : `Adicionar — ${formatBRL(active.price)}`}
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
   );
 }
 
@@ -1487,7 +1076,7 @@ function AdminEditModal() {
         className="fixed inset-0 z-[100] bg-charcoal/80 backdrop-blur-sm animate-in fade-in duration-300"
       />
       <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 pointer-events-none">
-        <div className="pointer-events-auto relative w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+        <div className="pointer-events-auto relative w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-background animate-in fade-in zoom-in-95 duration-500">
           <div className="flex items-center justify-between border-b border-border px-6 py-4">
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-accent" strokeWidth={1.5} />
@@ -1548,7 +1137,7 @@ function AdminEditModal() {
                 className={`mt-3 flex items-center justify-center gap-2 border border-accent/50 bg-accent/5 px-3 py-2 text-[10px] tracking-luxe uppercase text-accent transition-colors ${
                   form.gallery.length >= MAX_PRODUCT_IMAGES
                     ? "cursor-not-allowed opacity-40"
-                    : "cursor-pointer hover:bg-accent hover:text-charcoal"
+                    : "cursor-pointer hover:bg-accent hover:text-asc-ink"
                 }`}
               >
                 <Upload className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -1584,7 +1173,7 @@ function AdminEditModal() {
                       onClick={() => setForm({ ...form, category: c })}
                       className={`border px-3 py-1.5 text-[10px] tracking-luxe uppercase transition-colors ${
                         form.category === c
-                          ? "border-foreground bg-foreground text-ivory"
+                          ? "border-foreground bg-foreground text-asc-bg"
                           : "border-border hover:border-foreground"
                       }`}
                     >
@@ -1691,7 +1280,7 @@ function AdminEditModal() {
               </button>
               <button
                 onClick={onSave}
-                className="inline-flex items-center gap-2 bg-accent px-6 py-2.5 text-[11px] tracking-luxe uppercase text-charcoal transition-colors hover:bg-accent/90"
+                className="inline-flex items-center gap-2 bg-accent px-6 py-2.5 text-[11px] tracking-luxe uppercase text-asc-ink transition-colors hover:bg-accent/90"
               >
                 <Save className="h-3.5 w-3.5" strokeWidth={1.5} />
                 {isCreate ? "Criar Produto" : "Salvar Alterações"}
@@ -1930,11 +1519,11 @@ function InstitutionalModal({
         className="fixed inset-0 z-[130] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
       />
       <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 md:p-8 pointer-events-none">
-        <div className="pointer-events-auto relative w-full max-w-2xl max-h-[88vh] overflow-y-auto bg-[color:var(--ivory)] text-charcoal p-10 md:p-14 shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+        <div className="pointer-events-auto relative w-full max-w-2xl max-h-[88vh] overflow-y-auto bg-asc-bg-raised text-asc-ink p-10 md:p-14 animate-in fade-in zoom-in-95 duration-500">
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="absolute right-5 top-5 rounded-full bg-white/70 p-2 backdrop-blur hover:text-[color:var(--gold)] transition-colors"
+            className="absolute right-5 top-5 rounded-full bg-asc-bg-raised/80 p-2 backdrop-blur hover:text-[color:var(--gold)] transition-colors"
           >
             <X className="h-4 w-4" strokeWidth={1.5} />
           </button>
@@ -1944,15 +1533,15 @@ function InstitutionalModal({
           <h2 className="mt-3 font-serif text-3xl md:text-4xl leading-tight">
             {content.title}
           </h2>
-          <div className="mt-8 space-y-5 font-serif text-[15px] md:text-base leading-relaxed text-charcoal/85">
+          <div className="mt-8 space-y-5 font-serif text-[15px] md:text-base leading-relaxed text-asc-ink/85">
             {content.paragraphs.map((p, i) => (
               <p key={i}>{p}</p>
             ))}
           </div>
-          <div className="mt-10 border-t border-charcoal/15 pt-6">
+          <div className="mt-10 border-t border-asc-line pt-6">
             <button
               onClick={onClose}
-              className="w-full bg-charcoal py-3 text-[11px] tracking-luxe uppercase text-ivory hover:bg-navy transition-colors"
+              className="w-full asc-btn-primary py-3 text-[11px] tracking-luxe uppercase"
             >
               Fechar
             </button>
@@ -1999,7 +1588,7 @@ function Footer() {
     },
   ];
   return (
-    <footer className="border-t border-border bg-charcoal text-ivory">
+    <footer className="asc-gravure border-t border-asc-line bg-charcoal text-ivory">
       <div className="mx-auto max-w-[1600px] px-6 py-20 md:px-12">
         <div className="grid grid-cols-2 gap-10 md:grid-cols-5">
           <div className="col-span-2 md:col-span-1">
@@ -2079,7 +1668,7 @@ function Footer() {
           </div>
 
         </div>
-        <div className="mt-16 flex flex-col gap-3 border-t border-ivory/10 pt-8 text-xs font-light text-ivory/70 md:flex-row md:items-center md:justify-between">
+        <div className="mt-16 flex flex-col gap-3 border-t border-asc-line pt-8 text-xs font-light text-ivory/70 md:flex-row md:items-center md:justify-between">
           <p>
             Dúvidas ou problemas com seu pedido? Fale conosco:{" "}
             <a
@@ -2101,7 +1690,7 @@ function Footer() {
             </a>
           </p>
         </div>
-        <div className="mt-8 flex flex-col justify-between gap-4 border-t border-ivory/10 pt-8 text-[11px] text-ivory/50 md:flex-row">
+        <div className="mt-8 flex flex-col justify-between gap-4 border-t border-asc-line pt-8 text-[11px] text-ivory/50 md:flex-row">
           <p>© {new Date().getFullYear()} A&amp;S Conccept. Todos os direitos reservados.</p>
           <p className="tracking-luxe uppercase">Feito com propósito · Preços em BRL</p>
         </div>
@@ -2318,7 +1907,7 @@ function SearchOverlay() {
         className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
       />
       <div className="fixed inset-x-0 top-0 z-[90] animate-in slide-in-from-top duration-500">
-        <div className="bg-background shadow-2xl">
+        <div className="bg-background">
           <div className="mx-auto max-w-3xl px-6 py-10 md:py-14">
             <div className="flex items-center justify-between">
               <p className="text-[11px] tracking-luxe uppercase text-accent">Buscar</p>
@@ -2423,7 +2012,7 @@ function AuthModal() {
           className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
         />
         <div className="fixed inset-0 z-[90] flex items-end justify-center pointer-events-none sm:items-center sm:p-4">
-          <div className="pointer-events-auto relative max-h-[95svh] w-full max-w-md overflow-y-auto bg-background p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-500 sm:p-8 md:p-10">
+          <div className="pointer-events-auto relative max-h-[95svh] w-full max-w-md overflow-y-auto bg-background p-6 animate-in fade-in zoom-in-95 duration-500 sm:p-8 md:p-10">
             <button
               onClick={closeAuth}
               aria-label="Fechar"
@@ -2440,7 +2029,7 @@ function AuthModal() {
             </p>
             <button
               onClick={closeAuth}
-              className="mt-8 w-full bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
+              className="mt-8 w-full asc-btn-primary py-4 text-[11px] tracking-luxe uppercase"
             >
               Entendi
             </button>
@@ -2467,7 +2056,7 @@ function AuthModal() {
         className="fixed inset-0 z-[80] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
       />
       <div className="fixed inset-0 z-[90] flex items-end justify-center pointer-events-none sm:items-center sm:p-4">
-        <div className="pointer-events-auto relative max-h-[95svh] w-full max-w-md overflow-y-auto bg-background p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-500 sm:p-8 md:p-10">
+        <div className="pointer-events-auto relative max-h-[95svh] w-full max-w-md overflow-y-auto bg-background p-6 animate-in fade-in zoom-in-95 duration-500 sm:p-8 md:p-10">
           <button
             onClick={closeAuth}
             aria-label="Fechar"
@@ -2597,7 +2186,7 @@ function AuthModal() {
             <button
               type="submit"
               disabled={loading || passwordsMismatch}
-              className="w-full bg-charcoal py-4 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy disabled:opacity-50"
+              className="w-full asc-btn-primary py-4 text-[11px] tracking-luxe uppercase disabled:opacity-50"
             >
 
               {loading
@@ -2680,7 +2269,7 @@ function FilterSidebar({ open, onClose }: { open: boolean; onClose: () => void }
         }`}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-[90] flex w-full max-w-xs flex-col bg-background shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`fixed inset-y-0 left-0 z-[90] flex w-full max-w-xs flex-col bg-background transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -2775,7 +2364,7 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
         className="fixed inset-0 z-[95] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
       />
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 pointer-events-none">
-        <div className="pointer-events-auto relative w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+        <div className="pointer-events-auto relative w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-background animate-in fade-in zoom-in-95 duration-300">
           <button
             onClick={onClose}
             aria-label="Fechar"
@@ -2890,7 +2479,7 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
               )}
               <button
                 onClick={onSave}
-                className="inline-flex items-center gap-2 bg-charcoal px-6 py-2.5 text-[11px] tracking-luxe uppercase text-ivory transition-colors hover:bg-navy"
+                className="inline-flex items-center gap-2 asc-btn-primary px-6 py-2.5 text-[11px] tracking-luxe uppercase"
               >
                 <Save className="h-3.5 w-3.5" /> Salvar dados
               </button>
@@ -2973,7 +2562,7 @@ function ConfirmDialog({
     <>
       <div onClick={onCancel} className="fixed inset-0 z-[110] bg-charcoal/70 backdrop-blur-sm" />
       <div className="fixed inset-0 z-[115] flex items-center justify-center p-4">
-        <div className="pointer-events-auto w-full max-w-md bg-background p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="pointer-events-auto w-full max-w-md bg-background p-8 animate-in fade-in zoom-in-95 duration-200">
           <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Conccept · Confirmação</p>
           <h3 className="mt-2 font-serif text-2xl">{title}</h3>
           <p className="mt-4 text-sm text-muted-foreground">{message}</p>
@@ -3106,7 +2695,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
         className="fixed inset-0 z-[95] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300"
       />
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 pointer-events-none">
-        <div className="pointer-events-auto relative w-full max-w-5xl max-h-[92vh] overflow-y-auto bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+        <div className="pointer-events-auto relative w-full max-w-5xl max-h-[92vh] overflow-y-auto bg-background animate-in fade-in zoom-in-95 duration-300">
           <button
             onClick={onClose}
             aria-label="Fechar"
@@ -3153,7 +2742,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                   </p>
                   <button
                     onClick={() => setShowManualOrder(true)}
-                    className="inline-flex items-center gap-1.5 border border-charcoal bg-charcoal px-3 py-1.5 text-[10px] tracking-luxe uppercase text-ivory hover:bg-navy transition-colors"
+                    className="inline-flex items-center gap-1.5 asc-btn-primary px-3 py-1.5 text-[10px] tracking-luxe uppercase"
                   >
                     <Plus className="h-3 w-3" /> Adicionar Novo Pedido Manualmente
                   </button>
@@ -3263,7 +2852,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                     </h3>
                     <button
                       onClick={() => setShowManualCustomer(true)}
-                      className="inline-flex items-center gap-1.5 border border-charcoal bg-charcoal px-3 py-1.5 text-[10px] tracking-luxe uppercase text-ivory hover:bg-navy transition-colors"
+                      className="inline-flex items-center gap-1.5 asc-btn-primary px-3 py-1.5 text-[10px] tracking-luxe uppercase"
                     >
                       <Plus className="h-3 w-3" /> Adicionar Cliente Manualmente
                     </button>
@@ -3514,7 +3103,7 @@ function MarkupCalculator() {
             </label>
           </div>
 
-          <div className="border border-border bg-[color:var(--ivory)]/40 p-6 space-y-4">
+          <div className="border border-border bg-asc-bg-raised/40 p-6 space-y-4">
             <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">Resultado</p>
             <ResultRow label="Preço de Venda Sugerido (Etiqueta)" value={formatBRL(suggestedPrice)} highlight />
             <div className="border-t border-border/60" />
@@ -3560,7 +3149,7 @@ function MarkupCalculator() {
             </label>
           </div>
 
-          <div className="border border-border bg-[color:var(--ivory)]/40 p-6 space-y-4">
+          <div className="border border-border bg-asc-bg-raised/40 p-6 space-y-4">
             <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
               Diagnóstico Real
             </p>
@@ -3583,14 +3172,14 @@ function MarkupCalculator() {
               </span>
               <span
                 className={`font-serif text-2xl tabular-nums ${
-                  isLoss ? "text-[#7a1f1f]" : "text-[color:var(--gold)]"
+                  isLoss ? "text-asc-error" : "text-[color:var(--gold)]"
                 }`}
               >
                 {rMarginPct.toFixed(2)}%
               </span>
             </div>
             {isLoss && (
-              <p className="text-[11px] text-[#7a1f1f] font-light">
+              <p className="text-[11px] text-asc-error font-light">
                 Atenção: nesta configuração o produto opera em prejuízo após taxas.
               </p>
             )}
@@ -3614,7 +3203,7 @@ function ResultRow({
 }) {
   const color =
     highlight && tone === "loss"
-      ? "text-[#7a1f1f]"
+      ? "text-asc-error"
       : highlight
         ? "text-[color:var(--gold)]"
         : "";
@@ -3729,7 +3318,7 @@ function FinancialOverview() {
         />
       </div>
 
-      <div className="border border-border bg-[color:var(--ivory)]/40 p-6">
+      <div className="border border-border bg-asc-bg-raised/40 p-6">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
@@ -3764,8 +3353,8 @@ function KpiCard({
     accent === "gold"
       ? "text-[color:var(--gold)]"
       : accent === "navy"
-        ? "text-[color:var(--navy)]"
-        : "text-[color:var(--charcoal)]";
+        ? "text-asc-gold-soft"
+        : "text-asc-ink";
   return (
     <div className="border border-border bg-background p-5">
       <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">{label}</p>
@@ -3893,11 +3482,11 @@ function FinanceChart({ data }: { data: FinancePoint[] }) {
             {data[hover].label}
           </p>
           <p className="tabular-nums">
-            <span className="text-[color:var(--navy)]">■</span> Faturamento:{" "}
+            <span className="text-asc-gold-soft">■</span> Faturamento:{" "}
             {formatBRL(data[hover].gross)}
           </p>
           <p className="tabular-nums">
-            <span className="text-[color:var(--charcoal)]">■</span> Lucro Bruto:{" "}
+            <span className="text-asc-ink">■</span> Lucro Bruto:{" "}
             {formatBRL(data[hover].grossProfit)}
           </p>
           <p className="tabular-nums">
@@ -3983,7 +3572,7 @@ function ManualOrderModal({
     <>
       <div onClick={onClose} className="fixed inset-0 z-[110] bg-charcoal/70 backdrop-blur-sm" />
       <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-lg bg-background p-8 shadow-2xl relative">
+        <div className="pointer-events-auto w-full max-w-lg bg-background p-8 relative">
           <button
             onClick={onClose}
             aria-label="Fechar"
@@ -4109,7 +3698,7 @@ function ManualOrderModal({
             <button
               onClick={save}
               disabled={saving}
-              className="bg-charcoal px-5 py-2 text-[11px] tracking-luxe uppercase text-ivory hover:bg-navy disabled:opacity-50"
+              className="asc-btn-primary px-5 py-2 text-[11px] tracking-luxe uppercase disabled:opacity-50"
             >
               {saving ? "Salvando..." : "Salvar Pedido"}
             </button>
@@ -4161,7 +3750,7 @@ function ManualCustomerModal({
     <>
       <div onClick={onClose} className="fixed inset-0 z-[110] bg-charcoal/70 backdrop-blur-sm" />
       <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-md bg-background p-8 shadow-2xl relative">
+        <div className="pointer-events-auto w-full max-w-md bg-background p-8 relative">
           <button
             onClick={onClose}
             aria-label="Fechar"
@@ -4224,7 +3813,7 @@ function ManualCustomerModal({
             <button
               onClick={save}
               disabled={saving}
-              className="bg-charcoal px-5 py-2 text-[11px] tracking-luxe uppercase text-ivory hover:bg-navy disabled:opacity-50"
+              className="asc-btn-primary px-5 py-2 text-[11px] tracking-luxe uppercase disabled:opacity-50"
             >
               {saving ? "Salvando..." : "Salvar Cliente"}
             </button>
@@ -4294,7 +3883,7 @@ function CouponRow({ subtotal }: { subtotal: number }) {
         <button
           onClick={apply}
           disabled={loading}
-          className="border border-charcoal px-3 py-1.5 text-[10px] tracking-luxe uppercase hover:bg-charcoal hover:text-ivory transition-colors disabled:opacity-50"
+          className="border border-asc-line px-3 py-1.5 text-[10px] tracking-luxe uppercase hover:bg-charcoal hover:text-ivory transition-colors disabled:opacity-50"
         >
           Aplicar
         </button>
@@ -4325,7 +3914,7 @@ function WelcomeCouponPopup() {
     <>
       <div className="fixed inset-0 z-[120] bg-charcoal/70 backdrop-blur-sm animate-in fade-in duration-300" onClick={clearJustSignedUp} />
       <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 pointer-events-none">
-        <div className="pointer-events-auto relative w-full max-w-md bg-[color:var(--ivory)] p-10 text-charcoal shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+        <div className="pointer-events-auto relative w-full max-w-md bg-asc-bg-raised p-10 text-asc-ink animate-in fade-in zoom-in-95 duration-500">
           <button onClick={clearJustSignedUp} aria-label="Fechar" className="absolute right-4 top-4 hover:text-[color:var(--gold)]">
             <X className="h-4 w-4" strokeWidth={1.5} />
           </button>
@@ -4333,15 +3922,15 @@ function WelcomeCouponPopup() {
           <h2 className="mt-2 font-serif text-3xl leading-tight">
             Um presente<br />de estreia ✦
           </h2>
-          <p className="mt-4 text-sm font-light text-charcoal/80">
+          <p className="mt-4 text-sm font-light text-asc-ink/80">
             Sua adesão à A&amp;S Conccept desbloqueia 10% de desconto na primeira compra.
           </p>
-          <div className="mt-6 border border-dashed border-[color:var(--gold)] bg-white p-4 text-center">
+          <div className="mt-6 border border-dashed border-[color:var(--gold)] bg-asc-bg-raised p-4 text-center">
             <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">Cupom exclusivo</p>
             <p className="mt-1 font-mono text-2xl tracking-widest text-[color:var(--gold)]">10%OFFF</p>
             <button
               onClick={copy}
-              className="mt-3 text-[10px] tracking-luxe uppercase text-charcoal hover:text-[color:var(--gold)] underline underline-offset-4"
+              className="mt-3 text-[10px] tracking-luxe uppercase text-asc-ink hover:text-[color:var(--gold)] underline underline-offset-4"
             >
               {copied ? "Copiado ✦" : "Copiar código"}
             </button>
@@ -4351,7 +3940,7 @@ function WelcomeCouponPopup() {
           </p>
           <button
             onClick={clearJustSignedUp}
-            className="mt-6 w-full bg-charcoal py-3 text-[11px] tracking-luxe uppercase text-ivory hover:bg-navy transition-colors"
+            className="mt-6 w-full asc-btn-primary py-3 text-[11px] tracking-luxe uppercase"
           >
             Explorar a coleção
           </button>
@@ -4433,7 +4022,7 @@ function Testimonials() {
         {current && (
           <figure key={current.id} className="mt-12 animate-in fade-in duration-700">
             <Stars n={current.rating} />
-            <blockquote className="mt-6 font-serif text-xl md:text-2xl italic leading-relaxed text-charcoal">
+            <blockquote className="mt-6 font-serif text-xl md:text-2xl italic leading-relaxed text-asc-ink">
               “{current.content}”
             </blockquote>
             <figcaption className="mt-6 text-[11px] tracking-luxe uppercase text-muted-foreground">
@@ -4461,7 +4050,7 @@ function Testimonials() {
               <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">Admin · Depoimentos</p>
               <button
                 onClick={() => { setCreating(true); setEditing({ id: "", customer_name: "", content: "", rating: 5, sort_order: rows.length }); }}
-                className="inline-flex items-center gap-1 border border-accent px-3 py-1.5 text-[10px] tracking-luxe uppercase text-accent hover:bg-accent hover:text-charcoal"
+                className="inline-flex items-center gap-1 border border-accent px-3 py-1.5 text-[10px] tracking-luxe uppercase text-accent hover:bg-accent hover:text-asc-ink"
               >
                 <Plus className="h-3 w-3" /> Novo
               </button>
@@ -4511,7 +4100,7 @@ function TestimonialEditor({
     <>
       <div onClick={onCancel} className="fixed inset-0 z-[100] bg-charcoal/70 backdrop-blur-sm" />
       <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-md bg-background p-6 shadow-2xl">
+        <div className="pointer-events-auto w-full max-w-md bg-background p-6">
           <p className="text-[11px] tracking-luxe uppercase text-accent">
             {isCreate ? "Novo depoimento" : "Editar depoimento"}
           </p>
@@ -4533,7 +4122,7 @@ function TestimonialEditor({
             <button onClick={onCancel} className="border border-border px-4 py-2 text-[11px] tracking-luxe uppercase hover:bg-secondary">Cancelar</button>
             <button
               onClick={() => onSave({ id: isCreate ? undefined : initial.id, customer_name: name.trim(), content: content.trim(), rating })}
-              className="bg-accent px-4 py-2 text-[11px] tracking-luxe uppercase text-charcoal hover:bg-accent/90"
+              className="bg-accent px-4 py-2 text-[11px] tracking-luxe uppercase text-asc-ink hover:bg-accent/90"
             >
               Salvar
             </button>
