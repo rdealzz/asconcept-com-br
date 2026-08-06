@@ -370,28 +370,46 @@ function AdminClientsPanel() {
 
 /* ---------- Calculadora de Markup Financeiro ---------- */
 
-const STRIPE_BR_RATE = 0.0499; // 4,99%
-const STRIPE_BR_FIXED = 0.5; // R$ 0,50 por transação
+/**
+ * Taxa padrão do gateway.
+ *
+ * Herdada da configuração antiga (Stripe Brasil, 4,99% + R$ 0,50) e mantida
+ * apenas como ponto de partida: a loja cobra pelo Mercado Pago, cuja taxa
+ * depende do plano e do prazo de recebimento da conta. Por isso os dois
+ * valores viraram campos editáveis — inventar um número aqui seria precificar
+ * a coleção inteira em cima de um palpite.
+ */
+const TAXA_PADRAO_PCT = "4,99";
+const TAXA_PADRAO_FIXA = "0,50";
+
+const paraNumero = (v: string) => Number(v.replace(/\./g, "").replace(",", "."));
 
 function MarkupCalculator() {
   const [cost, setCost] = useState<string>("");
   const [margin, setMargin] = useState<string>("60");
+  const [taxaPct, setTaxaPct] = useState<string>(TAXA_PADRAO_PCT);
+  const [taxaFixa, setTaxaFixa] = useState<string>(TAXA_PADRAO_FIXA);
 
   const parsed = useMemo(() => {
-    const c = Number(cost.replace(",", "."));
-    const m = Number(margin.replace(",", "."));
+    const c = paraNumero(cost);
+    const m = paraNumero(margin);
+    const pct = paraNumero(taxaPct);
+    const fixa = paraNumero(taxaFixa);
     if (!isFinite(c) || c <= 0 || !isFinite(m) || m < 0) return null;
-    // Queremos que o valor líquido recebido (após Stripe) cubra o custo mais a margem.
+    if (!isFinite(pct) || pct < 0 || pct >= 100 || !isFinite(fixa) || fixa < 0) return null;
+    const rate = pct / 100;
+    // Queremos que o valor líquido recebido (após o gateway) cubra o custo mais
+    // a margem.
     // desired = c * (1 + m/100)
     // net(P) = P - P*rate - fixed = P*(1-rate) - fixed
     // desired = P*(1-rate) - fixed  =>  P = (desired + fixed) / (1 - rate)
     const desired = c * (1 + m / 100);
-    const price = (desired + STRIPE_BR_FIXED) / (1 - STRIPE_BR_RATE);
-    const stripeFee = price * STRIPE_BR_RATE + STRIPE_BR_FIXED;
-    const net = price - stripeFee;
+    const price = (desired + fixa) / (1 - rate);
+    const taxaEstimada = price * rate + fixa;
+    const net = price - taxaEstimada;
     const profit = net - c;
-    return { desired, price, stripeFee, net, profit, cost: c, margin: m };
-  }, [cost, margin]);
+    return { desired, price, taxaEstimada, net, profit, cost: c, margin: m };
+  }, [cost, margin, taxaPct, taxaFixa]);
 
   return (
     <div className="mt-10 animate-[fade-in_0.4s_ease-out]">
@@ -400,10 +418,11 @@ function MarkupCalculator() {
           <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
             Precificação
           </p>
-          <h3 className="font-serif text-xl">Calculadora de Markup + Taxa Stripe (Brasil)</h3>
+          <h3 className="font-serif text-xl">Calculadora de Markup + Taxa do Mercado Pago</h3>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Taxa considerada: 4,99% + R$ 0,50 por transação. O preço sugerido garante que a margem
-            líquida desejada seja preservada mesmo após o desconto do gateway.
+            O preço sugerido preserva a margem líquida desejada mesmo depois do desconto do gateway.
+            Ajuste a taxa abaixo para a do seu plano no Mercado Pago — ela varia com o prazo de
+            recebimento e com a forma de pagamento (Pix costuma ser bem menor que cartão).
           </p>
         </header>
 
@@ -432,6 +451,30 @@ function MarkupCalculator() {
               className="mt-2 w-full border border-border bg-background px-3 py-2 text-lg tabular-nums outline-none focus:border-asc-line"
             />
           </label>
+          <label className="block">
+            <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+              Taxa do gateway (%)
+            </span>
+            <input
+              value={taxaPct}
+              onChange={(e) => setTaxaPct(e.target.value.replace(/[^\d.,]/g, ""))}
+              inputMode="decimal"
+              placeholder="Ex: 4,99"
+              className="mt-2 w-full border border-border bg-background px-3 py-2 text-lg tabular-nums outline-none focus:border-asc-line"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+              Taxa fixa por transação (R$)
+            </span>
+            <input
+              value={taxaFixa}
+              onChange={(e) => setTaxaFixa(e.target.value.replace(/[^\d.,]/g, ""))}
+              inputMode="decimal"
+              placeholder="Ex: 0,50"
+              className="mt-2 w-full border border-border bg-background px-3 py-2 text-lg tabular-nums outline-none focus:border-asc-line"
+            />
+          </label>
         </div>
 
         {parsed ? (
@@ -441,7 +484,10 @@ function MarkupCalculator() {
               value={formatBRL(parsed.price)}
               accent
             />
-            <ResultCell label="Taxa Stripe estimada" value={`− ${formatBRL(parsed.stripeFee)}`} />
+            <ResultCell
+              label="Taxa do gateway estimada"
+              value={`− ${formatBRL(parsed.taxaEstimada)}`}
+            />
             <ResultCell label="Valor líquido recebido" value={formatBRL(parsed.net)} />
             <ResultCell
               label={`Lucro real (margem ${parsed.margin.toFixed(0)}%)`}
@@ -1081,9 +1127,10 @@ function StatusIcon({ status }: { status: OrderStatus }) {
 }
 
 export function paymentLabel(m: Order["paymentMethod"]) {
-  if (m === "mp_pix" || m === "pix") return "Pix";
-  if (m === "mp_card" || m === "credit_card") return "Cartão de crédito";
-  if (m === "stripe") return "Stripe (cartão / Pix)";
+  if (m === "mp_pix") return "Pix · Mercado Pago";
+  if (m === "mp_card") return "Cartão · Mercado Pago";
+  if (m === "pix") return "Pix";
+  if (m === "credit_card") return "Cartão de crédito";
   if (m === "boleto") return "Boleto";
   // Valor desconhecido não pode virar "Boleto" por descuido: mostra o que veio.
   return m ? String(m) : "—";

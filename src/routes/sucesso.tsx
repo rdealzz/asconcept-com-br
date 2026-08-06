@@ -4,11 +4,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { Check, Loader2 } from "lucide-react";
 
-import { confirmStripePayment } from "@/lib/checkout.functions";
-import { getStripeEnvironment } from "@/lib/stripe";
+import { getPaymentStatus } from "@/lib/payments.functions";
 import { useCart } from "@/lib/cart-context";
 import { ContactStrip } from "@/components/ContactStrip";
-
 
 export const Route = createFileRoute("/sucesso")({
   ssr: false,
@@ -20,15 +18,18 @@ export const Route = createFileRoute("/sucesso")({
     ],
   }),
   validateSearch: z.object({
-    session_id: z.string().optional(),
     order: z.string().optional(),
   }),
   component: SucessoPage,
 });
 
+/** De quanto em quanto tempo perguntamos ao Mercado Pago, e por quanto tempo. */
+const INTERVALO_MS = 4000;
+const TENTATIVAS = 45;
+
 function SucessoPage() {
-  const { session_id: sessionId, order } = Route.useSearch();
-  const confirm = useServerFn(confirmStripePayment);
+  const { order } = Route.useSearch();
+  const consultar = useServerFn(getPaymentStatus);
   const navigate = useNavigate();
   const { clear } = useCart();
   const [state, setState] = useState<
@@ -38,41 +39,58 @@ function SucessoPage() {
     | { kind: "error"; message: string }
   >({ kind: "loading" });
 
+  /**
+   * Confirmação do pagamento.
+   *
+   * A fonte oficial é a webhook do Mercado Pago, que chega ao servidor sem
+   * depender do navegador. Esta consulta existe para a pessoa ver o resultado
+   * na tela: ela pergunta o status do próprio pedido até o pagamento entrar,
+   * e desiste depois de alguns minutos sem travar a página — o pedido segue
+   * sendo confirmado pela webhook de qualquer forma.
+   */
   useEffect(() => {
-    if (!sessionId) {
-      if (order) {
-        setState({ kind: "pending", orderNumber: order });
-        return;
-      }
-      setState({ kind: "error", message: "Sessão de pagamento não encontrada." });
+    if (!order) {
+      setState({ kind: "error", message: "Pedido não informado." });
       return;
     }
-    let cancelled = false;
-    (async () => {
+    let cancelado = false;
+    let tentativas = 0;
+    let timer = 0;
+
+    const perguntar = async () => {
+      tentativas += 1;
       try {
-        const res = await confirm({
-          data: { sessionId, environment: getStripeEnvironment() },
-        });
-        if (cancelled) return;
+        const res = await consultar({ data: { orderNumber: order } });
+        if (cancelado) return;
         if (res.paid) {
           clear();
-
-          setState({ kind: "paid", orderNumber: res.orderNumber });
-        } else {
-          setState({ kind: "pending", orderNumber: res.orderNumber });
+          setState({ kind: "paid", orderNumber: order });
+          return;
         }
+        setState({ kind: "pending", orderNumber: order });
       } catch (e) {
-        if (!cancelled)
+        if (cancelado) return;
+        // Falha de rede não vira tela de erro: o pedido existe e a webhook
+        // resolve. Mostramos o estado de "em processamento".
+        if (tentativas === 1) {
           setState({
             kind: "error",
-            message: e instanceof Error ? e.message : "Falha ao confirmar pagamento.",
+            message: e instanceof Error ? e.message : "Falha ao consultar o pagamento.",
           });
+          return;
+        }
       }
-    })();
-    return () => {
-      cancelled = true;
+      if (!cancelado && tentativas < TENTATIVAS) {
+        timer = window.setTimeout(perguntar, INTERVALO_MS);
+      }
     };
-  }, [sessionId, order, confirm, clear]);
+
+    void perguntar();
+    return () => {
+      cancelado = true;
+      window.clearTimeout(timer);
+    };
+  }, [order, consultar, clear]);
 
   return (
     <main className="min-h-screen bg-background px-6 py-24">
@@ -92,12 +110,13 @@ function SucessoPage() {
             </div>
             <h1 className="mt-4 font-serif text-2xl text-asc-ink">Pagamento aprovado</h1>
             <p className="mt-3 text-sm text-muted-foreground">
-              Pedido <strong>{state.orderNumber}</strong> confirmado. Você receberá um e-mail com os detalhes.
+              Pedido <strong>{state.orderNumber}</strong> confirmado. Você receberá um e-mail com os
+              detalhes e um aviso a cada etapa do ateliê.
             </p>
             <Link
               to="/pedidos/$id"
               params={{ id: state.orderNumber }}
-              className="mt-8 inline-block asc-btn-primary px-8 py-3 text-[11px] tracking-luxe uppercase"
+              className="asc-btn-primary mt-8 inline-block px-8 py-3 text-[11px] tracking-luxe uppercase"
             >
               Acompanhar Pedido
             </Link>
@@ -105,10 +124,15 @@ function SucessoPage() {
         )}
         {state.kind === "pending" && (
           <>
-            <h1 className="mt-6 font-serif text-2xl text-asc-ink">Pagamento em processamento</h1>
+            <Loader2
+              className="mx-auto mt-6 h-6 w-6 animate-spin text-accent"
+              strokeWidth={1.5}
+              aria-hidden
+            />
+            <h1 className="mt-4 font-serif text-2xl text-asc-ink">Pagamento em processamento</h1>
             <p className="mt-3 text-sm text-muted-foreground">
-              Assim que confirmarmos, o pedido <strong>{state.orderNumber}</strong> será atualizado.
-              Pix pode levar alguns minutos.
+              Assim que o Mercado Pago confirmar, o pedido <strong>{state.orderNumber}</strong> será
+              atualizado e avisamos por e-mail. O Pix costuma levar alguns instantes.
             </p>
             <Link
               to="/pedidos/$id"
@@ -123,16 +147,25 @@ function SucessoPage() {
           <>
             <h1 className="mt-6 font-serif text-2xl text-asc-ink">Não foi possível confirmar</h1>
             <p className="mt-3 text-sm text-asc-error">{state.message}</p>
+            {order && (
+              <Link
+                to="/pedidos/$id"
+                params={{ id: order }}
+                className="mt-6 inline-block border border-border px-6 py-3 text-[11px] uppercase tracking-luxe text-asc-ink"
+              >
+                Ver pedido {order}
+              </Link>
+            )}
             <button
               onClick={() => navigate({ to: "/" })}
-              className="mt-6 inline-block border border-border px-6 py-3 text-[11px] uppercase tracking-luxe text-asc-ink"
+              className="mt-3 inline-block border border-border px-6 py-3 text-[11px] uppercase tracking-luxe text-asc-ink"
             >
               Voltar à loja
             </button>
           </>
         )}
       </div>
-    <ContactStrip />
+      <ContactStrip />
     </main>
   );
 }

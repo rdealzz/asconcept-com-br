@@ -2898,8 +2898,18 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
 }
 
 /* ---------- Markup Calculator ---------- */
-const STRIPE_RATE = 0.0499;
-const STRIPE_FIXED = 0.5;
+/**
+ * Taxa do gateway usada na precificação e no painel financeiro.
+ *
+ * O valor veio da configuração antiga (Stripe Brasil) e continua aqui como
+ * estimativa. A loja cobra pelo Mercado Pago, cuja taxa muda conforme o plano,
+ * o prazo de recebimento e a forma de pagamento — Pix costuma ser bem mais
+ * barato que cartão. Ajuste os dois números abaixo para os do seu contrato:
+ * é o único ponto do código que precisa mudar.
+ */
+const TAXA_GATEWAY_PCT = 0.0499;
+const TAXA_GATEWAY_FIXA = 0.5;
+const TAXA_LABEL = "Taxa do gateway (4,99% + R$ 0,50 · estimativa)";
 
 function MarkupCalculator() {
   const [mode, setMode] = useState<"suggest" | "reverse">("suggest");
@@ -2909,16 +2919,16 @@ function MarkupCalculator() {
   const [margin, setMargin] = useState<number>(50);
 
   const desiredNet = cost + (cost * margin) / 100;
-  const suggestedPrice = (desiredNet + STRIPE_FIXED) / (1 - STRIPE_RATE);
-  const stripeFee = suggestedPrice * STRIPE_RATE + STRIPE_FIXED;
-  const netReceived = suggestedPrice - stripeFee;
+  const suggestedPrice = (desiredNet + TAXA_GATEWAY_FIXA) / (1 - TAXA_GATEWAY_PCT);
+  const taxaEstimada = suggestedPrice * TAXA_GATEWAY_PCT + TAXA_GATEWAY_FIXA;
+  const netReceived = suggestedPrice - taxaEstimada;
   const profit = netReceived - cost;
 
   // Modo 2 — descobrir margem real a partir de custo + preço fixo
   const [rCost, setRCost] = useState<number>(100);
   const [rPrice, setRPrice] = useState<number>(220);
-  const rStripeFee = rPrice > 0 ? rPrice * STRIPE_RATE + STRIPE_FIXED : 0;
-  const rNet = rPrice - rStripeFee;
+  const rTaxaEstimada = rPrice > 0 ? rPrice * TAXA_GATEWAY_PCT + TAXA_GATEWAY_FIXA : 0;
+  const rNet = rPrice - rTaxaEstimada;
   const rProfit = rNet - rCost;
   const rMarginPct = rPrice > 0 ? (rProfit / rPrice) * 100 : 0;
   const isLoss = rProfit < 0;
@@ -2957,8 +2967,8 @@ function MarkupCalculator() {
           <div className="space-y-5">
             <p className="text-xs font-light text-muted-foreground">
               Insira o custo bruto e a margem líquida desejada. O preço de etiqueta é calculado para
-              que, após as taxas Stripe Brasil (4,99% + R$ 0,50), você receba exatamente o custo
-              somado à margem líquida.
+              que, após a taxa do gateway (estimada em 4,99% + R$ 0,50), você receba exatamente o
+              custo somado à margem líquida.
             </p>
             <label className="block">
               <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
@@ -2998,10 +3008,7 @@ function MarkupCalculator() {
               highlight
             />
             <div className="border-t border-border/60" />
-            <ResultRow
-              label="Taxa Stripe Brasil (4,99% + R$ 0,50)"
-              value={`− ${formatBRL(stripeFee)}`}
-            />
+            <ResultRow label={TAXA_LABEL} value={`− ${formatBRL(taxaEstimada)}`} />
             <ResultRow label="Você recebe (líquido)" value={formatBRL(netReceived)} />
             <ResultRow label="Custo do produto" value={`− ${formatBRL(cost)}`} />
             <div className="border-t border-border/60" />
@@ -3013,7 +3020,8 @@ function MarkupCalculator() {
           <div className="space-y-5">
             <p className="text-xs font-light text-muted-foreground">
               Informe o custo do produto e o preço de venda que você já pratica. O sistema deduz a
-              taxa Stripe Brasil (4,99% + R$ 0,50) e revela sua margem líquida real em tempo real.
+              taxa estimada do gateway (4,99% + R$ 0,50) e revela sua margem líquida real em tempo
+              real.
             </p>
             <label className="block">
               <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
@@ -3048,10 +3056,7 @@ function MarkupCalculator() {
               Diagnóstico Real
             </p>
             <ResultRow label="Preço de Venda" value={formatBRL(rPrice)} />
-            <ResultRow
-              label="Taxa Stripe Brasil (4,99% + R$ 0,50)"
-              value={`− ${formatBRL(rStripeFee)}`}
-            />
+            <ResultRow label={TAXA_LABEL} value={`− ${formatBRL(rTaxaEstimada)}`} />
             <ResultRow label="Custo do Produto" value={`− ${formatBRL(rCost)}`} />
             <div className="border-t border-border/60" />
             <ResultRow
@@ -3137,7 +3142,7 @@ function FinancialOverview() {
       for (const it of o.items) {
         cpv += it.price * it.quantity * COST_RATIO;
       }
-      fees += o.subtotal * STRIPE_RATE + STRIPE_FIXED;
+      fees += o.subtotal * TAXA_GATEWAY_PCT + TAXA_GATEWAY_FIXA;
       if (o.paymentMethod === "pix") fees += o.subtotal * PIX_FEE_RATE;
     }
     const grossProfit = gross - cpv;
@@ -3162,7 +3167,7 @@ function FinancialOverview() {
         if (d >= start && d <= end) {
           g += o.subtotal;
           for (const it of o.items) c += it.price * it.quantity * COST_RATIO;
-          f += o.subtotal * STRIPE_RATE + STRIPE_FIXED;
+          f += o.subtotal * TAXA_GATEWAY_PCT + TAXA_GATEWAY_FIXA;
           if (o.paymentMethod === "pix") f += o.subtotal * PIX_FEE_RATE;
         }
       }
@@ -3210,7 +3215,7 @@ function FinancialOverview() {
               Evolução · Últimas 4 semanas
             </p>
             <p className="text-xs text-muted-foreground font-light">
-              Faturamento, lucro bruto e lucro líquido real após taxas Stripe e Pix.
+              Faturamento, lucro bruto e lucro líquido real após a taxa estimada do gateway.
             </p>
           </div>
         </div>

@@ -20,11 +20,11 @@ export interface OrderItem {
 /**
  * Formas de pagamento gravadas em `orders.payment_method`.
  *
- * `mp_pix` e `mp_card` são o que o checkout do site realmente grava hoje
- * (createPendingOrderCore); estavam fora deste tipo, e por isso todo pedido
- * pago por Pix ou cartão aparecia no painel rotulado como "Boleto".
+ * `mp_pix` e `mp_card` são o que o checkout grava — Pix e cartão pelo Mercado
+ * Pago. Os três últimos aparecem só em pedidos antigos e nos cadastros
+ * manuais; ficam aqui para que o histórico continue exibindo o rótulo certo.
  */
-export type PaymentMethod = "mp_pix" | "mp_card" | "stripe" | "pix" | "credit_card" | "boleto";
+export type PaymentMethod = "mp_pix" | "mp_card" | "pix" | "credit_card" | "boleto";
 
 /**
  * Estados de um pedido.

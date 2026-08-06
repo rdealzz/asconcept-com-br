@@ -9,10 +9,7 @@ import { ContactStrip } from "@/components/ContactStrip";
 export const Route = createFileRoute("/pedidos/$id")({
   ssr: false,
   head: () => ({
-    meta: [
-      { title: "Detalhes do Pedido — A&S Conccept" },
-      { name: "robots", content: "noindex" },
-    ],
+    meta: [{ title: "Detalhes do Pedido — A&S Conccept" }, { name: "robots", content: "noindex" }],
   }),
   component: OrderDetail,
   notFoundComponent: () => (
@@ -60,7 +57,9 @@ function OrderDetail() {
         <p className="mt-1 text-sm text-muted-foreground">
           Pedido <span className="font-mono">{order.id}</span> · {created}
         </p>
-        <div className="mt-4"><StatusBadge status={order.status} /></div>
+        <div className="mt-4">
+          <StatusBadge status={order.status} />
+        </div>
 
         <section className="mt-10 border border-border">
           <header className="border-b border-border px-6 py-4">
@@ -92,7 +91,9 @@ function OrderDetail() {
               </span>
             </p>
             <p className="mt-2 flex items-baseline justify-between border-t border-border pt-2">
-              <span className="text-[11px] tracking-luxe uppercase text-muted-foreground">Total</span>
+              <span className="text-[11px] tracking-luxe uppercase text-muted-foreground">
+                Total
+              </span>
               <span className="font-serif text-2xl tabular-nums">{formatBRL(order.total)}</span>
             </p>
           </div>
@@ -101,19 +102,19 @@ function OrderDetail() {
         <section className="mt-8 grid gap-6 sm:grid-cols-2">
           <div className="border border-border p-6">
             <h3 className="text-[11px] tracking-luxe uppercase text-muted-foreground">Endereço</h3>
-            <AddressBlock address={order.address as unknown as Record<string, string | undefined>} />
+            <AddressBlock
+              address={order.address as unknown as Record<string, string | undefined>}
+            />
           </div>
           <div className="border border-border p-6">
             <h3 className="text-[11px] tracking-luxe uppercase text-muted-foreground">Pagamento</h3>
             <p className="mt-3 text-sm">{paymentLabel(order.paymentMethod)}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {order.paymentMethod === "pix"
-                ? "QR Code enviado por e-mail."
+              {order.paymentMethod === "mp_pix" || order.paymentMethod === "pix"
+                ? "Pagamento por Pix, confirmado automaticamente pelo Mercado Pago."
                 : order.paymentMethod === "boleto"
                   ? "Boleto disponível em até 1h."
-                  : order.paymentMethod === "stripe"
-                    ? "Pagamento confirmado pelo Stripe."
-                    : "Cobrança realizada no cartão informado."}
+                  : "Cobrança realizada no cartão informado, processada pelo Mercado Pago."}
             </p>
           </div>
         </section>
@@ -127,10 +128,15 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-5">
-          <Link to="/pedidos" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <Link
+            to="/pedidos"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          >
             <ChevronLeft className="h-4 w-4" /> Meus pedidos
           </Link>
-          <Link to="/" className="font-serif text-xl tracking-widest">A&S Conccept</Link>
+          <Link to="/" className="font-serif text-xl tracking-widest">
+            A&S Conccept
+          </Link>
           <span className="w-24" />
         </div>
       </header>
@@ -141,9 +147,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 function AddressBlock({ address }: { address: Record<string, string | undefined> }) {
-  const hasAny = Boolean(
-    address?.logradouro || address?.cidade || address?.cep || address?.uf,
-  );
+  const hasAny = Boolean(address?.logradouro || address?.cidade || address?.cep || address?.uf);
   if (!hasAny) {
     return (
       <p className="mt-3 text-sm text-muted-foreground italic">
@@ -159,9 +163,18 @@ function AddressBlock({ address }: { address: Record<string, string | undefined>
   return (
     <p className="mt-3 text-sm leading-relaxed">
       {withComp}
-      {cityLine && (<><br />{cityLine}</>)}
-      {address.cep && (<><br />CEP {address.cep}</>)}
+      {cityLine && (
+        <>
+          <br />
+          {cityLine}
+        </>
+      )}
+      {address.cep && (
+        <>
+          <br />
+          CEP {address.cep}
+        </>
+      )}
     </p>
   );
 }
-
