@@ -1,6 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronLeft, CreditCard, Loader2, QrCode, ShieldCheck } from "lucide-react";
+import {
+  BadgeCheck,
+  ChevronLeft,
+  CreditCard,
+  Loader2,
+  Lock,
+  MessageCircle,
+  Package,
+  QrCode,
+  ShieldCheck,
+  Truck,
+} from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useCart, formatBRL, PIX_DISCOUNT_RATE, PIX_ENABLED } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
@@ -16,6 +27,14 @@ import { InstallmentsBadge, InstallmentsTable } from "@/components/InstallmentsN
 import { PixPanel, type PixCharge } from "@/components/PixPanel";
 import { quoteShipping, formatCep, normalizeCep } from "@/lib/shipping";
 import { ContactStrip } from "@/components/ContactStrip";
+import {
+  CampoFlutuante,
+  CartaoEscolha,
+  CartaoMockup,
+  PainelVidro,
+  PassoCheckout,
+  SelosConfianca,
+} from "@/components/checkout-ui";
 
 export const Route = createFileRoute("/checkout")({
   ssr: false,
@@ -62,6 +81,8 @@ const EMPTY: CustomerForm = {
 };
 
 type PayMethod = "card" | "pix";
+/** 1 Identificação · 2 Entrega · 3 Frete · 4 Pagamento */
+type Passo = 1 | 2 | 3 | 4;
 
 function formatPhoneBR(raw: string): string {
   const d = raw.replace(/\D/g, "").slice(0, 11);
@@ -70,6 +91,12 @@ function formatPhoneBR(raw: string): string {
   if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
+
+const emailValido = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+const telefoneValido = (v: string) => {
+  const d = v.replace(/\D/g, "");
+  return d.length >= 10 && d.length <= 11;
+};
 
 function CheckoutPage() {
   const { items, coupon, couponDiscount, subtotal, count, clear, hydrated } = useCart();
@@ -80,7 +107,8 @@ function CheckoutPage() {
   const startPix = useServerFn(createPixPayment);
   const checkStatus = useServerFn(getPaymentStatus);
 
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<Passo>(1);
+  const [maxStep, setMaxStep] = useState<Passo>(1);
   const [method, setMethod] = useState<PayMethod>("card");
   const [form, setForm] = useState<CustomerForm>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<keyof CustomerForm, string>>>({});
@@ -90,7 +118,6 @@ function CheckoutPage() {
   const [pix, setPix] = useState<PixCharge | null>(null);
   const prefilledRef = useRef(false);
   const pendingRef = useRef<{ signature: string; orderNumber: string } | null>(null);
-
 
   // Sem redirecionar: a página mostra o estado certo (entrar / sacola vazia).
   // Redirecionar dentro de efeito quebrava o checkout em acesso direto ou F5,
@@ -153,32 +180,69 @@ function CheckoutPage() {
     }
   };
 
-  const validateStep1 = (): boolean => {
+  /* ── validação por passo ────────────────────────────────────────── */
+
+  const validarIdentificacao = (): boolean => {
     const e: Partial<Record<keyof CustomerForm, string>> = {};
     if (form.name.trim().length < 3) e.name = "Informe seu nome completo.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = "E-mail inválido.";
-    const phoneDigits = form.phone.replace(/\D/g, "");
-    if (phoneDigits.length < 10 || phoneDigits.length > 11) e.phone = "Telefone inválido.";
-    if (!isValidCpf(form.cpf)) e.cpf = "CPF inválido.";
-    if (normalizeCep(form.cep).length !== 8) e.cep = "CEP inválido.";
+    if (!emailValido(form.email)) e.email = "Confira o e-mail informado.";
+    if (!telefoneValido(form.phone)) e.phone = "Confira o telefone com DDD.";
+    if (!isValidCpf(form.cpf)) e.cpf = "Confira o CPF informado.";
+    setErrors((prev) => ({
+      ...prev,
+      ...e,
+      name: e.name,
+      email: e.email,
+      phone: e.phone,
+      cpf: e.cpf,
+    }));
+    return Object.values(e).every((v) => !v);
+  };
+
+  const validarEndereco = (): boolean => {
+    const e: Partial<Record<keyof CustomerForm, string>> = {};
+    if (normalizeCep(form.cep).length !== 8) e.cep = "CEP incompleto.";
     if (!form.logradouro.trim()) e.logradouro = "Informe o endereço.";
     if (!form.numero.trim()) e.numero = "Informe o número.";
     if (!form.bairro.trim()) e.bairro = "Informe o bairro.";
     if (!form.cidade.trim()) e.cidade = "Informe a cidade.";
-    if (!/^[A-Z]{2}$/.test(form.uf.trim().toUpperCase())) e.uf = "UF inválida.";
-    setErrors(e);
-    return Object.keys(e).length === 0;
+    if (!/^[A-Z]{2}$/.test(form.uf.trim().toUpperCase())) e.uf = "UF.";
+    setErrors((prev) => ({
+      ...prev,
+      cep: e.cep,
+      logradouro: e.logradouro,
+      numero: e.numero,
+      bairro: e.bairro,
+      cidade: e.cidade,
+      uf: e.uf,
+    }));
+    return Object.values(e).every((v) => !v);
   };
 
-  const goToPayment = () => {
+  const irPara = (p: Passo) => {
+    setStep(p);
+    setMaxStep((m) => (p > m ? p : m));
+  };
+
+  const avancar = () => {
     setError(null);
-    if (!validateStep1()) return;
-    if (!shippingQuote) {
-      setError("Não conseguimos calcular o frete para esse CEP.");
+    if (step === 1) {
+      if (!validarIdentificacao()) return;
+      irPara(2);
       return;
     }
-    setStep(2);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (step === 2) {
+      if (!validarEndereco()) return;
+      if (!shippingQuote) {
+        setError("Não conseguimos calcular o frete para esse CEP.");
+        return;
+      }
+      irPara(3);
+      return;
+    }
+    if (step === 3) {
+      irPara(4);
+    }
   };
 
   const customerPayload = useCallback(
@@ -323,8 +387,8 @@ function CheckoutPage() {
 
   if (loading || !hydrated) {
     return (
-      <main className="flex min-h-[70vh] items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-accent" strokeWidth={1.5} />
+      <main className="flex min-h-[70vh] items-center justify-center bg-asc-bg-dark">
+        <Loader2 className="h-6 w-6 animate-spin text-asc-gold" strokeWidth={1.5} />
       </main>
     );
   }
@@ -335,10 +399,7 @@ function CheckoutPage() {
         title="Entre para finalizar"
         text="Faça login ou crie sua conta para concluir o pedido com segurança."
         action={
-          <button
-            onClick={() => openAuth()}
-            className="asc-btn-primary px-8 py-3 text-[11px] uppercase tracking-luxe"
-          >
+          <button onClick={() => openAuth()} className="asc-btn-gold px-8 py-3.5">
             Entrar
           </button>
         }
@@ -352,10 +413,7 @@ function CheckoutPage() {
         title="Sua sacola está vazia"
         text="Explore a coleção e adicione peças para finalizar a compra."
         action={
-          <Link
-            to="/"
-            className="asc-btn-primary px-8 py-3 text-[11px] uppercase tracking-luxe"
-          >
+          <Link to="/" className="asc-btn-gold px-8 py-3.5">
             Ver coleção
           </Link>
         }
@@ -363,125 +421,443 @@ function CheckoutPage() {
     );
   }
 
+  const resumoIdentificacao = form.name ? `${form.name} · ${form.email}` : "Quem receberá a peça";
+  const resumoEndereco = form.logradouro
+    ? `${form.logradouro}, ${form.numero} — ${form.cidade}/${form.uf}`
+    : "Para onde enviamos";
+  const resumoFrete = shippingQuote
+    ? shippingQuote.free
+      ? "Frete cortesia · envio assegurado"
+      : `${formatBRL(shippingCost)} · ${shippingQuote.etaDays[0]}–${shippingQuote.etaDays[1]} dias úteis`
+    : "Calculado pelo CEP";
+
   return (
-    <main className="min-h-screen bg-background px-6 py-12">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-10 flex items-center justify-between">
+    <main className="asc-on-dark relative min-h-screen bg-asc-bg-dark px-4 py-8 text-asc-ink sm:px-6 sm:py-12">
+      {/* Halo dourado ao fundo: dá profundidade sem competir com o conteúdo. */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(90rem 60rem at 50% -20%, rgba(197,160,89,0.08) 0%, transparent 60%)",
+        }}
+      />
+
+      <div className="mx-auto max-w-6xl">
+        <header className="mb-10 flex items-center justify-between gap-4">
           <Link
             to="/"
-            className="inline-flex items-center gap-1 text-[11px] uppercase tracking-luxe text-muted-foreground hover:text-asc-ink"
+            className="inline-flex items-center gap-1.5 text-[10px] tracking-luxe uppercase text-asc-ink-inverse-muted transition-colors duration-ascfast ease-asc hover:text-asc-gold"
           >
-            <ChevronLeft className="h-3.5 w-3.5" /> Continuar comprando
+            <ChevronLeft className="h-3.5 w-3.5" />{" "}
+            <span className="hidden sm:inline">Continuar comprando</span>
           </Link>
-          <p className="font-serif text-lg tracking-widest text-asc-ink">A&S Conccept</p>
-          <span className="w-40" />
+          <p className="asc-heading-tracked text-center text-sm text-asc-gold sm:text-base">
+            A&amp;S Conccept
+          </p>
+          <span className="inline-flex items-center gap-1.5 text-[10px] tracking-luxe uppercase text-asc-ink-inverse-muted">
+            <Lock className="h-3 w-3" strokeWidth={1.5} />
+            <span className="hidden sm:inline">Compra segura</span>
+          </span>
         </header>
 
         {pix ? (
-          <div className="mx-auto max-w-xl">
+          <div className="mx-auto max-w-xl animate-in fade-in slide-in-from-bottom-3 duration-500">
             <PixPanel charge={pix} awaiting />
             <Link
               to="/pedidos/$id"
               params={{ id: pix.orderNumber }}
-              className="mt-6 inline-block border border-border px-6 py-3 text-[11px] uppercase tracking-luxe text-asc-ink"
+              className="mt-6 inline-block rounded-full border border-asc-line px-6 py-3 text-[10px] tracking-luxe uppercase text-asc-ink transition-colors duration-asc ease-asc hover:border-asc-gold hover:text-asc-gold"
             >
               Acompanhar pedido
             </Link>
           </div>
         ) : (
           <>
-            <Stepper step={step} />
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-start lg:gap-10">
+              {/* ── Coluna esquerda: os passos ─────────────────────── */}
+              <section className="space-y-4">
+                <PassoCheckout
+                  numero={1}
+                  titulo="Identificação"
+                  resumo={resumoIdentificacao}
+                  aberto={step === 1}
+                  concluido={maxStep > 1}
+                  onEditar={() => setStep(1)}
+                >
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <CampoFlutuante
+                      label="Nome completo"
+                      value={form.name}
+                      onChange={(e) => setField("name", e.target.value)}
+                      erro={errors.name}
+                      valido={form.name.trim().length >= 3}
+                      autoComplete="name"
+                      containerClassName="sm:col-span-2"
+                    />
+                    <CampoFlutuante
+                      label="E-mail"
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setField("email", e.target.value)}
+                      erro={errors.email}
+                      valido={emailValido(form.email)}
+                      autoComplete="email"
+                    />
+                    <CampoFlutuante
+                      label="Celular / WhatsApp"
+                      value={form.phone}
+                      onChange={(e) => setField("phone", formatPhoneBR(e.target.value))}
+                      erro={errors.phone}
+                      valido={telefoneValido(form.phone)}
+                      inputMode="numeric"
+                      autoComplete="tel"
+                    />
+                    <CampoFlutuante
+                      label="CPF"
+                      value={form.cpf}
+                      onChange={(e) => setField("cpf", formatCpf(e.target.value))}
+                      erro={errors.cpf}
+                      valido={isValidCpf(form.cpf)}
+                      inputMode="numeric"
+                      maxLength={14}
+                      dica="Exigido pelo emissor para autorizar o pagamento."
+                      containerClassName="sm:col-span-2"
+                    />
+                  </div>
+                  <button
+                    onClick={avancar}
+                    className="asc-btn-gold mt-6 w-full py-4 sm:w-auto sm:px-10"
+                  >
+                    Continuar
+                  </button>
+                </PassoCheckout>
 
-            <div className="mt-10 grid gap-10 lg:grid-cols-[1.4fr_1fr]">
-              <section>
-                {step === 1 ? (
-                  <StepOne
-                    form={form}
-                    errors={errors}
-                    setField={setField}
-                    onCepChange={onCepChange}
-                    cepLoading={cepLoading}
-                    onSubmit={goToPayment}
-                  />
-                ) : (
-                  <StepTwo
-                    form={form}
-                    method={method}
-                    setMethod={setMethod}
-                    onEdit={() => setStep(1)}
-                    submitting={submitting}
-                    totalCard={totalCard}
-                    totalPix={totalPix}
-                    onCardSubmit={onCardSubmit}
-                    onPixSubmit={onPixSubmit}
-                  />
-                )}
+                <PassoCheckout
+                  numero={2}
+                  titulo="Endereço de entrega"
+                  resumo={resumoEndereco}
+                  aberto={step === 2}
+                  concluido={maxStep > 2}
+                  onEditar={() => setStep(2)}
+                >
+                  <div className="grid gap-4 sm:grid-cols-6">
+                    <div className="relative sm:col-span-2">
+                      <CampoFlutuante
+                        label="CEP"
+                        value={form.cep}
+                        onChange={(e) => void onCepChange(e.target.value)}
+                        erro={errors.cep}
+                        valido={normalizeCep(form.cep).length === 8}
+                        inputMode="numeric"
+                        maxLength={9}
+                        autoComplete="postal-code"
+                      />
+                      {cepLoading && (
+                        <Loader2
+                          className="absolute right-4 top-5 h-4 w-4 animate-spin text-asc-gold"
+                          strokeWidth={1.5}
+                        />
+                      )}
+                    </div>
+                    <CampoFlutuante
+                      label="Endereço"
+                      value={form.logradouro}
+                      onChange={(e) => setField("logradouro", e.target.value)}
+                      erro={errors.logradouro}
+                      valido={!!form.logradouro.trim()}
+                      autoComplete="address-line1"
+                      containerClassName="sm:col-span-4"
+                    />
+                    <CampoFlutuante
+                      label="Número"
+                      value={form.numero}
+                      onChange={(e) => setField("numero", e.target.value)}
+                      erro={errors.numero}
+                      valido={!!form.numero.trim()}
+                      containerClassName="sm:col-span-2"
+                    />
+                    <CampoFlutuante
+                      label="Complemento (opcional)"
+                      value={form.complemento}
+                      onChange={(e) => setField("complemento", e.target.value)}
+                      containerClassName="sm:col-span-4"
+                    />
+                    <CampoFlutuante
+                      label="Bairro"
+                      value={form.bairro}
+                      onChange={(e) => setField("bairro", e.target.value)}
+                      erro={errors.bairro}
+                      valido={!!form.bairro.trim()}
+                      containerClassName="sm:col-span-3"
+                    />
+                    <CampoFlutuante
+                      label="Cidade"
+                      value={form.cidade}
+                      onChange={(e) => setField("cidade", e.target.value)}
+                      erro={errors.cidade}
+                      valido={!!form.cidade.trim()}
+                      containerClassName="sm:col-span-2"
+                    />
+                    <CampoFlutuante
+                      label="UF"
+                      value={form.uf}
+                      onChange={(e) => setField("uf", e.target.value.toUpperCase().slice(0, 2))}
+                      erro={errors.uf}
+                      valido={/^[A-Z]{2}$/.test(form.uf)}
+                      maxLength={2}
+                      className="uppercase"
+                      containerClassName="sm:col-span-1"
+                    />
+                  </div>
+                  <button
+                    onClick={avancar}
+                    className="asc-btn-gold mt-6 w-full py-4 sm:w-auto sm:px-10"
+                  >
+                    Continuar
+                  </button>
+                </PassoCheckout>
+
+                <PassoCheckout
+                  numero={3}
+                  titulo="Envio"
+                  resumo={resumoFrete}
+                  aberto={step === 3}
+                  concluido={maxStep > 3}
+                  onEditar={() => setStep(3)}
+                >
+                  {shippingQuote ? (
+                    <>
+                      <CartaoEscolha
+                        ativo
+                        onClick={() => {}}
+                        icone={<Truck className="h-4 w-4" strokeWidth={1.5} />}
+                        titulo="Envio assegurado A&S"
+                        destaque={shippingQuote.free ? "Cortesia" : undefined}
+                        subtitulo={`Entrega em ${shippingQuote.etaDays[0]} a ${shippingQuote.etaDays[1]} dias úteis · ${shippingQuote.stateName}`}
+                        valor={shippingQuote.free ? "Grátis" : formatBRL(shippingCost)}
+                      />
+                      <p className="mt-3 text-[11px] font-light leading-relaxed text-asc-ink-inverse-muted">
+                        Peça embalada à mão, com rastreio informado por e-mail assim que sair do
+                        ateliê.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-asc-ink-inverse-muted">
+                      Volte ao passo anterior e informe um CEP válido para calcularmos o envio.
+                    </p>
+                  )}
+                  <button
+                    onClick={avancar}
+                    className="asc-btn-gold mt-6 w-full py-4 sm:w-auto sm:px-10"
+                  >
+                    Ir para o pagamento
+                  </button>
+                </PassoCheckout>
+
+                <PassoCheckout numero={4} titulo="Pagamento" aberto={step === 4} concluido={false}>
+                  {PIX_ENABLED && (
+                    <div className="mb-6 grid gap-3 sm:grid-cols-2">
+                      <CartaoEscolha
+                        ativo={method === "card"}
+                        onClick={() => setMethod("card")}
+                        icone={<CreditCard className="h-4 w-4" strokeWidth={1.5} />}
+                        titulo="Cartão de crédito"
+                        subtitulo="Até 3× sem juros"
+                        valor={formatBRL(totalCard)}
+                      />
+                      <CartaoEscolha
+                        ativo={method === "pix"}
+                        onClick={() => setMethod("pix")}
+                        icone={<QrCode className="h-4 w-4" strokeWidth={1.5} />}
+                        titulo="Pix"
+                        destaque="5% off"
+                        subtitulo="Aprovação imediata"
+                        valor={formatBRL(totalPix)}
+                      />
+                    </div>
+                  )}
+
+                  {method === "card" ? (
+                    <div className="animate-in fade-in duration-300">
+                      <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
+                        <div className="order-2 lg:order-1">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-[10px] tracking-luxe uppercase text-asc-ink-inverse-muted">
+                              Dados do cartão
+                            </p>
+                            <InstallmentsBadge amount={totalCard} />
+                          </div>
+                          <div className="mt-5">
+                            <CardBrick
+                              amount={totalCard}
+                              email={form.email}
+                              onSubmitCard={onCardSubmit}
+                            />
+                          </div>
+                        </div>
+                        <div className="order-1 lg:order-2 lg:w-[19rem]">
+                          <CartaoMockup nome={form.name} />
+                          <p className="mt-3 flex items-start gap-2 text-[10px] font-light leading-relaxed text-asc-ink-inverse-muted">
+                            <Lock className="mt-px h-3 w-3 shrink-0" strokeWidth={1.5} />
+                            Os dados do cartão são digitados dentro do ambiente criptografado do
+                            Mercado Pago. Nenhum número passa pelos nossos servidores.
+                          </p>
+                        </div>
+                      </div>
+
+                      <details className="mt-6 border-t border-asc-line pt-4">
+                        <summary className="cursor-pointer list-none text-[10px] tracking-luxe uppercase text-asc-ink-inverse-muted transition-colors duration-ascfast ease-asc hover:text-asc-gold">
+                          Condições de parcelamento
+                        </summary>
+                        <InstallmentsTable amount={totalCard} className="mt-3" />
+                      </details>
+
+                      {submitting && (
+                        <p className="mt-4 inline-flex items-center gap-2 text-[11px] text-asc-ink-inverse-muted">
+                          <Loader2
+                            className="h-3.5 w-3.5 animate-spin text-asc-gold"
+                            strokeWidth={1.5}
+                          />
+                          Processando pagamento…
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="animate-in fade-in duration-300">
+                      <div className="rounded-xl border border-asc-gold/30 bg-asc-gold/[0.06] p-5">
+                        <p className="flex items-center gap-2 text-[10px] tracking-luxe uppercase text-asc-gold">
+                          <QrCode className="h-3.5 w-3.5" strokeWidth={1.5} /> Pix · 5% de desconto
+                        </p>
+                        <p className="mt-3 text-sm font-light leading-relaxed text-asc-ink-inverse-muted">
+                          Geramos o QR Code aqui mesmo, sem sair do site. A confirmação é automática
+                          assim que o banco liquida.
+                        </p>
+                        <p className="mt-4 font-serif text-3xl tabular-nums text-asc-ink">
+                          {formatBRL(totalPix)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={onPixSubmit}
+                        disabled={submitting}
+                        className="asc-btn-gold mt-6 w-full py-4 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                        {submitting ? "Gerando QR Code…" : "Gerar QR Code Pix"}
+                      </button>
+                    </div>
+                  )}
+                </PassoCheckout>
+
                 {error && (
-                  <p className="mt-6 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  <p
+                    role="alert"
+                    className="rounded-xl border border-asc-error/40 bg-asc-error/10 px-4 py-3 text-sm text-asc-error animate-in fade-in slide-in-from-top-1 duration-300"
+                  >
                     {error}
                   </p>
                 )}
               </section>
 
-              <aside className="h-fit border border-border bg-card/40 p-8 md:sticky md:top-28">
-                <h2 className="border-b border-border pb-4 text-[10px] uppercase tracking-[0.35em] text-muted-foreground">
-                  Resumo · {count} {count === 1 ? "peça" : "peças"}
-                </h2>
-                <ul className="mt-2 divide-y divide-border">
-                  {items.map((i) => (
-                    <li key={`${i.id}-${i.size}`} className="flex gap-4 py-5">
-                      <img src={i.image} alt={i.name} className="h-20 w-14 flex-none object-cover" />
-                      <div className="flex-1 text-sm">
-                        <p className="font-serif text-base leading-snug">{i.name}</p>
-                        <p className="mt-1 text-[11px] font-light tracking-wide text-muted-foreground">
-                          Tam. {i.size} · {i.qty}×
-                        </p>
-                      </div>
-                      <span className="text-sm font-light tabular-nums">
-                        {formatBRL(i.price * i.qty)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+              {/* ── Coluna direita: resumo fixo ────────────────────── */}
+              <aside className="lg:sticky lg:top-8">
+                <PainelVidro className="overflow-hidden">
+                  <div className="flex items-baseline justify-between border-b border-asc-line px-6 py-5">
+                    <h2 className="font-serif text-lg tracking-[0.06em] text-asc-ink">
+                      Seu pedido
+                    </h2>
+                    <span className="text-[10px] tracking-luxe uppercase text-asc-ink-inverse-muted">
+                      {count} {count === 1 ? "peça" : "peças"}
+                    </span>
+                  </div>
 
-                <dl className="mt-4 space-y-1.5 border-t border-border pt-4 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Subtotal</dt>
-                    <dd className="tabular-nums">{formatBRL(subtotal)}</dd>
-                  </div>
-                  {couponDiscount > 0 && (
-                    <div className="flex justify-between text-accent">
-                      <dt>Cupom {coupon?.code}</dt>
-                      <dd className="tabular-nums">− {formatBRL(couponDiscount)}</dd>
+                  <ul className="max-h-[19rem] divide-y divide-asc-line overflow-y-auto px-6">
+                    {items.map((i) => (
+                      <li key={`${i.id}-${i.size}`} className="flex gap-4 py-5">
+                        <img
+                          src={i.image}
+                          alt={i.name}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-20 w-14 flex-none rounded-md border border-asc-line object-cover"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-serif text-[15px] leading-snug text-asc-ink">
+                            {i.name}
+                          </p>
+                          <p className="mt-1 text-[11px] font-light tracking-wide text-asc-ink-inverse-muted">
+                            Tam. {i.size} · {i.qty}×
+                          </p>
+                        </div>
+                        <span className="text-sm font-light tabular-nums text-asc-ink">
+                          {formatBRL(i.price * i.qty)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <dl className="space-y-2 border-t border-asc-line px-6 py-5 text-sm">
+                    <div className="flex justify-between">
+                      <dt className="text-asc-ink-inverse-muted">Subtotal</dt>
+                      <dd className="tabular-nums text-asc-ink">{formatBRL(subtotal)}</dd>
                     </div>
-                  )}
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Frete</dt>
-                    <dd className="tabular-nums">
-                      {shippingQuote
-                        ? shippingQuote.free
-                          ? "Grátis"
-                          : formatBRL(shippingCost)
-                        : "—"}
-                    </dd>
+                    {couponDiscount > 0 && (
+                      <div className="flex justify-between text-asc-gold">
+                        <dt>Cupom {coupon?.code}</dt>
+                        <dd className="tabular-nums">− {formatBRL(couponDiscount)}</dd>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <dt className="text-asc-ink-inverse-muted">Frete</dt>
+                      <dd className="tabular-nums text-asc-ink">
+                        {shippingQuote
+                          ? shippingQuote.free
+                            ? "Grátis"
+                            : formatBRL(shippingCost)
+                          : "—"}
+                      </dd>
+                    </div>
+                    <div className="mt-3 flex items-baseline justify-between border-t border-asc-line pt-4">
+                      <dt className="text-[10px] tracking-luxe uppercase text-asc-ink-inverse-muted">
+                        Total
+                      </dt>
+                      <dd className="font-serif text-3xl tabular-nums text-asc-ink">
+                        {formatBRL(totalDue)}
+                      </dd>
+                    </div>
+                    {PIX_ENABLED && method === "card" && (
+                      <p className="pt-1 text-right text-[11px] text-asc-gold">
+                        ou <span className="font-medium">{formatBRL(totalPix)}</span> no Pix
+                      </p>
+                    )}
+                  </dl>
+
+                  <div className="border-t border-asc-line px-6 py-5">
+                    <SelosConfianca
+                      itens={[
+                        {
+                          icone: <ShieldCheck className="h-4 w-4" strokeWidth={1.5} />,
+                          texto: "Pagamento criptografado pelo Mercado Pago",
+                        },
+                        {
+                          icone: <BadgeCheck className="h-4 w-4" strokeWidth={1.5} />,
+                          texto: "Autenticidade garantida — peça numerada do ateliê",
+                        },
+                        {
+                          icone: <Package className="h-4 w-4" strokeWidth={1.5} />,
+                          texto: "Envio assegurado com rastreio",
+                        },
+                        {
+                          icone: <MessageCircle className="h-4 w-4" strokeWidth={1.5} />,
+                          texto: "Atendimento exclusivo por WhatsApp",
+                        },
+                      ]}
+                    />
                   </div>
-                  <div className="mt-2 flex items-baseline justify-between border-t border-border pt-3">
-                    <dt className="text-[11px] uppercase tracking-luxe">Total</dt>
-                    <dd className="font-serif text-2xl tabular-nums">{formatBRL(totalDue)}</dd>
-                  </div>
-                  {PIX_ENABLED && method === "card" && (
-                    <p className="pt-1 text-[11px] text-accent">
-                      ou <span className="font-medium">{formatBRL(totalPix)}</span> no Pix (5% de
-                      desconto)
-                    </p>
-                  )}
-                </dl>
-                <p className="mt-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-                  <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  Pagamento processado com segurança pelo Mercado Pago
-                </p>
+                </PainelVidro>
               </aside>
             </div>
+
             <ContactStrip />
           </>
         )}
@@ -489,356 +865,6 @@ function CheckoutPage() {
     </main>
   );
 }
-
-function Stepper({ step }: { step: 1 | 2 }) {
-  return (
-    <ol className="flex items-center justify-center gap-6 text-[11px] uppercase tracking-luxe">
-      <li className={step === 1 ? "text-asc-ink" : "text-accent"}>
-        <span className="mr-2 inline-flex h-6 w-6 items-center justify-center border border-current tabular-nums">
-          1
-        </span>
-        Dados & Entrega
-      </li>
-      <span className="h-px w-10 bg-border" />
-      <li className={step === 2 ? "text-asc-ink" : "text-muted-foreground"}>
-        <span className="mr-2 inline-flex h-6 w-6 items-center justify-center border border-current tabular-nums">
-          2
-        </span>
-        Pagamento
-      </li>
-    </ol>
-  );
-}
-
-function Field({
-  label,
-  error,
-  children,
-  className = "",
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <label className={`block ${className}`}>
-      <span className="mb-1 block text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-        {label}
-      </span>
-      {children}
-      {error && <span className="mt-1 block text-[11px] text-destructive">{error}</span>}
-    </label>
-  );
-}
-
-const inputCls =
-  "w-full border-b border-foreground/25 bg-transparent px-1 py-2 text-sm outline-none transition-colors focus:border-accent";
-
-function StepOne({
-  form,
-  errors,
-  setField,
-  onCepChange,
-  cepLoading,
-  onSubmit,
-}: {
-  form: CustomerForm;
-  errors: Partial<Record<keyof CustomerForm, string>>;
-  setField: <K extends keyof CustomerForm>(k: K, v: string) => void;
-  onCepChange: (v: string) => void;
-  cepLoading: boolean;
-  onSubmit: () => void;
-}) {
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit();
-      }}
-      className="space-y-8"
-    >
-      <div>
-        <h1 className="font-serif text-2xl text-asc-ink">Seus dados</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Precisamos dessas informações para preparar sua peça com o cuidado de sempre.
-        </p>
-      </div>
-
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Nome completo" error={errors.name} className="sm:col-span-2">
-          <input
-            className={inputCls}
-            value={form.name}
-            onChange={(e) => setField("name", e.target.value)}
-            autoComplete="name"
-          />
-        </Field>
-        <Field label="E-mail" error={errors.email}>
-          <input
-            className={inputCls}
-            type="email"
-            value={form.email}
-            onChange={(e) => setField("email", e.target.value)}
-            autoComplete="email"
-          />
-        </Field>
-        <Field label="Celular / WhatsApp" error={errors.phone}>
-          <input
-            className={inputCls}
-            value={form.phone}
-            onChange={(e) => setField("phone", formatPhoneBR(e.target.value))}
-            placeholder="(00) 00000-0000"
-            inputMode="numeric"
-            autoComplete="tel"
-          />
-        </Field>
-        <Field label="CPF" error={errors.cpf}>
-          <input
-            className={inputCls}
-            value={form.cpf}
-            onChange={(e) => setField("cpf", formatCpf(e.target.value))}
-            placeholder="000.000.000-00"
-            inputMode="numeric"
-            maxLength={14}
-          />
-        </Field>
-      </div>
-
-      <div>
-        <h2 className="font-serif text-xl text-asc-ink">Endereço de entrega</h2>
-      </div>
-
-      <div className="grid gap-5 sm:grid-cols-6">
-        <Field
-          label={cepLoading ? "CEP · buscando…" : "CEP"}
-          error={errors.cep}
-          className="sm:col-span-2"
-        >
-          <input
-            className={inputCls}
-            value={form.cep}
-            onChange={(e) => onCepChange(e.target.value)}
-            placeholder="00000-000"
-            inputMode="numeric"
-            maxLength={9}
-            autoComplete="postal-code"
-          />
-        </Field>
-        <Field label="Endereço" error={errors.logradouro} className="sm:col-span-4">
-          <input
-            className={inputCls}
-            value={form.logradouro}
-            onChange={(e) => setField("logradouro", e.target.value)}
-            autoComplete="address-line1"
-          />
-        </Field>
-        <Field label="Número" error={errors.numero} className="sm:col-span-2">
-          <input
-            className={inputCls}
-            value={form.numero}
-            onChange={(e) => setField("numero", e.target.value)}
-          />
-        </Field>
-        <Field label="Complemento (opcional)" className="sm:col-span-4">
-          <input
-            className={inputCls}
-            value={form.complemento}
-            onChange={(e) => setField("complemento", e.target.value)}
-          />
-        </Field>
-        <Field label="Bairro" error={errors.bairro} className="sm:col-span-2">
-          <input
-            className={inputCls}
-            value={form.bairro}
-            onChange={(e) => setField("bairro", e.target.value)}
-          />
-        </Field>
-        <Field label="Cidade" error={errors.cidade} className="sm:col-span-3">
-          <input
-            className={inputCls}
-            value={form.cidade}
-            onChange={(e) => setField("cidade", e.target.value)}
-          />
-        </Field>
-        <Field label="UF" error={errors.uf} className="sm:col-span-1">
-          <input
-            className={`${inputCls} uppercase`}
-            value={form.uf}
-            onChange={(e) => setField("uf", e.target.value.toUpperCase().slice(0, 2))}
-            maxLength={2}
-          />
-        </Field>
-      </div>
-
-      <button
-        type="submit"
-        className="w-full asc-btn-primary px-8 py-4 text-[11px] uppercase tracking-luxe sm:w-auto"
-      >
-        Ir para o pagamento →
-      </button>
-    </form>
-  );
-}
-
-function StepTwo({
-  form,
-  method,
-  setMethod,
-  onEdit,
-  submitting,
-  totalCard,
-  totalPix,
-  onCardSubmit,
-  onPixSubmit,
-}: {
-  form: CustomerForm;
-  method: PayMethod;
-  setMethod: (m: PayMethod) => void;
-  onEdit: () => void;
-  submitting: boolean;
-  totalCard: number;
-  totalPix: number;
-  onCardSubmit: (card: CardFormData) => Promise<void>;
-  onPixSubmit: () => void;
-}) {
-  const addressLine = `${form.logradouro}, ${form.numero}${form.complemento ? " — " + form.complemento : ""}`;
-  const cityLine = `${form.bairro} · ${form.cidade}/${form.uf} · CEP ${formatCep(form.cep)}`;
-
-  return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="font-serif text-2xl text-asc-ink">Pagamento</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Todo o pagamento acontece aqui mesmo, sem sair do site.
-        </p>
-      </div>
-
-      <section className="border border-border p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="text-sm">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-              Entregar para
-            </p>
-            <p className="mt-2 font-serif text-base">{form.name}</p>
-            <p className="text-muted-foreground">
-              {form.email} · {form.phone}
-            </p>
-            <p className="mt-3">{addressLine}</p>
-            <p className="text-muted-foreground">{cityLine}</p>
-          </div>
-          <button
-            onClick={onEdit}
-            className="text-[11px] uppercase tracking-luxe text-accent underline-offset-4 hover:underline"
-          >
-            Editar
-          </button>
-        </div>
-      </section>
-
-      {PIX_ENABLED && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <MethodTile
-            active={method === "card"}
-            onClick={() => setMethod("card")}
-            icon={<CreditCard className="h-4 w-4" strokeWidth={1.5} />}
-            title="Cartão de crédito"
-            subtitle={`até 3× sem juros · ${formatBRL(totalCard)}`}
-          />
-          <MethodTile
-            active={method === "pix"}
-            onClick={() => setMethod("pix")}
-            icon={<QrCode className="h-4 w-4" strokeWidth={1.5} />}
-            title="Pix"
-            subtitle={`5% de desconto · ${formatBRL(totalPix)}`}
-          />
-        </div>
-      )}
-
-      {method === "card" ? (
-        <section className="border border-border p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-              Dados do cartão
-            </p>
-            <InstallmentsBadge amount={totalCard} />
-          </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Os dados do seu cartão são enviados criptografados diretamente ao Mercado Pago.
-          </p>
-          <div className="mt-6">
-            <CardBrick amount={totalCard} email={form.email} onSubmitCard={onCardSubmit} />
-          </div>
-          <details className="mt-6 border-t border-border/60 pt-4">
-            <summary className="cursor-pointer list-none text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-              Condições de parcelamento
-            </summary>
-            <InstallmentsTable amount={totalCard} className="mt-3" />
-          </details>
-
-          {submitting && (
-            <p className="mt-4 inline-flex items-center gap-2 text-[11px] text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" strokeWidth={1.5} />
-              Processando pagamento…
-            </p>
-          )}
-        </section>
-      ) : (
-        <section className="border border-border p-6">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-            Pix · 5% de desconto
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Geramos o QR Code na próxima tela, aqui mesmo no site. A confirmação é automática.
-          </p>
-          <p className="mt-4 font-serif text-2xl tabular-nums text-asc-ink">
-            {formatBRL(totalPix)}
-          </p>
-          <button
-            onClick={onPixSubmit}
-            disabled={submitting}
-            className="mt-6 inline-flex w-full items-center justify-center gap-2 asc-btn-primary px-8 py-4 text-[11px] uppercase tracking-luxe disabled:opacity-60 sm:w-auto"
-          >
-            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {submitting ? "Gerando QR Code…" : "Gerar QR Code Pix"}
-          </button>
-        </section>
-      )}
-    </div>
-  );
-}
-
-function MethodTile({
-  active,
-  onClick,
-  icon,
-  title,
-  subtitle,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-3 border px-4 py-4 text-left transition-colors ${
-        active
-          ? "border-[color:var(--gold)] bg-[color:var(--gold)]/5"
-          : "border-border hover:border-foreground/40"
-      }`}
-    >
-      <span className={active ? "text-accent" : "text-muted-foreground"}>{icon}</span>
-      <span>
-        <span className="block text-[11px] uppercase tracking-luxe text-asc-ink">{title}</span>
-        <span className="block text-[11px] text-muted-foreground">{subtitle}</span>
-      </span>
-    </button>
-  );
-}
-
 
 function CheckoutNotice({
   title,
@@ -850,11 +876,11 @@ function CheckoutNotice({
   action: ReactNode;
 }) {
   return (
-    <main className="flex min-h-[70vh] items-center justify-center bg-background px-6">
+    <main className="asc-on-dark flex min-h-[70vh] items-center justify-center bg-asc-bg-dark px-6 text-asc-ink">
       <div className="max-w-md text-center">
-        <p className="text-[11px] uppercase tracking-luxe text-muted-foreground">A&S Conccept</p>
+        <p className="asc-heading-tracked text-[11px] text-asc-gold">A&amp;S Conccept</p>
         <h1 className="mt-4 font-serif text-3xl text-asc-ink">{title}</h1>
-        <p className="mt-3 text-sm text-muted-foreground">{text}</p>
+        <p className="mt-3 text-sm font-light text-asc-ink-inverse-muted">{text}</p>
         <div className="mt-8 flex justify-center">{action}</div>
       </div>
     </main>

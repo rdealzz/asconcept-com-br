@@ -317,6 +317,71 @@
   background-image: var(--asc-gold-gradient);
 }
 
+/* — CTA de alto padrão: gradiente dourado, brilho metálico no hover.
+   É o botão de ação principal do modal de acesso e do checkout. O brilho é
+   um box-shadow, não um filtro: não custa camada de composição nem borra o
+   texto. — */
+@utility asc-btn-gold {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  border: none;
+  border-radius: 999px;
+  background-image: linear-gradient(135deg, #c5a059 0%, #e5c687 50%, #c5a059 100%);
+  color: #08090c;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    box-shadow var(--asc-duration) var(--asc-ease),
+    transform var(--asc-duration) var(--asc-ease),
+    filter var(--asc-duration) var(--asc-ease);
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+    box-shadow:
+      0 0 0 1px rgba(229, 198, 135, 0.5),
+      0 12px 30px -10px rgba(197, 160, 89, 0.65);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  /* Faixa de brilho que atravessa o botão ao passar o mouse. */
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.45) 50%,
+      transparent 70%
+    );
+    transform: translateX(-120%);
+    transition: transform 0.7s var(--asc-ease);
+    pointer-events: none;
+  }
+
+  &:hover:not(:disabled)::after {
+    transform: translateX(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asc-btn-gold::after {
+    display: none;
+  }
+}
+
 /* — Marca d'água de gravura (casario/veleiro da logo), para hero e rodapé.
    `--asc-gravure-image` fica intencionalmente indefinida: sem o asset a
    camada resolve para `none` e não renderiza nada. Para ligar a textura,

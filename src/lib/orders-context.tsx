@@ -2,7 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./auth-context";
 import { adminUpdateOrderStatus } from "./admin.functions";
-import type { CheckoutAddress, Order, OrderItem, OrderStatus, PaymentMethod } from "./types";
+import {
+  isFlowStatus,
+  isPrePaymentStatus,
+  type CheckoutAddress,
+  type Order,
+  type OrderItem,
+  type OrderStatus,
+  type PaymentMethod,
+} from "./types";
 
 type OrdersCtx = {
   orders: Order[];
@@ -16,7 +24,6 @@ type OrdersCtx = {
     subtotal: number;
     total: number;
     paymentMethod: PaymentMethod;
-    status?: OrderStatus;
     couponCode?: string | null;
     discount?: number;
   }) => Promise<Order>;
@@ -64,9 +71,10 @@ function rowToOrder(r: Row): Order {
 }
 
 function normalizeStatus(s: string): OrderStatus {
-  if (s === "Preparando pedido" || s === "Em trânsito" || s === "Entregue" || s === "Aguardando Aprovação")
-    return s;
-  return "Aguardando Aprovação";
+  if (isFlowStatus(s) || isPrePaymentStatus(s)) return s;
+  // Status desconhecido vindo do banco: trata como anterior ao pagamento, que é
+  // o lado seguro — nunca como "pronto para aprovar".
+  return "Aguardando Pagamento";
 }
 
 export function OrdersProvider({ children }: { children: ReactNode }) {
@@ -111,7 +119,11 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
       subtotal: o.subtotal,
       total: o.total,
       payment_method: o.paymentMethod,
-      status: o.status ?? "Aguardando Aprovação",
+      // Todo pedido nasce aguardando aprovação — inclusive o que o admin cria à
+      // mão. Quem tira o pedido daqui é o botão de avançar etapa no painel, que
+      // é também o ponto onde o estoque baixa. Antes o cadastro manual entrava
+      // já em "Preparando pedido", pulando a aprovação e a baixa.
+      status: "Aguardando Aprovação" satisfies OrderStatus,
       coupon_code: o.couponCode ?? null,
       discount: o.discount ?? 0,
     };
@@ -156,7 +168,16 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider
-      value={{ orders, loading, createOrder, updateStatus, setTrackingCode, byUser, getById, refresh }}
+      value={{
+        orders,
+        loading,
+        createOrder,
+        updateStatus,
+        setTrackingCode,
+        byUser,
+        getById,
+        refresh,
+      }}
     >
       {children}
     </Ctx.Provider>

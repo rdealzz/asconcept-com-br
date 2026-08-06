@@ -58,8 +58,7 @@ function escapeHtml(s: string) {
     .replace(/'/g, "&#39;");
 }
 
-const brl = (n: number) =>
-  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export function welcomeTemplate(email: string, name?: string) {
   const display = name || email.split("@")[0];
@@ -148,12 +147,14 @@ export function statusUpdateTemplate(
   trackingCode?: string,
 ) {
   const copy: Record<OrderStatus, string> = {
+    "Aguardando Pagamento": "Seu pedido está reservado e aguarda a confirmação do pagamento.",
+    "Pagamento recusado":
+      "O pagamento não foi autorizado. Nenhum valor foi cobrado — você pode tentar novamente quando quiser.",
+    "Falha no pagamento": "Houve uma falha ao processar o pagamento. Nenhum valor foi cobrado.",
     "Aguardando Aprovação":
       "Seu pedido está aguardando aprovação e será avaliado pelo nosso ateliê em instantes.",
-    "Preparando pedido":
-      "Nosso ateliê está preparando cuidadosamente cada peça do seu pedido.",
-    "Em trânsito":
-      "Suas peças partiram do ateliê e estão a caminho do endereço informado.",
+    "Preparando pedido": "Nosso ateliê está preparando cuidadosamente cada peça do seu pedido.",
+    "Em trânsito": "Suas peças partiram do ateliê e estão a caminho do endereço informado.",
     Entregue: "Seu pedido foi entregue. Que seja vestido com prazer.",
   };
   const trackBlock = trackingCode
@@ -181,10 +182,6 @@ export function statusUpdateTemplate(
     </p>`;
   return {
     subject: `Pedido ${orderId} — ${nextStatus}`,
-    html: shell(
-      `Atualização do pedido ${orderId}`,
-      `Status: ${nextStatus}`,
-      inner,
-    ),
+    html: shell(`Atualização do pedido ${orderId}`, `Status: ${nextStatus}`, inner),
   };
 }

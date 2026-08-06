@@ -8,12 +8,18 @@ import {
   Truck,
   CheckCircle2,
   Search,
+  Mail,
+  MapPin,
+  CreditCard,
+  ArrowRight,
+  Check,
+  Lock,
 } from "lucide-react";
 import { useAuth, isMasterAdminEmail } from "@/lib/auth-context";
 import { useOrders } from "@/lib/orders-context";
 import { formatBRL } from "@/lib/cart-context";
 import { supabase } from "@/integrations/supabase/client";
-import type { Order, OrderStatus } from "@/lib/types";
+import { FLOW_STATUSES, isPrePaymentStatus, type Order, type OrderStatus } from "@/lib/types";
 import { ContactStrip } from "@/components/ContactStrip";
 
 export const Route = createFileRoute("/pedidos/")({
@@ -32,10 +38,25 @@ export const Route = createFileRoute("/pedidos/")({
   component: OrdersPage,
 });
 
-// Os quatro estados formam uma progressão de intensidade dentro da paleta —
-// do taupe apagado ao dourado preenchido — em vez de quatro pastéis distintos,
-// que no fundo escuro viravam ilhas claras e saíam da identidade.
+// Os estados do ateliê formam uma progressão de intensidade dentro da paleta —
+// do taupe apagado ao dourado preenchido — em vez de pastéis distintos, que no
+// fundo escuro viravam ilhas claras e saíam da identidade.
 const STATUS_META: Record<OrderStatus, { label: string; icon: string; className: string }> = {
+  "Aguardando Pagamento": {
+    label: "Aguardando Pagamento",
+    icon: "◌",
+    className: "border-asc-line bg-asc-bg-raised text-asc-ink-muted",
+  },
+  "Pagamento recusado": {
+    label: "Pagamento Recusado",
+    icon: "✕",
+    className: "border-destructive/50 bg-destructive/10 text-destructive",
+  },
+  "Falha no pagamento": {
+    label: "Falha no Pagamento",
+    icon: "✕",
+    className: "border-destructive/50 bg-destructive/10 text-destructive",
+  },
   "Aguardando Aprovação": {
     label: "Aguardando Aprovação",
     icon: "⏳",
@@ -58,7 +79,8 @@ const STATUS_META: Record<OrderStatus, { label: string; icon: string; className:
   },
 };
 
-const ALL_STATUSES = Object.keys(STATUS_META) as OrderStatus[];
+/** As quatro etapas do ateliê, na ordem em que avançam. */
+const ALL_STATUSES: OrderStatus[] = [...FLOW_STATUSES];
 
 function OrdersPage() {
   const { user, loading, openAuth } = useAuth();
@@ -201,9 +223,7 @@ function AdminDashboard({ orders }: { orders: Order[] }) {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`relative px-5 py-3 text-[11px] tracking-luxe uppercase transition-colors whitespace-nowrap ${
-              tab === t.id
-                ? "text-foreground"
-                : "text-muted-foreground hover:text-foreground"
+              tab === t.id ? "text-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {t.label}
@@ -295,14 +315,10 @@ function AdminClientsPanel() {
               {customers.map((c) => (
                 <li key={c.email} className="flex items-center justify-between gap-4 px-5 py-3">
                   <div className="min-w-0">
-                    <p className="truncate font-serif text-sm">
-                      {c.name ?? c.email.split("@")[0]}
-                    </p>
+                    <p className="truncate font-serif text-sm">{c.name ?? c.email.split("@")[0]}</p>
                     <p className="truncate text-xs text-muted-foreground">{c.email}</p>
                     {c.phone && (
-                      <p className="truncate text-[11px] text-[color:var(--gold)]">
-                        📱 {c.phone}
-                      </p>
+                      <p className="truncate text-[11px] text-[color:var(--gold)]">📱 {c.phone}</p>
                     )}
                   </div>
                   {c.createdAt && (
@@ -386,8 +402,8 @@ function MarkupCalculator() {
           </p>
           <h3 className="font-serif text-xl">Calculadora de Markup + Taxa Stripe (Brasil)</h3>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Taxa considerada: 4,99% + R$ 0,50 por transação. O preço sugerido garante que a
-            margem líquida desejada seja preservada mesmo após o desconto do gateway.
+            Taxa considerada: 4,99% + R$ 0,50 por transação. O preço sugerido garante que a margem
+            líquida desejada seja preservada mesmo após o desconto do gateway.
           </p>
         </header>
 
@@ -425,14 +441,8 @@ function MarkupCalculator() {
               value={formatBRL(parsed.price)}
               accent
             />
-            <ResultCell
-              label="Taxa Stripe estimada"
-              value={`− ${formatBRL(parsed.stripeFee)}`}
-            />
-            <ResultCell
-              label="Valor líquido recebido"
-              value={formatBRL(parsed.net)}
-            />
+            <ResultCell label="Taxa Stripe estimada" value={`− ${formatBRL(parsed.stripeFee)}`} />
+            <ResultCell label="Valor líquido recebido" value={formatBRL(parsed.net)} />
             <ResultCell
               label={`Lucro real (margem ${parsed.margin.toFixed(0)}%)`}
               value={formatBRL(parsed.profit)}
@@ -445,9 +455,9 @@ function MarkupCalculator() {
         )}
 
         <p className="border-t border-border px-6 py-3 text-[10px] leading-relaxed text-muted-foreground">
-          Fórmula: preço = (custo × (1 + margem%) + R$ 0,50) ÷ (1 − 4,99%). Assim, após a
-          dedução da taxa, o valor líquido corresponde exatamente ao custo mais o percentual
-          de lucro pretendido.
+          Fórmula: preço = (custo × (1 + margem%) + R$ 0,50) ÷ (1 − 4,99%). Assim, após a dedução da
+          taxa, o valor líquido corresponde exatamente ao custo mais o percentual de lucro
+          pretendido.
         </p>
       </section>
     </div>
@@ -469,14 +479,15 @@ function ResultCell({ label, value, accent }: { label: string; value: string; ac
   );
 }
 
-
 function AdminOrdersList({ orders }: { orders: Order[] }) {
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | "todos">("todos");
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | "todos" | "nao-pagos">("todos");
   const [term, setTerm] = useState("");
 
   const filtered = useMemo(() => {
     return orders.filter((o) => {
-      if (statusFilter !== "todos" && o.status !== statusFilter) return false;
+      if (statusFilter === "nao-pagos" && !isPrePaymentStatus(o.status)) return false;
+      if (statusFilter !== "todos" && statusFilter !== "nao-pagos" && o.status !== statusFilter)
+        return false;
       if (!term.trim()) return true;
       const q = term.trim().toLowerCase();
       return (
@@ -487,34 +498,75 @@ function AdminOrdersList({ orders }: { orders: Order[] }) {
     });
   }, [orders, statusFilter, term]);
 
+  // Um cartão por etapa do ateliê, mais um para o que ainda não foi pago —
+  // esse é o balde que antes se disfarçava de "Aguardando Aprovação".
   const totals = useMemo(() => {
-    return ALL_STATUSES.map((s) => ({
-      status: s,
+    const cartoes: {
+      key: OrderStatus | "nao-pagos";
+      label: string;
+      icon: string;
+      count: number;
+    }[] = ALL_STATUSES.map((s) => ({
+      key: s,
+      label: STATUS_META[s].label,
+      icon: STATUS_META[s].icon,
       count: orders.filter((o) => o.status === s).length,
     }));
+    const naoPagos = orders.filter((o) => isPrePaymentStatus(o.status)).length;
+    if (naoPagos > 0) {
+      cartoes.push({ key: "nao-pagos", label: "Sem pagamento", icon: "◌", count: naoPagos });
+    }
+    return cartoes;
   }, [orders]);
 
   return (
     <div className="mt-10 space-y-8">
-      <section className="grid gap-3 sm:grid-cols-5">
-        {totals.map((t) => (
-          <button
-            key={t.status}
-            onClick={() =>
-              setStatusFilter((cur) => (cur === t.status ? "todos" : t.status))
-            }
-            className={`flex flex-col items-start gap-1 border px-4 py-3 text-left transition-all ${
-              statusFilter === t.status
-                ? "border-asc-line bg-charcoal text-ivory"
-                : "border-border bg-background hover:border-asc-line"
-            }`}
-          >
-            <span className="text-[10px] tracking-luxe uppercase opacity-80">
-              {STATUS_META[t.status].icon} {STATUS_META[t.status].label}
-            </span>
-            <span className="font-serif text-2xl tabular-nums">{t.count}</span>
-          </button>
-        ))}
+      {/* Cada cartão é um filtro: clicar aplica, clicar de novo limpa. */}
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+        {totals.map((t) => {
+          const ativo = statusFilter === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setStatusFilter((cur) => (cur === t.key ? "todos" : t.key))}
+              aria-pressed={ativo}
+              title={ativo ? "Clique para remover o filtro" : `Ver apenas: ${t.label}`}
+              className={`group relative flex cursor-pointer flex-col items-start gap-1 rounded-lg border px-4 py-3 text-left transition-all duration-asc ease-asc hover:-translate-y-0.5 ${
+                ativo
+                  ? "border-asc-gold bg-asc-bg-raised shadow-[0_0_0_1px_var(--asc-gold),0_10px_28px_-12px_rgba(197,160,89,0.55)]"
+                  : "border-border bg-background hover:border-asc-gold/50 hover:shadow-[0_8px_22px_-14px_rgba(0,0,0,0.6)]"
+              }`}
+            >
+              <span className="flex w-full items-center justify-between gap-2">
+                <span
+                  className={`text-[10px] tracking-luxe uppercase ${
+                    ativo ? "text-asc-gold" : "text-muted-foreground"
+                  }`}
+                >
+                  {t.icon} {t.label}
+                </span>
+                <span
+                  className={`min-w-6 rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold tabular-nums transition-colors ${
+                    ativo
+                      ? "bg-asc-gold text-asc-bg"
+                      : "bg-asc-bg-raised text-muted-foreground group-hover:text-asc-ink"
+                  }`}
+                >
+                  {t.count}
+                </span>
+              </span>
+              <span className="font-serif text-3xl tabular-nums text-asc-ink">{t.count}</span>
+              <span
+                className={`text-[10px] tracking-luxe uppercase transition-opacity ${
+                  ativo ? "text-asc-gold opacity-100" : "opacity-0 group-hover:opacity-60"
+                }`}
+              >
+                {ativo ? "Filtrando ·  clique para limpar" : "Clique para filtrar"}
+              </span>
+            </button>
+          );
+        })}
       </section>
 
       <div className="flex flex-wrap items-center gap-3 border-b border-border pb-4">
@@ -524,15 +576,20 @@ function AdminOrdersList({ orders }: { orders: Order[] }) {
             value={term}
             onChange={(e) => setTerm(e.target.value)}
             placeholder="Buscar por ID, cliente ou e-mail"
-            className="w-full border border-border bg-background px-9 py-2 text-sm outline-none focus:border-asc-line"
+            className="w-full rounded-md border border-border bg-background px-9 py-2 text-sm outline-none transition-colors duration-ascfast ease-asc focus:border-asc-gold"
           />
         </div>
+        {(statusFilter !== "todos" || term) && (
+          <span className="text-[11px] text-muted-foreground">
+            {filtered.length} {filtered.length === 1 ? "pedido" : "pedidos"}
+          </span>
+        )}
         <button
           onClick={() => {
             setStatusFilter("todos");
             setTerm("");
           }}
-          className="border border-border px-4 py-2 text-[11px] tracking-luxe uppercase text-muted-foreground transition-colors hover:border-asc-line hover:text-foreground"
+          className="rounded-md border border-border px-4 py-2 text-[11px] tracking-luxe uppercase text-muted-foreground transition-colors duration-ascfast ease-asc hover:border-asc-gold hover:text-asc-gold"
         >
           Limpar filtros
         </button>
@@ -559,14 +616,25 @@ function AdminOrderCard({ order }: { order: Order }) {
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
   const showTracking = order.status === "Em trânsito" || !!order.trackingCode;
 
+  const naoPago = isPrePaymentStatus(order.status);
+  const currentIndex = ALL_STATUSES.indexOf(order.status);
+  const proximo = currentIndex >= 0 ? ALL_STATUSES[currentIndex + 1] : undefined;
+
   const changeStatus = async (next: OrderStatus) => {
     if (next === order.status) return;
     try {
-      await updateStatus(order.id, next, next === "Em trânsito" ? tracking || undefined : order.trackingCode);
+      await updateStatus(
+        order.id,
+        next,
+        next === "Em trânsito" ? tracking || undefined : order.trackingCode,
+      );
       setSavedFlash(`Status atualizado para "${STATUS_META[next].label}"`);
       setTimeout(() => setSavedFlash(null), 2400);
-    } catch {
-      setSavedFlash("Não foi possível atualizar o pedido.");
+    } catch (e) {
+      // A mensagem do servidor explica o motivo (fora de ordem, pedido não
+      // pago). Engoli-la deixava o admin sem saber o que aconteceu.
+      setSavedFlash(e instanceof Error ? e.message : "Não foi possível atualizar o pedido.");
+      setTimeout(() => setSavedFlash(null), 5000);
     }
   };
 
@@ -582,7 +650,10 @@ function AdminOrderCard({ order }: { order: Order }) {
 
   const customerName =
     order.customerName ||
-    order.customerEmail.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    order.customerEmail
+      .split("@")[0]
+      .replace(/[._-]+/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
 
   return (
     <li className="border border-border bg-card shadow-[0_1px_0_0_rgba(0,0,0,0.03)] transition-shadow hover:shadow-[0_4px_18px_-6px_rgba(0,0,0,0.15)]">
@@ -607,30 +678,79 @@ function AdminOrderCard({ order }: { order: Order }) {
           <h3 className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
             Quem comprou
           </h3>
-          <p className="mt-2 font-serif text-lg">{customerName}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground break-all">
-            {order.customerEmail}
-          </p>
-          <div className="mt-4 space-y-0.5 border-t border-border pt-3 text-xs text-muted-foreground">
-            <p className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]/80">
-              Endereço
+          <p className="mt-2 font-serif text-lg text-asc-ink">{customerName}</p>
+
+          {/* E-mail em destaque: é por ele que sai toda a comunicação do pedido,
+              e era a linha mais apagada do card. */}
+          <a
+            href={`mailto:${order.customerEmail}`}
+            className="mt-2 flex items-center gap-2 rounded-md border border-asc-line bg-asc-bg-raised px-3 py-2 text-xs text-asc-ink transition-colors duration-ascfast ease-asc hover:border-asc-gold hover:text-asc-gold"
+          >
+            <Mail className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+            <span className="break-all">{order.customerEmail}</span>
+          </a>
+
+          {/* Forma de pagamento em destaque, ao lado de quem comprou. */}
+          <div className="mt-2 flex items-center gap-2 rounded-md border border-asc-line bg-asc-bg-raised px-3 py-2 text-xs">
+            <CreditCard
+              className="h-3.5 w-3.5 shrink-0 text-[color:var(--gold)]"
+              strokeWidth={1.5}
+            />
+            <span className="text-muted-foreground">Pagamento</span>
+            <span className="ml-auto font-medium text-asc-ink">
+              {paymentLabel(order.paymentMethod)}
+            </span>
+          </div>
+
+          <div className="mt-3 rounded-md border border-asc-line bg-asc-bg-raised p-3 text-xs">
+            <p className="flex items-center gap-2 text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
+              <MapPin className="h-3.5 w-3.5" strokeWidth={1.5} /> Endereço de entrega
             </p>
             {order.address?.logradouro || order.address?.cidade || order.address?.cep ? (
-              <>
-                <p className="text-asc-ink">
+              <div className="mt-2 space-y-0.5 leading-relaxed">
+                <p className="font-medium text-asc-ink">
                   {order.address.logradouro}
                   {order.address.numero ? `, ${order.address.numero}` : ""}
                   {order.address.complemento ? ` — ${order.address.complemento}` : ""}
                 </p>
                 <p className="text-asc-ink">
-                  {[order.address.bairro, [order.address.cidade, order.address.uf].filter(Boolean).join("/")]
+                  {[
+                    order.address.bairro,
+                    [order.address.cidade, order.address.uf].filter(Boolean).join("/"),
+                  ]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
-                {order.address.cep && <p>CEP {order.address.cep}</p>}
-              </>
+                {order.address.cep && (
+                  <p className="text-muted-foreground">CEP {order.address.cep}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const linha = [
+                      customerName,
+                      `${order.address.logradouro ?? ""}${order.address.numero ? `, ${order.address.numero}` : ""}${order.address.complemento ? ` — ${order.address.complemento}` : ""}`,
+                      [
+                        order.address.bairro,
+                        [order.address.cidade, order.address.uf].filter(Boolean).join("/"),
+                      ]
+                        .filter(Boolean)
+                        .join(" · "),
+                      order.address.cep ? `CEP ${order.address.cep}` : "",
+                    ]
+                      .filter(Boolean)
+                      .join("\n");
+                    void navigator.clipboard?.writeText(linha);
+                    setSavedFlash("Endereço copiado.");
+                    setTimeout(() => setSavedFlash(null), 2000);
+                  }}
+                  className="mt-2 text-[10px] tracking-luxe uppercase text-[color:var(--gold)] underline-offset-4 hover:underline"
+                >
+                  Copiar endereço
+                </button>
+              </div>
             ) : (
-              <p className="italic">Endereço não informado.</p>
+              <p className="mt-2 italic text-muted-foreground">Endereço não informado.</p>
             )}
           </div>
         </section>
@@ -681,42 +801,89 @@ function AdminOrderCard({ order }: { order: Order }) {
           <h3 className="text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
             Fluxo de aprovação
           </h3>
-          <div className="mt-2 space-y-2">
-            {ALL_STATUSES.map((s, index) => {
-              const active = s === order.status;
-              const currentIndex = ALL_STATUSES.indexOf(order.status);
-              // O fluxo só avança uma etapa por vez, sempre na ordem.
-              const selectable = index === currentIndex + 1;
-              return (
+
+          {/* Pedido sem pagamento não entra no fluxo: a única ação é confirmar
+              o pagamento na mão, e é isso que o botão diz. */}
+          {naoPago ? (
+            <div className="mt-2 rounded-md border border-dashed border-destructive/50 bg-destructive/5 p-3">
+              <p className="text-xs leading-relaxed text-asc-ink">
+                Pagamento não confirmado ({STATUS_META[order.status].label}). O estoque continua
+                intacto e nada é cobrado.
+              </p>
+              <button
+                onClick={() => changeStatus("Aguardando Aprovação")}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-[color:var(--gold)] bg-[color:var(--gold)]/10 px-3 py-2.5 text-[11px] font-medium tracking-luxe uppercase text-[color:var(--gold)] transition-all duration-asc ease-asc hover:bg-[color:var(--gold)] hover:text-asc-bg"
+              >
+                <Check className="h-3.5 w-3.5" strokeWidth={2} />
+                Confirmar pagamento recebido
+              </button>
+              <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+                Use apenas se recebeu o valor por fora (Pix manual, transferência). O pedido entra
+                na fila de aprovação e o cliente recebe a confirmação por e-mail.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* O próximo passo vem primeiro e em destaque: é a ação que o
+                  admin realmente veio fazer. */}
+              {proximo && (
                 <button
-                  key={s}
-                  onClick={() => changeStatus(s)}
-                  disabled={!selectable}
-                  title={
-                    selectable
-                      ? `Avançar para "${STATUS_META[s].label}"`
-                      : active
-                        ? "Status atual"
-                        : "Disponível apenas na ordem do fluxo"
-                  }
-                  className={`flex w-full items-center gap-2 border px-3 py-2 text-left text-xs transition-all ${
-                    active
-                      ? `${STATUS_META[s].className} font-medium`
-                      : selectable
-                        ? "border-border bg-background hover:border-asc-line"
-                        : "cursor-not-allowed border-border/60 bg-background/40 text-muted-foreground/60"
-                  }`}
+                  onClick={() => changeStatus(proximo)}
+                  className="group mt-2 flex w-full items-center gap-3 rounded-md border border-[color:var(--gold)] bg-[color:var(--gold)]/10 px-3 py-3 text-left transition-all duration-asc ease-asc hover:bg-[color:var(--gold)] hover:text-asc-bg"
                 >
-                  <StatusIcon status={s} />
-                  <span className="flex-1">{STATUS_META[s].label}</span>
-                  {active && <span className="text-[10px] uppercase tracking-luxe">Atual</span>}
-                  {selectable && (
-                    <span className="text-[10px] uppercase tracking-luxe">Avançar</span>
-                  )}
+                  <StatusIcon status={proximo} />
+                  <span className="flex-1">
+                    <span className="block text-[10px] tracking-luxe uppercase opacity-70">
+                      Avançar para
+                    </span>
+                    <span className="block text-sm font-medium">{STATUS_META[proximo].label}</span>
+                  </span>
+                  <ArrowRight
+                    className="h-4 w-4 transition-transform duration-asc ease-asc group-hover:translate-x-1"
+                    strokeWidth={1.8}
+                  />
                 </button>
-              );
-            })}
-          </div>
+              )}
+
+              <p className="mt-3 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Etapas
+              </p>
+              <ol className="mt-2 space-y-1.5">
+                {ALL_STATUSES.map((s, index) => {
+                  const active = s === order.status;
+                  const concluido = index < currentIndex;
+                  const selectable = index === currentIndex + 1;
+                  return (
+                    <li
+                      key={s}
+                      className={`flex items-center gap-2 rounded-md border px-3 py-2 text-xs transition-all ${
+                        active
+                          ? `${STATUS_META[s].className} font-medium`
+                          : concluido
+                            ? "border-transparent bg-asc-bg-raised text-muted-foreground"
+                            : "border-border/60 bg-background/40 text-muted-foreground/60"
+                      }`}
+                    >
+                      {concluido ? (
+                        <Check className="h-3.5 w-3.5 text-[color:var(--gold)]" strokeWidth={2} />
+                      ) : active ? (
+                        <StatusIcon status={s} />
+                      ) : (
+                        <Lock className="h-3 w-3 opacity-50" strokeWidth={1.5} />
+                      )}
+                      <span className="flex-1">{STATUS_META[s].label}</span>
+                      {active && <span className="text-[10px] uppercase tracking-luxe">Atual</span>}
+                      {selectable && (
+                        <span className="text-[10px] uppercase tracking-luxe opacity-60">
+                          Próximo
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            </>
+          )}
 
           {showTracking && (
             <div className="mt-4 border border-dashed border-[color:var(--gold)] bg-asc-bg-raised p-3">
@@ -745,10 +912,18 @@ function AdminOrderCard({ order }: { order: Order }) {
               ✦ {savedFlash}
             </p>
           )}
-          <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
-            Pagamento: <span className="text-asc-ink">{paymentLabel(order.paymentMethod)}</span>
-            <br />
-            Toda alteração dispara e-mail transacional para {order.customerEmail}
+          <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-relaxed text-muted-foreground">
+            <Mail className="mt-px h-3 w-3 shrink-0" strokeWidth={1.5} />
+            <span>
+              Cada avanço de etapa dispara o e-mail correspondente para{" "}
+              <span className="text-asc-ink">{order.customerEmail}</span>.
+              {proximo === "Preparando pedido" && (
+                <>
+                  {" "}
+                  Aprovar também <span className="text-asc-ink">baixa o estoque</span> das peças.
+                </>
+              )}
+            </span>
           </p>
         </section>
       </div>
@@ -872,8 +1047,7 @@ function CustomerOrderCard({ order }: { order: Order }) {
               </p>
               {order.trackingCode && (
                 <p className="text-xs text-muted-foreground">
-                  Rastreio:{" "}
-                  <span className="font-mono text-foreground">{order.trackingCode}</span>
+                  Rastreio: <span className="font-mono text-foreground">{order.trackingCode}</span>
                 </p>
               )}
             </div>
@@ -907,8 +1081,10 @@ function StatusIcon({ status }: { status: OrderStatus }) {
 }
 
 export function paymentLabel(m: Order["paymentMethod"]) {
-  if (m === "pix") return "PIX";
-  if (m === "credit_card") return "Cartão de Crédito";
-  if (m === "stripe") return "Stripe (Cartão / PIX)";
-  return "Boleto";
+  if (m === "mp_pix" || m === "pix") return "Pix";
+  if (m === "mp_card" || m === "credit_card") return "Cartão de crédito";
+  if (m === "stripe") return "Stripe (cartão / Pix)";
+  if (m === "boleto") return "Boleto";
+  // Valor desconhecido não pode virar "Boleto" por descuido: mostra o que veio.
+  return m ? String(m) : "—";
 }

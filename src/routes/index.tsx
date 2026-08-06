@@ -28,7 +28,7 @@ import {
   Package,
 } from "lucide-react";
 import { useOrders } from "@/lib/orders-context";
-import type { OrderStatus } from "@/lib/types";
+import { isPrePaymentStatus, type Order, type OrderStatus } from "@/lib/types";
 import { useCart, formatBRL, type Product, type ProductCategory } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -1280,7 +1280,7 @@ function AdminEditModal() {
     }
 
     const accepted: string[] = [];
-    let ignored = files.length > remaining;
+    const ignored = files.length > remaining;
 
     for (const file of files.slice(0, remaining)) {
       if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) {
@@ -2426,6 +2426,74 @@ const ADMIN_STATUSES: OrderStatus[] = [
   "Entregue",
 ];
 
+const ROTULO_STATUS: Record<string, string> = {
+  "Aguardando Pagamento": "Aguardando Pagamento",
+  "Pagamento recusado": "Pagamento Recusado",
+  "Falha no pagamento": "Falha no Pagamento",
+  "Aguardando Aprovação": "Aguardando Aprovação",
+  "Preparando pedido": "Preparando Pedido",
+  "Em trânsito": "Em Trânsito",
+  Entregue: "Entregue",
+};
+
+/**
+ * Seletor de etapa da tabela do painel rápido.
+ *
+ * Oferece apenas o status atual e o seguinte: o servidor recusa qualquer salto,
+ * e um `<select>` com as quatro etapas convidava o admin a escolher algo que
+ * seria rejeitado. Pedido sem pagamento confirmado só tem um caminho —
+ * confirmar o pagamento — e é isso que aparece.
+ */
+function StatusSelect({
+  order,
+  onChange,
+}: {
+  order: Order;
+  onChange: (next: OrderStatus) => Promise<void>;
+}) {
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+
+  const naoPago = isPrePaymentStatus(order.status);
+  const idx = ADMIN_STATUSES.indexOf(order.status);
+  const proximo = naoPago ? "Aguardando Aprovação" : idx >= 0 ? ADMIN_STATUSES[idx + 1] : undefined;
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <select
+        value={order.status}
+        disabled={salvando || !proximo}
+        onChange={async (e) => {
+          const next = e.target.value as OrderStatus;
+          if (next === order.status) return;
+          setErro(null);
+          setSalvando(true);
+          try {
+            await onChange(next);
+          } catch (err) {
+            // Sem isto a recusa do servidor sumia e o admin só via o valor
+            // voltar sozinho, sem explicação.
+            setErro(err instanceof Error ? err.message : "Não foi possível atualizar.");
+          } finally {
+            setSalvando(false);
+          }
+        }}
+        className="border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-accent disabled:opacity-60"
+      >
+        <option value={order.status}>{ROTULO_STATUS[order.status] ?? order.status}</option>
+        {proximo && (
+          <option value={proximo}>
+            → {naoPago ? "Confirmar pagamento" : ROTULO_STATUS[proximo]}
+          </option>
+        )}
+      </select>
+      {erro && (
+        <span className="max-w-[14rem] text-[10px] leading-tight text-destructive">{erro}</span>
+      )}
+    </div>
+  );
+}
+
 type NewsletterRow = { id: string; email: string; created_at: string };
 type ManualCustomerRow = {
   id: string;
@@ -2634,25 +2702,10 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                               </td>
                               <td className="py-3 pr-3">
                                 {ix === 0 && (
-                                  <select
-                                    value={o.status}
-                                    onChange={(e) =>
-                                      updateStatus(o.id, e.target.value as OrderStatus)
-                                    }
-                                    className="border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-accent"
-                                  >
-                                    {ADMIN_STATUSES.map((s) => (
-                                      <option key={s} value={s}>
-                                        {s === "Aguardando Aprovação"
-                                          ? "Aprovar"
-                                          : s === "Preparando pedido"
-                                            ? "Preparando Pedido"
-                                            : s === "Em trânsito"
-                                              ? "Em Trânsito"
-                                              : s}
-                                      </option>
-                                    ))}
-                                  </select>
+                                  <StatusSelect
+                                    order={o}
+                                    onChange={(next) => updateStatus(o.id, next)}
+                                  />
                                 )}
                               </td>
                               <td className="py-3 pr-3 text-right">
@@ -3383,7 +3436,6 @@ function ManualOrderModal({
         subtotal: Number(total),
         total: Number(total),
         paymentMethod: "pix",
-        status: "Preparando pedido",
       });
       onSaved();
     } catch (e) {

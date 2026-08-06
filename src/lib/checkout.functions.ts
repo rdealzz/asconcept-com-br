@@ -26,7 +26,14 @@ type CheckoutResult = {
 };
 
 const PIX_DISCOUNT_RATE = 0.05;
+/**
+ * Todo pedido nasce aqui: seja o manual do admin, seja o do cliente depois que
+ * o pagamento é confirmado. Quem tira o pedido deste estado é o administrador,
+ * clicando em avançar no painel — nunca o gateway de pagamento sozinho.
+ */
 const INITIAL_STATUS = "Aguardando Aprovação";
+/** Status de um pedido pago e ainda não aprovado pelo ateliê. */
+const PAID_STATUS = INITIAL_STATUS;
 
 // Alterar para `true` quando o Pix for aprovado pela Stripe.
 const PIX_ENABLED = false;
@@ -319,6 +326,30 @@ export const createStripeHostedSession = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<HostedCheckoutResult> => {
     const { supabase, userId } = context;
 
+    // As URLs de retorno vêm do cliente e são para onde o Stripe manda a pessoa
+    // depois de pagar. Aceitar qualquer http(s) fazia deste fluxo um redirect
+    // aberto: bastava forjar a chamada para levar o comprador a um site
+    // qualquer logo após o pagamento, com toda a aparência de ser nosso.
+    // Agora só valem URLs do próprio site.
+    try {
+      const { getRequestUrl } = await import("@tanstack/react-start/server");
+      const origem = getRequestUrl().origin;
+      const daCasa = (u: string) => {
+        try {
+          return new URL(u).origin === origem;
+        } catch {
+          return false;
+        }
+      };
+      if (!daCasa(data.successUrl) || !daCasa(data.cancelUrl)) {
+        return { error: "URLs de retorno inválidas." };
+      }
+    } catch {
+      // Sem contexto de requisição (teste, execução fora do servidor HTTP) não
+      // dá para saber a origem; seguimos com a validação de formato que o
+      // inputValidator já fez.
+    }
+
     const ids = Array.from(new Set(data.items.map((i) => i.id)));
     const { data: rows, error: fetchErr } = await supabase
       .from("products")
@@ -563,7 +594,9 @@ export const confirmStripePayment = createServerFn({ method: "POST" })
       const { supabase, userId } = context;
       const { data: order, error } = await supabase
         .from("orders")
-        .select("order_number, status, stock_decremented, user_id")
+        .select(
+          "order_number, status, stock_decremented, user_id, customer_email, customer_name, total, items, mail_sent",
+        )
         .eq("stripe_session_id", data.sessionId)
         .maybeSingle();
       if (error || !order) throw new Error("Pedido não encontrado para essa sessão.");
@@ -586,11 +619,15 @@ export const confirmStripePayment = createServerFn({ method: "POST" })
 
       // Endereço e nome já foram capturados na Etapa 1 do checkout; aqui apenas
       // atualizamos status, frete e total confirmados pelo Stripe.
+      //
+      // Pagamento aprovado NÃO significa pedido aprovado: o pedido entra na fila
+      // do ateliê e só avança para "Preparando pedido" quando o admin clicar no
+      // painel. Antes esta linha pulava a aprovação inteira.
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       await supabaseAdmin
         .from("orders")
         .update({
-          status: "Preparando pedido",
+          status: PAID_STATUS,
           shipping_cost: shippingCost,
           total: totalPaid,
           updated_at: new Date().toISOString(),
@@ -620,6 +657,33 @@ export const confirmStripePayment = createServerFn({ method: "POST" })
           );
         }
       }
-      return { orderNumber: order.order_number, status: "Preparando pedido", paid: true };
+
+      // Mesmo e-mail de "pedido confirmado" que o Mercado Pago dispara. Sem isto
+      // quem pagava pelo Stripe não recebia nenhuma confirmação.
+      const mailRow = order as unknown as {
+        customer_email?: string;
+        customer_name?: string | null;
+        mail_sent?: boolean;
+        items?: unknown;
+      };
+      if (!mailRow.mail_sent && mailRow.customer_email) {
+        try {
+          const { enqueueOrderEmail } = await import("@/lib/order-email.server");
+          await enqueueOrderEmail(supabaseAdmin, "pedido-confirmado", mailRow.customer_email, {
+            orderNumber: order.order_number,
+            customerName: mailRow.customer_name ?? undefined,
+            total: totalPaid,
+            items: Array.isArray(mailRow.items) ? mailRow.items : [],
+          });
+          await supabaseAdmin
+            .from("orders")
+            .update({ mail_sent: true } as never)
+            .eq("order_number", order.order_number);
+        } catch (e) {
+          console.error("[mail] falha ao enviar e-mail de pedido confirmado (Stripe)", e);
+        }
+      }
+
+      return { orderNumber: order.order_number, status: PAID_STATUS, paid: true };
     },
   );

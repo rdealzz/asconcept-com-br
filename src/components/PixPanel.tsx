@@ -45,7 +45,7 @@ export function PixPanel({ charge, awaiting }: { charge: PixCharge; awaiting: bo
   };
 
   return (
-    <section className="border border-[color:var(--gold)]/40 bg-card/40 p-6 sm:p-8">
+    <section className="rounded-2xl border border-[color:var(--gold)]/40 bg-card/40 p-6 backdrop-blur-[12px] sm:p-8">
       <p className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
         <QrCode className="h-3.5 w-3.5" strokeWidth={1.5} /> Pagamento via Pix
       </p>
@@ -56,15 +56,17 @@ export function PixPanel({ charge, awaiting }: { charge: PixCharge; awaiting: bo
 
       {charge.qrCodeBase64 && (
         <div className="mt-6 flex justify-center">
-          {/* Fundo branco de propósito: o QR Code do Mercado Pago é preto e
-              precisa da zona de silêncio clara para ser lido pela câmera.
-              Não trocar pela paleta escura. */}
-          <div className="border border-[color:var(--gold)]/50 bg-white p-4">
-            <img
-              src={`data:image/png;base64,${charge.qrCodeBase64}`}
-              alt={`QR Code Pix do pedido ${charge.orderNumber}`}
-              className="h-52 w-52 object-contain"
-            />
+          {/* Moldura dourada em duas camadas; o miolo é branco de propósito: o
+              QR Code do Mercado Pago é preto e precisa da zona de silêncio
+              clara para ser lido pela câmera. Não trocar pela paleta escura. */}
+          <div className="rounded-2xl border border-[color:var(--gold)]/60 bg-[color:var(--gold)]/10 p-2 shadow-[0_0_40px_-12px_rgba(197,160,89,0.5)]">
+            <div className="rounded-xl bg-white p-4">
+              <img
+                src={`data:image/png;base64,${charge.qrCodeBase64}`}
+                alt={`QR Code Pix do pedido ${charge.orderNumber}`}
+                className="h-52 w-52 object-contain"
+              />
+            </div>
           </div>
         </div>
       )}
@@ -73,15 +75,16 @@ export function PixPanel({ charge, awaiting }: { charge: PixCharge; awaiting: bo
         <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
           Pix copia e cola
         </p>
-        <p className="mt-2 max-h-24 overflow-y-auto break-all border border-border bg-background/60 p-3 text-[11px] text-muted-foreground">
+        <p className="mt-2 max-h-24 overflow-y-auto break-all rounded-lg border border-border bg-background/60 p-3 text-[11px] text-muted-foreground">
           {charge.qrCode}
         </p>
         <button
           onClick={copy}
-          className="mt-3 inline-flex items-center gap-2 border border-asc-line px-6 py-3 text-[11px] uppercase tracking-luxe text-asc-ink transition-colors hover:bg-charcoal hover:text-ivory"
+          className={`asc-btn-gold mt-3 w-full px-6 py-3.5 sm:w-auto ${copied ? "!bg-none !bg-asc-success/20 !text-asc-success" : ""}`}
+          aria-live="polite"
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-          {copied ? "Código copiado" : "Copiar código"}
+          {copied ? "Código copiado" : "Copiar chave Pix"}
         </button>
       </div>
 

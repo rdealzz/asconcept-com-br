@@ -1,5 +1,9 @@
 {
   "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "eslint.config.js"],
+  // Os testes rodam no runtime do Bun (`bun test`), que traz os próprios tipos
+  // de `bun:test`. Sem os `bun-types` instalados, deixá-los aqui faria o tsc
+  // acusar um módulo inexistente e derrubar a checagem do projeto inteiro.
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",

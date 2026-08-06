@@ -89,15 +89,33 @@ export async function persistPayment(
   // afeta baixa de estoque nem envio de e-mail.
   const approved = payment.status === "approved";
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  // O Mercado Pago reenvia a mesma notificação várias vezes. Se o admin já
+  // avançou o pedido no painel, reescrever o status aqui rebobinaria o fluxo —
+  // um pedido "Em trânsito" voltaria para "Aguardando Aprovação" a cada
+  // reenvio. Só mexemos no status enquanto o pedido não entrou no ateliê.
+  const { data: atual } = await supabaseAdmin
+    .from("orders")
+    .select("status")
+    .eq("order_number", orderNumber)
+    .maybeSingle();
+  const statusAtual = (atual as { status?: string } | null)?.status;
+  const jaNoAtelie =
+    statusAtual === "Preparando pedido" ||
+    statusAtual === "Em trânsito" ||
+    statusAtual === "Entregue";
+
+  const patch: Record<string, unknown> = {
+    mp_payment_id: String(payment.id),
+    mp_status: payment.status,
+    installments: payment.installments ?? null,
+    updated_at: new Date().toISOString(),
+  };
+  if (!jaNoAtelie) patch.status = status;
+
   await supabaseAdmin
     .from("orders")
-    .update({
-      mp_payment_id: String(payment.id),
-      mp_status: payment.status,
-      installments: payment.installments ?? null,
-      status,
-      updated_at: new Date().toISOString(),
-    } as never)
+    .update(patch as never)
     .eq("order_number", orderNumber);
 
   if (approved) {

@@ -1,18 +1,21 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { OrderStatus } from "@/lib/types";
+import { FLOW_STATUSES, type OrderStatus } from "@/lib/types";
 
 export const adminUpdateOrderStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { orderNumber: string; status: OrderStatus; trackingCode?: string }) => {
     if (!/^AS-\d{6}$/.test(input?.orderNumber ?? "")) throw new Error("Pedido inválido.");
-    if (!["Aguardando Aprovação", "Preparando pedido", "Em trânsito", "Entregue"].includes(input?.status)) {
+    // Só as etapas do ateliê: o painel nunca devolve um pedido para um estado
+    // anterior ao pagamento.
+    if (!(FLOW_STATUSES as readonly string[]).includes(input?.status)) {
       throw new Error("Status inválido.");
     }
     return {
       orderNumber: input.orderNumber,
       status: input.status,
-      trackingCode: typeof input.trackingCode === "string" ? input.trackingCode.slice(0, 80) : undefined,
+      trackingCode:
+        typeof input.trackingCode === "string" ? input.trackingCode.slice(0, 80) : undefined,
     };
   })
   .handler(async ({ data, context }) => {
@@ -49,7 +52,6 @@ export const adminDeleteOrder = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!roleRow) throw new Error("Acesso negado.");
 
-
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("orders")
@@ -81,7 +83,6 @@ export const adminDeleteCustomer = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!roleRow) throw new Error("Acesso negado.");
 
-
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     if (data.kind === "manual") {
@@ -102,10 +103,7 @@ export const adminDeleteCustomer = createServerFn({ method: "POST" })
 
     if (!profile?.id) {
       // fallback: tenta remover apenas por e-mail (perfil pode ter sido removido)
-      const { error } = await supabaseAdmin
-        .from("profiles")
-        .delete()
-        .eq("email", data.email);
+      const { error } = await supabaseAdmin.from("profiles").delete().eq("email", data.email);
       if (error) throw new Error(error.message);
       return { ok: true };
     }
@@ -114,10 +112,7 @@ export const adminDeleteCustomer = createServerFn({ method: "POST" })
     const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(profile.id);
     if (authErr) {
       // Se falhar (por algum motivo), remove ao menos o profile
-      const { error } = await supabaseAdmin
-        .from("profiles")
-        .delete()
-        .eq("id", profile.id);
+      const { error } = await supabaseAdmin.from("profiles").delete().eq("id", profile.id);
       if (error) throw new Error(authErr.message);
     }
     return { ok: true };
