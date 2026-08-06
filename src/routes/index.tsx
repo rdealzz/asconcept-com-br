@@ -49,6 +49,7 @@ import { StitchDivider } from "@/components/StitchDivider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Loader } from "@/components/Loader";
 import { Eyebrow, PillButton } from "@/components/ui-kit";
+import { Showroom } from "@/components/Showroom";
 import { Inview, StackedLines, WordReveal, useScrollProgress } from "@/lib/motion";
 import { useVisualShell } from "@/lib/visual-shell";
 import { EmptyCategoryState } from "@/components/EmptyCategoryState";
@@ -165,11 +166,11 @@ function Index() {
                 passar por cima das seções seguintes. */}
             <div className="relative">
               <CategoryTabs />
+              <ShowroomBand />
               <Products />
             </div>
 
             <Concept />
-            <StatsBand />
             <Testimonials />
             <Newsletter />
             <Footer />
@@ -691,6 +692,36 @@ function CategoryTabs() {
         ))}
       </div>
     </div>
+  );
+}
+
+/* ---------- Vitrine giratória ---------- */
+/**
+ * O palco da aba ativa: as peças com estoque, apresentadas uma a uma no
+ * desenho de landing — peça girável no centro, informação de um lado, cartões
+ * de vidro do outro. Some quando não há o que mostrar.
+ */
+function ShowroomBand() {
+  const { tab } = useSearch();
+  const { products, stock } = useCatalog();
+
+  const destaques = useMemo(
+    () =>
+      products
+        .filter((p) => (p.category ?? "clothes") === tab)
+        .filter((p) => totalStock(stock[p.id]) > 0)
+        .slice(0, 8),
+    [products, stock, tab],
+  );
+
+  if (destaques.length === 0) return null;
+
+  return (
+    <Showroom
+      products={destaques}
+      eyebrow={tab === "clothes" ? "Em exibição · Roupas" : "Em exibição · Sneakers"}
+      sideTitle={tab === "clothes" ? ["Herança", "que se veste"] : ["Cadência", "contemporânea"]}
+    />
   );
 }
 
@@ -1567,43 +1598,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /* ---------- Concept ---------- */
-/**
- * Faixa de números sobre fundo escuro — a "prova social" em forma tipográfica,
- * como a banda de estatísticas do desenho de referência.
- */
-const NUMEROS = [
-  { valor: "15", rotulo: "Anos de curadoria" },
-  { valor: "40+", rotulo: "Ateliês parceiros" },
-  { valor: "9K+", rotulo: "Peças entregues" },
-  { valor: "100%", rotulo: "Edições limitadas" },
-];
-
-function StatsBand() {
-  return (
-    <section className="asc-on-dark mt-3 rounded-[2rem] bg-asc-bg-dark px-6 py-20 text-asc-ink sm:px-10">
-      <div className="mx-auto max-w-[1600px]">
-        <Eyebrow tone="light">Em números</Eyebrow>
-        <h2 className="mt-4 font-serif text-4xl md:text-5xl">
-          <StackedLines lines={["Uma casa que", "conta história"]} />
-        </h2>
-
-        <dl className="mt-16 grid grid-cols-2 gap-x-8 gap-y-12 lg:grid-cols-4">
-          {NUMEROS.map((n, i) => (
-            <Inview key={n.rotulo} delayIn={i * 110} y={30}>
-              <div className="border-t border-asc-line pt-5">
-                <dd className="font-display-wide text-5xl font-medium leading-none sm:text-6xl">
-                  {n.valor}
-                </dd>
-                <dt className="mt-3 text-sm text-asc-ink-muted">{n.rotulo}</dt>
-              </div>
-            </Inview>
-          ))}
-        </dl>
-      </div>
-    </section>
-  );
-}
-
 function Concept() {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);

@@ -300,16 +300,47 @@ export function useScrollProgress<T extends HTMLElement>(onProgress: (p: number)
   useEffect(() => {
     const el = ref.current;
     if (!el || prefersReducedMotion()) return;
+
     let raf = 0;
+    let naTela = false;
+
+    // Medir custa: `getBoundingClientRect` obriga o navegador a recalcular o
+    // layout. A versão anterior fazia isso a cada quadro, para sempre, mesmo
+    // com o elemento fora da tela — em duas instâncias na home era o bastante
+    // para a rolagem engasgar. Agora só medimos quando a página realmente se
+    // move, no máximo uma vez por quadro, e só enquanto o elemento está à
+    // vista.
     const medir = () => {
+      raf = 0;
       const r = el.getBoundingClientRect();
       const total = window.innerHeight + r.height;
       const p = total === 0 ? 0 : (window.innerHeight - r.top) / total;
       cb.current(Math.min(1, Math.max(0, p)));
+    };
+
+    const agendar = () => {
+      if (!naTela || raf) return;
       raf = requestAnimationFrame(medir);
     };
-    raf = requestAnimationFrame(medir);
-    return () => cancelAnimationFrame(raf);
+
+    const io = new IntersectionObserver(
+      ([e]) => {
+        naTela = e.isIntersecting;
+        if (naTela) agendar();
+      },
+      { rootMargin: "10% 0px" },
+    );
+    io.observe(el);
+
+    window.addEventListener("scroll", agendar, { passive: true });
+    window.addEventListener("resize", agendar, { passive: true });
+
+    return () => {
+      io.disconnect();
+      window.removeEventListener("scroll", agendar);
+      window.removeEventListener("resize", agendar);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   return ref;

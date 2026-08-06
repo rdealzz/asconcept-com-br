@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, ShoppingBag, X } from "lucide-react";
 import { useCart, formatBRL, type Product } from "@/lib/cart-context";
 import {
@@ -24,6 +24,7 @@ import { StitchDivider } from "@/components/StitchDivider";
 import { ContactStrip } from "@/components/ContactStrip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Eyebrow } from "@/components/ui-kit";
+import { GarmentTurntable } from "@/components/GarmentTurntable";
 import { Inview, StackedLines } from "@/lib/motion";
 import { useVisualShell } from "@/lib/visual-shell";
 
@@ -142,13 +143,21 @@ function ProductView({
   const availableQty = size ? (sizeStock[size] ?? 0) : 0;
   const canAdd = !soldOut && size !== null && availableQty > 0;
 
-  const gallery = product.gallery?.length ? product.gallery : product.image ? [product.image] : [];
+  // Memorizado: é a lista que alimenta o palco giratório, e uma identidade
+  // nova a cada render faria o palco recarregar as fotos sem necessidade.
+  const gallery = useMemo(
+    () => (product.gallery?.length ? product.gallery : product.image ? [product.image] : []),
+    [product.gallery, product.image],
+  );
   const related = products
     .filter((p) => p.id !== product.id && p.category === product.category)
     .slice(0, 10);
 
   const [activeImg, setActiveImg] = useState(0);
   const [zoomIndex, setZoomIndex] = useState<number | null>(null);
+
+  // Clique curto sobre a peça (sem arrasto) abre a foto que está de frente.
+  const abrirZoom = useCallback(() => setZoomIndex(activeImg), [activeImg]);
 
   // Ao trocar de peça (via "Complete o Look"), volta para a primeira foto.
   useEffect(() => {
@@ -201,24 +210,41 @@ function ProductView({
               que empurrava preço, tamanho e botão para muito abaixo da dobra.
               Clicar abre a foto em tela cheia. */}
           <div className="lg:sticky lg:top-8 lg:self-start">
-            <button
-              type="button"
-              onClick={() => setZoomIndex(activeImg)}
-              aria-label="Ampliar foto"
-              className="group relative block w-full cursor-zoom-in overflow-hidden border border-asc-line bg-asc-bg-raised"
-            >
-              <img
-                src={gallery[activeImg]}
-                alt={`${product.name} — foto ${activeImg + 1}`}
-                className="mx-auto max-h-[44vh] w-full object-contain md:max-h-[62vh]"
-                loading="eager"
-                fetchPriority="high"
-                decoding="async"
+            {/* O palco da peça: mesmo gesto da vitrine da home — arraste para
+                girar, cada meia-volta traz a próxima foto, clique curto amplia.
+                As miniaturas continuam funcionando: escolher uma faz a peça
+                girar até ela. */}
+            <div className="relative isolate overflow-hidden rounded-[1.5rem] border border-asc-line">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 -z-10"
+                style={{
+                  background:
+                    "radial-gradient(circle at 50% 42%, rgba(197,160,89,0.14) 0%, rgba(5,7,11,0.85) 62%, #05070B 100%)",
+                }}
               />
-              <span className="asc-label pointer-events-none absolute bottom-3 right-3 bg-asc-bg-dark/70 px-2 py-1 text-[10px] text-asc-ink opacity-0 backdrop-blur transition-opacity duration-ascfast ease-asc group-hover:opacity-100">
+              <GarmentTurntable
+                swapId={product.id}
+                images={gallery}
+                alt={product.name}
+                goTo={activeImg}
+                onIndex={setActiveImg}
+                onOpen={abrirZoom}
+                hint="Arraste para girar · toque para ampliar"
+                className="asc-float mx-auto h-[46vh] w-full max-w-[38rem] md:h-[62vh]"
+                imageClassName="drop-shadow-[0_24px_48px_rgba(0,0,0,0.5)]"
+              />
+
+              {/* O arraste é gesto de ponteiro; este botão dá o mesmo caminho
+                  a quem navega pelo teclado. */}
+              <button
+                type="button"
+                onClick={() => setZoomIndex(activeImg)}
+                className="asc-label absolute right-3 top-3 rounded-full border border-asc-line bg-asc-bg-dark/70 px-3 py-1.5 text-[10px] text-asc-ink backdrop-blur transition-colors duration-ascfast ease-asc hover:border-asc-gold hover:text-asc-gold"
+              >
                 Ampliar
-              </span>
-            </button>
+              </button>
+            </div>
 
             {gallery.length > 1 && (
               <div className="scrollbar-hide mt-3 flex gap-3 overflow-x-auto">

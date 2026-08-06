@@ -1,100 +1,20 @@
 /**
- * Rolagem suave.
+ * Trava de rolagem.
  *
- * Escrita à mão de propósito: o lockfile deste projeto aponta para um registro
- * privado, e somar uma dependência nova arriscaria o build. São poucas linhas
- * e, em troca, dá para desligar a rolagem com precisão quando abre a sacola,
- * um modal ou a tela de abertura.
+ * Antes este arquivo também interceptava a roda do mouse e perseguia um
+ * destino a cada quadro ("rolagem suave" feita à mão). O efeito colateral era
+ * o que se sentia como site pesado: cada gesto da roda virava dezenas de
+ * `window.scrollTo`, forçando recálculo de layout na página inteira e
+ * atrasando o movimento em relação ao dedo. A rolagem nativa do navegador já
+ * é suave, roda fora da thread principal e responde na hora — então ela ficou.
  *
- * Como funciona: intercepta a roda do mouse, acumula o destino e persegue esse
- * destino a cada quadro. Toque não é interceptado — no celular a rolagem
- * nativa já é suave e mexer nela costuma piorar.
+ * O que sobrou aqui é só o que a rolagem nativa não dá de graça: travar a
+ * página quando a sacola, um modal ou a tela de abertura estão abertos.
  */
 
-type Estado = {
-  ativo: boolean;
-  alvo: number;
-  atual: number;
-  raf: number;
-  travas: number;
-};
-
-const est: Estado = { ativo: false, alvo: 0, atual: 0, raf: 0, travas: 0 };
-
-/** Quanto do caminho até o destino é percorrido por quadro. */
-const SUAVIDADE = 0.1;
-
-function suportado() {
-  if (typeof window === "undefined") return false;
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
-  // Sem ponteiro fino (celular/tablet) fica com a rolagem nativa.
-  return window.matchMedia("(min-width: 769px) and (hover: hover)").matches;
-}
-
-function limite() {
-  return Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-}
-
-/** Última posição que NÓS aplicamos — serve para reconhecer rolagem externa. */
-let ultimoAplicado = -1;
-
-function quadro() {
-  est.raf = requestAnimationFrame(quadro);
-  if (est.travas > 0) return;
-
-  const y = window.scrollY;
-
-  // Se a página está numa posição que não fomos nós que definimos, ela veio de
-  // fora (âncora, teclado, barra de rolagem, scrollTo de código). Adotamos essa
-  // posição em vez de puxar o cliente de volta — era isso que travava a página.
-  if (ultimoAplicado < 0 || Math.abs(y - ultimoAplicado) > 2) {
-    est.atual = y;
-    est.alvo = y;
-    ultimoAplicado = y;
-    return;
-  }
-
-  const dif = est.alvo - est.atual;
-  if (Math.abs(dif) < 0.4) {
-    est.atual = est.alvo;
-    return; // já chegou: não mexe na página, para não brigar com ninguém
-  }
-  est.atual += dif * SUAVIDADE;
-  window.scrollTo(0, est.atual);
-  ultimoAplicado = window.scrollY;
-}
-
-function naRoda(e: WheelEvent) {
-  if (est.travas > 0) return;
-  // Deixa passar quando o cursor está sobre algo que rola por dentro
-  // (a sacola, um acordeão com scroll próprio).
-  let n = e.target as HTMLElement | null;
-  while (n && n !== document.body) {
-    const s = getComputedStyle(n);
-    if (/(auto|scroll)/.test(s.overflowY) && n.scrollHeight > n.clientHeight + 1) return;
-    n = n.parentElement;
-  }
-  e.preventDefault();
-  est.alvo = Math.min(limite(), Math.max(0, est.alvo + e.deltaY));
-}
-
-export function iniciarRolagemSuave() {
-  if (est.ativo || !suportado()) return;
-  est.ativo = true;
-  est.atual = window.scrollY;
-  est.alvo = window.scrollY;
-  ultimoAplicado = -1;
-  window.addEventListener("wheel", naRoda, { passive: false });
-  est.raf = requestAnimationFrame(quadro);
-}
-
-export function pararRolagemSuave() {
-  if (!est.ativo) return;
-  est.ativo = false;
-  window.removeEventListener("wheel", naRoda);
-  cancelAnimationFrame(est.raf);
-  est.raf = 0;
-}
+let travas = 0;
+/** Posição da página no momento em que ela foi travada. */
+let topoSalvo = 0;
 
 /**
  * Trava a rolagem da página (sacola aberta, modal, tela de abertura).
@@ -102,17 +22,22 @@ export function pararRolagemSuave() {
  * modal não libera a rolagem enquanto outro ainda estiver aberto.
  */
 export function travarRolagem() {
-  est.travas += 1;
-  if (est.travas === 1 && typeof document !== "undefined") {
-    document.documentElement.style.overflow = "hidden";
-  }
+  travas += 1;
+  if (travas > 1 || typeof document === "undefined") return;
+
+  topoSalvo = window.scrollY;
+  const barra = window.innerWidth - document.documentElement.clientWidth;
+  document.documentElement.style.overflow = "hidden";
+  // Compensa o sumiço da barra de rolagem, senão o conteúdo dá um pulo lateral.
+  if (barra > 0) document.body.style.paddingRight = `${barra}px`;
 }
 
 export function destravarRolagem() {
-  est.travas = Math.max(0, est.travas - 1);
-  if (est.travas === 0 && typeof document !== "undefined") {
-    document.documentElement.style.removeProperty("overflow");
-    est.atual = window.scrollY;
-    est.alvo = window.scrollY;
-  }
+  travas = Math.max(0, travas - 1);
+  if (travas > 0 || typeof document === "undefined") return;
+
+  document.documentElement.style.removeProperty("overflow");
+  document.body.style.removeProperty("padding-right");
+  // Alguns navegadores devolvem a página ao topo ao liberar o overflow.
+  if (topoSalvo > 0 && window.scrollY === 0) window.scrollTo(0, topoSalvo);
 }
