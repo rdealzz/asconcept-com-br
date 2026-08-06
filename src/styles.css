@@ -385,6 +385,30 @@
   letter-spacing: 0.22em;
 }
 
+/* ═══ Escala adaptativa da home ═══
+   Recalcula o rem pela largura da tela, para o desenho manter as proporções
+   em qualquer monitor. Fica preso ao atributo data-fluid, posto pela home:
+   solto no <html> ele escalaria também o checkout, que não faz parte deste
+   redesenho. O JS da home cuida do caso acima de 1920px. */
+@media (max-width: 1920px) {
+  html[data-fluid="1"] { font-size: 0.833333vw; }
+}
+@media (max-width: 1440px) {
+  html[data-fluid="1"] { font-size: 1.111111vw; }
+}
+@media (max-width: 1024px) {
+  html[data-fluid="1"] { font-size: 1.5625vw; }
+}
+@media (max-width: 640px) {
+  html[data-fluid="1"] { font-size: 4.444444vw; }
+}
+
+/* Barra de progresso da tela de abertura. */
+@keyframes asc-loader-fill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }

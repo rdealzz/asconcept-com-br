@@ -47,6 +47,10 @@ import { InstallmentsNote } from "@/components/InstallmentsNote";
 import { FavoriteButton, ShareButton } from "@/components/ProductActions";
 import { StitchDivider } from "@/components/StitchDivider";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Loader } from "@/components/Loader";
+import { Eyebrow, PillButton } from "@/components/ui-kit";
+import { Inview, StackedLines, WordReveal, useScrollProgress } from "@/lib/motion";
+import { iniciarRolagemSuave, pararRolagemSuave } from "@/lib/smooth-scroll";
 import { EmptyCategoryState } from "@/components/EmptyCategoryState";
 
 import {
@@ -118,11 +122,43 @@ function useSearch() {
   return c;
 }
 
+/** Largura de referência do desenho e coeficiente de ampliação acima dela. */
+const BASE_W = 1920;
+const FONT_BASE = 16;
+const COEF = 0.6666;
+
 function Index() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [pronto, setPronto] = useState(false);
+
+  // Escala adaptativa e rolagem suave valem só enquanto a home está montada:
+  // o rem mora no <html> e, solto, escalaria o checkout junto.
+  useEffect(() => {
+    const html = document.documentElement;
+    html.setAttribute("data-fluid", "1");
+
+    // Abaixo de 1920 quem manda são as media queries; acima, cresce por aqui.
+    const ajustar = () => {
+      const reducao = ((BASE_W - window.innerWidth) / BASE_W) * 100 * COEF;
+      const tamanho = FONT_BASE - (FONT_BASE * reducao) / 100;
+      if (tamanho > FONT_BASE) html.style.fontSize = `${tamanho}px`;
+      else html.style.removeProperty("font-size");
+    };
+    ajustar();
+    window.addEventListener("resize", ajustar);
+
+    iniciarRolagemSuave();
+
+    return () => {
+      window.removeEventListener("resize", ajustar);
+      html.removeAttribute("data-fluid");
+      html.style.removeProperty("font-size");
+      pararRolagemSuave();
+    };
+  }, []);
 
   // Quem chega na home com #produtos (voltando da página de produto, ou pelo
   // rodapé) precisa da mesma folga do cabeçalho fixo — o pulo nativo do
@@ -138,6 +174,7 @@ function Index() {
   return (
     <SearchProvider>
       <ProductProvider>
+        <Loader onReady={() => setPronto(true)} />
         <div className="min-h-screen bg-background text-foreground">
           <Nav
             onOpenFilter={() => setFilterOpen(true)}
@@ -145,17 +182,27 @@ function Index() {
             onOpenAdmin={() => setAdminOpen(true)}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
           />
-          <Hero />
-          <div className="mx-auto max-w-[1600px] px-6 pt-10 md:px-12 md:pt-14">
-            <StitchDivider label="The New Era of Heritage" />
-          </div>
-          <CategoryTabs />
-          <Products />
+          {/* O respiro em volta é o que dá o enquadramento em cartão: cada
+              seção vira um bloco arredondado sobre o fundo da página. */}
+          <main className="w-full overflow-x-clip p-2 sm:p-3">
+            <Hero pronto={pronto} />
+            <div className="mx-auto max-w-[1600px] px-6 pt-10 md:px-12 md:pt-14">
+              <StitchDivider label="The New Era of Heritage" />
+            </div>
+            {/* Abas e grade no mesmo bloco: assim a barra fixa solta o topo
+                quando a vitrine acaba, em vez de acompanhar a página inteira e
+                passar por cima das seções seguintes. */}
+            <div className="relative">
+              <CategoryTabs />
+              <Products />
+            </div>
 
-          <Testimonials />
-          <Concept />
-          <Newsletter />
-          <Footer />
+            <Concept />
+            <StatsBand />
+            <Testimonials />
+            <Newsletter />
+            <Footer />
+          </main>
           <WelcomeCouponPopup />
           <SearchOverlay />
           <AdminEditModal />
@@ -486,40 +533,88 @@ function MobileMenu({
 }
 
 /* ---------- Hero ---------- */
-function Hero() {
+/**
+ * Abertura editorial: título gigante que sobe de trás de uma máscara, palavra
+ * por palavra, sobre a foto em parallax. As animações só começam quando a tela
+ * de abertura termina — daí o `pronto`.
+ */
+function Hero({ pronto }: { pronto: boolean }) {
+  const placa = useRef<HTMLDivElement>(null);
+
+  // A foto é maior que a seção e sobe deslocada, para o parallax nunca
+  // descobrir uma borda.
+  const secao = useScrollProgress<HTMLElement>((p) => {
+    if (placa.current) placa.current.style.transform = `translateY(${p * 12}%)`;
+  });
+
   return (
-    <section className="asc-gravure asc-on-dark relative h-[100svh] w-full overflow-hidden bg-asc-bg-dark">
-      <img
-        src={hero}
-        alt="Editorial A&S Conccept"
-        width={1920}
-        height={1280}
-        className="absolute inset-0 h-full w-full object-cover object-[65%_center] md:object-center"
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-charcoal/60 via-charcoal/25 to-charcoal/85" />
-      <div className="relative z-10 flex h-full items-end pb-16 md:items-center md:pb-0">
-        <div className="mx-auto w-full max-w-[1600px] px-5 md:px-12">
-          {/* Entrada em cascata — eyebrow → título → subtítulo → CTA. É o
-              "momento" da página: não repetir esse padrão em outras seções. */}
-          <div className="max-w-2xl text-ivory">
-            <p className="animate-fade-up mb-4 text-[10px] tracking-luxe uppercase text-accent md:mb-6 md:text-[11px]">
-              — Coleção Outono / Inverno
-            </p>
-            <h1 className="animate-fade-up font-serif text-[2.5rem] leading-[1.05] [animation-delay:100ms] sm:text-5xl md:text-7xl lg:text-[6rem]">
-              A Nova Era
-              <br />
-              da Herança.
-            </h1>
-            <p className="animate-fade-up mt-6 max-w-md text-sm font-light text-ivory/85 [animation-delay:200ms] md:mt-8 md:text-lg">
-              Luxo curado para a próxima geração.
-            </p>
-            <button
-              onClick={() => scrollToSection("produtos")}
-              className="group animate-fade-up mt-8 inline-flex items-center gap-4 border border-asc-line px-8 py-3.5 text-[11px] tracking-luxe uppercase text-ivory transition-all duration-300 [animation-delay:300ms] hover:border-accent hover:text-accent md:mt-12 md:px-10 md:py-4"
-            >
-              Explorar a Coleção
-              <span className="inline-block h-px w-6 bg-current transition-all duration-300 group-hover:w-10 md:w-8" />
-            </button>
+    <section
+      ref={secao}
+      className="asc-gravure asc-on-dark relative isolate w-full overflow-hidden rounded-[2rem] bg-asc-bg-dark"
+      style={{ height: "calc(100svh - 1.5rem)", minHeight: "36rem" }}
+    >
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        <div ref={placa} className="absolute inset-x-0 -top-[16%] h-[132%] w-full">
+          <img
+            src={hero}
+            alt="Editorial A&S Conccept"
+            width={1920}
+            height={1280}
+            fetchPriority="high"
+            className="h-full w-full object-cover object-[65%_center] md:object-center"
+          />
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-b from-charcoal/65 via-charcoal/35 to-charcoal/80" />
+      </div>
+
+      <div className="flex h-full flex-col">
+        <div className="flex-1" />
+
+        <div className="px-6 sm:px-10">
+          <p
+            className="asc-tagline mb-4 transition-all duration-ascslow ease-asc"
+            style={{ opacity: pronto ? 1 : 0, transform: pronto ? "none" : "translateY(8px)" }}
+          >
+            Coleção Outono / Inverno
+          </p>
+          <h1
+            className="font-display-wide font-medium uppercase text-ivory"
+            style={{
+              fontSize: "12.5vw",
+              lineHeight: 0.85,
+              letterSpacing: "-0.02em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <WordReveal text="A Nova Era" play={pronto} stagger={140} duration={1100} />
+          </h1>
+        </div>
+
+        <div className="mt-auto flex flex-col gap-6 px-6 pb-8 sm:flex-row sm:items-end sm:justify-between sm:px-10 sm:pb-10">
+          <p
+            className="font-display-wide font-medium uppercase text-ivory/85"
+            style={{ fontSize: "2.4rem", lineHeight: 0.95, letterSpacing: "-0.01em" }}
+          >
+            <StackedLines
+              lines={["Herança que", "se veste."]}
+              play={pronto}
+              baseDelay={350}
+              stagger={110}
+              duration={900}
+            />
+          </p>
+
+          <div
+            className="transition-all duration-ascslow ease-asc"
+            style={{
+              opacity: pronto ? 1 : 0,
+              transform: pronto ? "none" : "translateY(28px)",
+              transitionDelay: "780ms",
+            }}
+          >
+            <PillButton variant="light" onClick={() => scrollToSection("produtos")}>
+              Ver a Coleção
+            </PillButton>
           </div>
         </div>
       </div>
@@ -551,6 +646,51 @@ function scrollToSection(id: string) {
     const y = el.getBoundingClientRect().top + window.scrollY - HEADER_OFFSET;
     window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
   });
+}
+
+/**
+ * Palavras enormes ao fundo da seção, em cor apagada, com um leve deslocamento
+ * horizontal conforme a página rola. Dá escala tipográfica à vitrine sem
+ * disputar atenção com as fotos das peças.
+ */
+function GhostHeading({ words }: { words: string[] }) {
+  const linhas = useRef<HTMLSpanElement[]>([]);
+  const ref = useScrollProgress<HTMLDivElement>((p) => {
+    linhas.current.forEach((el, i) => {
+      if (!el) return;
+      const de = i % 2 === 0 ? -3 : 3;
+      el.style.transform = `translateX(${de + (i % 2 === 0 ? 1 : -1) * -2 * p * 3}%)`;
+    });
+  });
+
+  return (
+    <div
+      ref={ref}
+      aria-hidden
+      // Fica atrás do cabeçalho da seção, e não no meio: sobre a grade as
+      // palavras cruzavam os nomes das peças e atrapalhavam a leitura.
+      className="pointer-events-none absolute inset-x-0 top-0 -z-10 mx-auto max-w-[88rem] select-none overflow-hidden px-6 pt-10 md:px-12"
+    >
+      {words.map((w, i) => (
+        <span
+          key={i}
+          ref={(el) => {
+            if (el) linhas.current[i] = el;
+          }}
+          className="block font-display-wide font-medium uppercase text-asc-line-dark"
+          style={{
+            fontSize: "8.2vw",
+            lineHeight: 0.98,
+            letterSpacing: "-0.02em",
+            textAlign: i % 2 === 0 ? "left" : "right",
+            opacity: 0.28,
+          }}
+        >
+          {w}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function CategoryTabs() {
@@ -635,14 +775,23 @@ function Products() {
   const showSneakersComingSoon = tab === "sneakers" && !isAdmin && base.length === 0;
 
   return (
-    <section id="produtos" className="py-20 md:py-28">
-      <div className="mx-auto max-w-[1600px] px-6 md:px-12">
+    <section
+      id="produtos"
+      className="relative isolate overflow-hidden rounded-[2rem] py-20 md:py-28"
+    >
+      {/* Palavra-fantasma gigante ao fundo, como no desenho de referência:
+          presença tipográfica sem competir com as peças. */}
+      <GhostHeading
+        words={tab === "clothes" ? ["Essenciais", "com", "Propósito"] : ["A", "Nova", "Cadência"]}
+      />
+
+      <div className="relative z-10 mx-auto max-w-[1600px] px-6 md:px-12">
         <div className="mb-12 flex flex-col items-center text-center md:mb-20">
-          <p className="mb-4 text-[11px] tracking-luxe uppercase text-accent">
-            {tab === "clothes" ? "A Coleção" : "Sneakers"}
-          </p>
+          <Eyebrow className="mb-4">{tab === "clothes" ? "A Coleção" : "Sneakers"}</Eyebrow>
           <h2 className="font-serif text-4xl md:text-6xl">
-            {tab === "clothes" ? "Essenciais com Propósito" : "A Nova Cadência"}
+            <StackedLines
+              lines={tab === "clothes" ? ["Essenciais com", "Propósito"] : ["A Nova", "Cadência"]}
+            />
           </h2>
           <p className="mt-6 max-w-xl text-sm md:text-base text-muted-foreground font-light">
             {tab === "clothes"
@@ -1447,6 +1596,43 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /* ---------- Concept ---------- */
+/**
+ * Faixa de números sobre fundo escuro — a "prova social" em forma tipográfica,
+ * como a banda de estatísticas do desenho de referência.
+ */
+const NUMEROS = [
+  { valor: "15", rotulo: "Anos de curadoria" },
+  { valor: "40+", rotulo: "Ateliês parceiros" },
+  { valor: "9K+", rotulo: "Peças entregues" },
+  { valor: "100%", rotulo: "Edições limitadas" },
+];
+
+function StatsBand() {
+  return (
+    <section className="asc-on-dark mt-3 rounded-[2rem] bg-asc-bg-dark px-6 py-20 text-asc-ink sm:px-10">
+      <div className="mx-auto max-w-[1600px]">
+        <Eyebrow tone="light">Em números</Eyebrow>
+        <h2 className="mt-4 font-serif text-4xl md:text-5xl">
+          <StackedLines lines={["Uma casa que", "conta história"]} />
+        </h2>
+
+        <dl className="mt-16 grid grid-cols-2 gap-x-8 gap-y-12 lg:grid-cols-4">
+          {NUMEROS.map((n, i) => (
+            <Inview key={n.rotulo} delayIn={i * 110} y={30}>
+              <div className="border-t border-asc-line pt-5">
+                <dd className="font-display-wide text-5xl font-medium leading-none sm:text-6xl">
+                  {n.valor}
+                </dd>
+                <dt className="mt-3 text-sm text-asc-ink-muted">{n.rotulo}</dt>
+              </div>
+            </Inview>
+          ))}
+        </dl>
+      </div>
+    </section>
+  );
+}
+
 function Concept() {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -3650,10 +3836,12 @@ function Testimonials() {
   };
 
   return (
-    <section className="border-t border-border bg-secondary/30 py-20 md:py-28">
+    <section className="mt-3 rounded-[2rem] border border-asc-line bg-secondary/30 py-20 md:py-28">
       <div className="mx-auto max-w-3xl px-6 text-center">
-        <p className="mb-4 text-[11px] tracking-luxe uppercase text-accent">Prova Social</p>
-        <h2 className="font-serif text-3xl md:text-5xl">Vozes da Maison</h2>
+        <Eyebrow className="mb-4">Prova Social</Eyebrow>
+        <h2 className="font-serif text-3xl md:text-5xl">
+          <StackedLines lines={["Vozes da", "Maison"]} />
+        </h2>
 
         {current && (
           <figure key={current.id} className="mt-12 animate-in fade-in duration-300">
