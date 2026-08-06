@@ -620,51 +620,6 @@ function scrollToSection(id: string) {
   });
 }
 
-/**
- * Palavras enormes ao fundo da seção, em cor apagada, com um leve deslocamento
- * horizontal conforme a página rola. Dá escala tipográfica à vitrine sem
- * disputar atenção com as fotos das peças.
- */
-function GhostHeading({ words }: { words: string[] }) {
-  const linhas = useRef<HTMLSpanElement[]>([]);
-  const ref = useScrollProgress<HTMLDivElement>((p) => {
-    linhas.current.forEach((el, i) => {
-      if (!el) return;
-      const de = i % 2 === 0 ? -3 : 3;
-      el.style.transform = `translateX(${de + (i % 2 === 0 ? 1 : -1) * -2 * p * 3}%)`;
-    });
-  });
-
-  return (
-    <div
-      ref={ref}
-      aria-hidden
-      // Fica atrás do cabeçalho da seção, e não no meio: sobre a grade as
-      // palavras cruzavam os nomes das peças e atrapalhavam a leitura.
-      className="pointer-events-none absolute inset-x-0 top-0 -z-10 mx-auto max-w-[88rem] select-none overflow-hidden px-6 pt-10 md:px-12"
-    >
-      {words.map((w, i) => (
-        <span
-          key={i}
-          ref={(el) => {
-            if (el) linhas.current[i] = el;
-          }}
-          className="block font-display-wide font-medium uppercase text-asc-line-dark"
-          style={{
-            fontSize: "8.2vw",
-            lineHeight: 0.98,
-            letterSpacing: "-0.02em",
-            textAlign: i % 2 === 0 ? "left" : "right",
-            opacity: 0.28,
-          }}
-        >
-          {w}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function CategoryTabs() {
   const { tab, setTab } = useSearch();
   return (
@@ -781,12 +736,6 @@ function Products() {
       id="produtos"
       className="relative isolate overflow-hidden rounded-[2rem] py-20 md:py-28"
     >
-      {/* Palavra-fantasma gigante ao fundo, como no desenho de referência:
-          presença tipográfica sem competir com as peças. */}
-      <GhostHeading
-        words={tab === "clothes" ? ["Essenciais", "com", "Propósito"] : ["A", "Nova", "Cadência"]}
-      />
-
       <div className="relative z-10 mx-auto max-w-[1600px] px-6 md:px-12">
         <div className="mb-12 flex flex-col items-center text-center md:mb-20">
           <Eyebrow className="mb-4">{tab === "clothes" ? "A Coleção" : "Sneakers"}</Eyebrow>
