@@ -8,6 +8,7 @@ import {
   openWhatsApp,
 } from "@/components/WhatsAppFab";
 import { TrustSeals } from "@/components/TrustSeals";
+import { Wordmark } from "@/components/Wordmark";
 
 /** Moldura editorial das páginas institucionais. */
 export function PageShell({
@@ -31,9 +32,9 @@ export function PageShell({
           >
             <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.5} /> Voltar
           </Link>
-          <span className="font-serif text-lg tracking-wider">
+          <Wordmark className="font-serif text-lg tracking-wider">
             A<span className="text-[color:var(--gold)]">&amp;</span>S Conccept
-          </span>
+          </Wordmark>
         </div>
       </header>
 

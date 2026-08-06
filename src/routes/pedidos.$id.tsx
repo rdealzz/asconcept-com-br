@@ -5,6 +5,7 @@ import { useOrders } from "@/lib/orders-context";
 import { formatBRL } from "@/lib/cart-context";
 import { StatusBadge, paymentLabel } from "./pedidos.index";
 import { ContactStrip } from "@/components/ContactStrip";
+import { Wordmark } from "@/components/Wordmark";
 
 export const Route = createFileRoute("/pedidos/$id")({
   ssr: false,
@@ -134,9 +135,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           >
             <ChevronLeft className="h-4 w-4" /> Meus pedidos
           </Link>
-          <Link to="/" className="font-serif text-xl tracking-widest">
-            A&S Conccept
-          </Link>
+          <Wordmark className="font-serif text-xl tracking-widest" />
           <span className="w-24" />
         </div>
       </header>

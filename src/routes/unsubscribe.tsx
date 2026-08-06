@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Wordmark } from "@/components/Wordmark";
 
 export const Route = createFileRoute("/unsubscribe")({
   ssr: false,
@@ -8,8 +9,7 @@ export const Route = createFileRoute("/unsubscribe")({
       { title: "Cancelar inscrição · A&S Conccept" },
       {
         name: "description",
-        content:
-          "Cancele o recebimento de comunicações por e-mail da A&S Conccept em um clique.",
+        content: "Cancele o recebimento de comunicações por e-mail da A&S Conccept em um clique.",
       },
       { property: "og:title", content: "Cancelar inscrição · A&S Conccept" },
       {
@@ -72,27 +72,16 @@ function UnsubscribePage() {
   return (
     <main className="min-h-screen bg-background flex items-center justify-center px-6 py-24">
       <section className="w-full max-w-md text-center">
-        <p className="text-[10px] tracking-[0.4em] uppercase text-muted-foreground">
-          A&amp;S Conccept
-        </p>
-        <h1 className="mt-6 font-serif text-3xl text-foreground">
-          Preferências de e-mail
-        </h1>
+        <Wordmark className="text-[10px] tracking-[0.4em] uppercase text-muted-foreground" />
+        <h1 className="mt-6 font-serif text-3xl text-foreground">Preferências de e-mail</h1>
 
         <div className="mt-8 text-sm text-muted-foreground leading-relaxed">
           {state === "loading" && <p>Verificando seu link…</p>}
           {state === "valid" && (
-            <p>
-              Confirme abaixo para deixar de receber nossas comunicações por
-              e-mail.
-            </p>
+            <p>Confirme abaixo para deixar de receber nossas comunicações por e-mail.</p>
           )}
-          {state === "already" && (
-            <p>Este endereço já foi removido da nossa lista de envios.</p>
-          )}
-          {state === "done" && (
-            <p>Pronto. Você não receberá mais e-mails da A&amp;S Conccept.</p>
-          )}
+          {state === "already" && <p>Este endereço já foi removido da nossa lista de envios.</p>}
+          {state === "done" && <p>Pronto. Você não receberá mais e-mails da A&amp;S Conccept.</p>}
           {state === "invalid" && (
             <p>Link inválido ou expirado. Solicite um novo link de cancelamento.</p>
           )}

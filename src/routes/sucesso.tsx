@@ -7,6 +7,7 @@ import { Check, Loader2 } from "lucide-react";
 import { getPaymentStatus } from "@/lib/payments.functions";
 import { useCart } from "@/lib/cart-context";
 import { ContactStrip } from "@/components/ContactStrip";
+import { Wordmark } from "@/components/Wordmark";
 
 export const Route = createFileRoute("/sucesso")({
   ssr: false,
@@ -95,7 +96,7 @@ function SucessoPage() {
   return (
     <main className="min-h-screen bg-background px-6 py-24">
       <div className="mx-auto max-w-lg border border-border bg-card p-10 text-center shadow-sm">
-        <p className="text-[10px] uppercase tracking-[0.4em] text-muted-foreground">A&S Conccept</p>
+        <Wordmark className="text-[10px] uppercase tracking-[0.4em] text-muted-foreground" />
         {state.kind === "loading" && (
           <>
             <Loader2 className="mx-auto mt-6 h-8 w-8 animate-spin text-accent" strokeWidth={1.5} />

@@ -103,6 +103,77 @@ export function CampoFlutuante({
   );
 }
 
+/* ─────────────────── moldura dos campos seguros ─────────────────── */
+
+/**
+ * Moldura para os campos do Mercado Pago (número, validade, CVV).
+ *
+ * O input em si é um iframe hospedado por eles — não conseguimos estilizá-lo
+ * por CSS daqui, nem detectar foco por `:focus-within`. Então a moldura é
+ * nossa (borda, rótulo, checkzinho) e o estado de foco chega por evento do
+ * SDK, via a prop `focado`. O rótulo fica sempre no alto, sem flutuar: o
+ * iframe não expõe `:placeholder-shown`.
+ */
+export function CampoSeguro({
+  label,
+  erro,
+  valido,
+  focado,
+  carregando,
+  selo,
+  children,
+  className = "",
+}: {
+  label: string;
+  erro?: string;
+  valido?: boolean;
+  focado?: boolean;
+  /** Enquanto o iframe não avisa que montou, mostramos um esqueleto. */
+  carregando?: boolean;
+  /** Conteúdo à direita do rótulo — a bandeira detectada, por exemplo. */
+  selo?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <div
+        className={`relative rounded-xl border bg-asc-ink/[0.04] px-4 pb-2.5 pt-6 transition-all duration-asc ease-asc ${
+          erro
+            ? "border-asc-error/60"
+            : focado
+              ? "border-asc-gold bg-asc-ink/[0.07] shadow-[0_0_0_3px_rgba(197,160,89,0.13)]"
+              : "border-asc-line"
+        }`}
+      >
+        <span className="pointer-events-none absolute left-4 right-4 top-2.5 flex items-center justify-between gap-2 text-[9px] tracking-luxe uppercase text-asc-gold">
+          <span className="truncate">{label}</span>
+          {selo}
+        </span>
+        <div className="asc-secure-field h-[1.375rem] pr-6">{children}</div>
+        {carregando && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute bottom-2.5 left-4 right-10 h-[1.375rem] animate-pulse rounded bg-asc-ink/10"
+          />
+        )}
+        {valido && !erro && (
+          <Check
+            aria-hidden
+            className="pointer-events-none absolute right-4 bottom-3 h-4 w-4 text-asc-gold opacity-70"
+            strokeWidth={2}
+          />
+        )}
+      </div>
+      {erro && (
+        <p className="mt-1.5 pl-1 text-[11px] font-light text-asc-error/90 animate-in fade-in slide-in-from-top-1 duration-200">
+          {erro}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /* ─────────────────── passo do checkout ─────────────────── */
 
 /**
@@ -254,7 +325,7 @@ export function CartaoEscolha({
  * O que ele mostra é o que já sabemos com legitimidade: o nome do titular
  * informado na identificação.
  */
-export function CartaoMockup({ nome }: { nome: string }) {
+export function CartaoMockup({ nome, bandeira }: { nome: string; bandeira?: string | null }) {
   const ref = useRef<HTMLDivElement>(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
 
@@ -286,7 +357,7 @@ export function CartaoMockup({ nome }: { nome: string }) {
         <div className="flex items-start justify-between">
           <span className="asc-heading-tracked text-[11px] text-asc-gold">A&amp;S</span>
           <span className="text-[9px] tracking-luxe uppercase text-asc-ink-inverse-muted">
-            Crédito
+            {bandeira?.trim() || "Crédito"}
           </span>
         </div>
         {/* Chip */}

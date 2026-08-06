@@ -22,11 +22,12 @@ import {
   payWithCardToken,
 } from "@/lib/payments.functions";
 import { formatCpf, isValidCpf } from "@/lib/mercadopago";
-import { CardBrick, type CardFormData } from "@/components/CardBrick";
+import { CardForm, type CardBrandInfo, type CardFormData } from "@/components/CardForm";
 import { InstallmentsBadge, InstallmentsTable } from "@/components/InstallmentsNote";
 import { PixPanel, type PixCharge } from "@/components/PixPanel";
 import { quoteShipping, formatCep, normalizeCep } from "@/lib/shipping";
 import { ContactStrip } from "@/components/ContactStrip";
+import { Wordmark } from "@/components/Wordmark";
 import {
   CampoFlutuante,
   CartaoEscolha,
@@ -116,6 +117,10 @@ function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pix, setPix] = useState<PixCharge | null>(null);
+  // Nome impresso no cartão e bandeira ficam aqui em cima só para o mockup
+  // ao lado do formulário poder espelhá-los.
+  const [cardHolder, setCardHolder] = useState("");
+  const [cardBrand, setCardBrand] = useState<CardBrandInfo | null>(null);
   const prefilledRef = useRef(false);
   const pendingRef = useRef<{ signature: string; orderNumber: string } | null>(null);
 
@@ -132,6 +137,13 @@ function CheckoutPage() {
       email: f.email || user.email || "",
     }));
   }, [user]);
+
+  // Chegando ao pagamento, o nome do titular já vem sugerido pela identificação
+  // — quase sempre é o mesmo, e ainda dá para corrigir.
+  useEffect(() => {
+    if (step !== 4) return;
+    setCardHolder((atual) => atual || form.name.trim().toUpperCase());
+  }, [step, form.name]);
 
   const shippingQuote = useMemo(() => {
     const cepDigits = normalizeCep(form.cep);
@@ -452,9 +464,7 @@ function CheckoutPage() {
             <ChevronLeft className="h-3.5 w-3.5" />{" "}
             <span className="hidden sm:inline">Continuar comprando</span>
           </Link>
-          <p className="asc-heading-tracked text-center text-sm text-asc-gold sm:text-base">
-            A&amp;S Conccept
-          </p>
+          <Wordmark className="asc-heading-tracked text-center text-sm text-asc-gold hover:text-asc-gold-soft sm:text-base" />
           <span className="inline-flex items-center gap-1.5 text-[10px] tracking-luxe uppercase text-asc-ink-inverse-muted">
             <Lock className="h-3 w-3" strokeWidth={1.5} />
             <span className="hidden sm:inline">Compra segura</span>
@@ -689,20 +699,20 @@ function CheckoutPage() {
                             <InstallmentsBadge amount={totalCard} />
                           </div>
                           <div className="mt-5">
-                            <CardBrick
+                            <CardForm
                               amount={totalCard}
                               email={form.email}
+                              cpf={form.cpf}
+                              titular={cardHolder}
+                              onTitularChange={setCardHolder}
+                              onBandeiraChange={setCardBrand}
+                              submitting={submitting}
                               onSubmitCard={onCardSubmit}
                             />
                           </div>
                         </div>
                         <div className="order-1 lg:order-2 lg:w-[19rem]">
-                          <CartaoMockup nome={form.name} />
-                          <p className="mt-3 flex items-start gap-2 text-[10px] font-light leading-relaxed text-asc-ink-inverse-muted">
-                            <Lock className="mt-px h-3 w-3 shrink-0" strokeWidth={1.5} />
-                            Os dados do cartão são digitados dentro do ambiente criptografado do
-                            Mercado Pago. Nenhum número passa pelos nossos servidores.
-                          </p>
+                          <CartaoMockup nome={cardHolder || form.name} bandeira={cardBrand?.nome} />
                         </div>
                       </div>
 
@@ -878,7 +888,7 @@ function CheckoutNotice({
   return (
     <main className="asc-on-dark flex min-h-[70vh] items-center justify-center bg-asc-bg-dark px-6 text-asc-ink">
       <div className="max-w-md text-center">
-        <p className="asc-heading-tracked text-[11px] text-asc-gold">A&amp;S Conccept</p>
+        <Wordmark className="asc-heading-tracked text-[11px] text-asc-gold hover:text-asc-gold-soft" />
         <h1 className="mt-4 font-serif text-3xl text-asc-ink">{title}</h1>
         <p className="mt-3 text-sm font-light text-asc-ink-inverse-muted">{text}</p>
         <div className="mt-8 flex justify-center">{action}</div>

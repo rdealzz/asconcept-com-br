@@ -1,13 +1,11 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Wordmark } from "@/components/Wordmark";
 
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
-    meta: [
-      { title: "Nova senha — A&S Conccept" },
-      { name: "robots", content: "noindex" },
-    ],
+    meta: [{ title: "Nova senha — A&S Conccept" }, { name: "robots", content: "noindex" }],
   }),
   component: ResetPasswordPage,
 });
@@ -51,7 +49,7 @@ function ResetPasswordPage() {
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
             ← Voltar
           </Link>
-          <span className="font-serif text-xl tracking-widest">A&amp;S Conccept</span>
+          <Wordmark className="font-serif text-xl tracking-widest" />
           <span className="w-16" />
         </div>
       </header>
@@ -67,7 +65,9 @@ function ResetPasswordPage() {
         ) : (
           <form onSubmit={submit} className="mt-8 space-y-5">
             <label className="block">
-              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">Nova senha</span>
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Nova senha
+              </span>
               <input
                 type="password"
                 required
@@ -78,7 +78,9 @@ function ResetPasswordPage() {
               />
             </label>
             <label className="block">
-              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">Confirmar nova senha</span>
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Confirmar nova senha
+              </span>
               <input
                 type="password"
                 required

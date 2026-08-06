@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Wordmark } from "@/components/Wordmark";
 import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
@@ -112,7 +113,7 @@ function OrdersPage() {
           >
             <ChevronLeft className="h-4 w-4" /> Voltar à loja
           </Link>
-          <span className="font-serif text-xl tracking-widest">A&S Conccept</span>
+          <Wordmark className="font-serif text-xl tracking-widest" />
           <span className="w-24" />
         </div>
       </header>

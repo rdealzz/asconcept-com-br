@@ -23,6 +23,7 @@ import { TrustSeals } from "@/components/TrustSeals";
 import { StitchDivider } from "@/components/StitchDivider";
 import { ContactStrip } from "@/components/ContactStrip";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Wordmark } from "@/components/Wordmark";
 import { Eyebrow } from "@/components/ui-kit";
 import { GarmentTurntable } from "@/components/GarmentTurntable";
 import { Inview, StackedLines } from "@/lib/motion";
@@ -465,14 +466,14 @@ function ProductHeader({ cartCount, onCartClick }: { cartCount: number; onCartCl
           <span className="hidden sm:inline">Voltar à loja</span>
         </Link>
 
-        <Link to="/" className="flex flex-col items-center leading-none">
+        <Wordmark className="flex flex-col items-center leading-none">
           <span className="asc-heading-tracked whitespace-nowrap text-sm text-asc-gold sm:text-base md:text-lg">
             A&amp;S Conccept
           </span>
           <span className="asc-tagline mt-1 hidden text-[0.55rem] md:block">
             Curadoria de Herança
           </span>
-        </Link>
+        </Wordmark>
 
         <div className="flex items-center gap-4 text-asc-ink-muted">
           <ThemeToggle />
