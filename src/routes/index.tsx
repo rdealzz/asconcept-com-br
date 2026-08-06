@@ -734,17 +734,19 @@ function Products() {
   return (
     <section
       id="produtos"
-      className="relative isolate overflow-hidden rounded-[2rem] py-20 md:py-28"
+      className="relative isolate overflow-hidden rounded-[2rem] py-12 md:py-16"
     >
       <div className="relative z-10 mx-auto max-w-[1600px] px-6 md:px-12">
-        <div className="mb-12 flex flex-col items-center text-center md:mb-20">
-          <Eyebrow className="mb-4">{tab === "clothes" ? "A Coleção" : "Sneakers"}</Eyebrow>
-          <h2 className="font-serif text-4xl md:text-6xl">
+        <div className="mb-10 flex flex-col items-center text-center md:mb-14">
+          <Eyebrow className="mb-3">{tab === "clothes" ? "A Coleção" : "Sneakers"}</Eyebrow>
+          {/* Entrelinha curta: o serif em corpo grande abre demais no padrão e
+              era o que empurrava as duas linhas do título para longe uma da outra. */}
+          <h2 className="font-serif text-3xl leading-[1.08] md:text-5xl">
             <StackedLines
               lines={tab === "clothes" ? ["Essenciais com", "Propósito"] : ["A Nova", "Cadência"]}
             />
           </h2>
-          <p className="mt-6 max-w-xl text-sm md:text-base text-muted-foreground font-light">
+          <p className="mt-4 max-w-xl text-sm md:text-base text-muted-foreground font-light">
             {tab === "clothes"
               ? "Peças atemporais, produzidas em pequenas séries por ateliês tradicionais europeus."
               : "Silhuetas contemporâneas, montadas artesanalmente em couros nobres."}
