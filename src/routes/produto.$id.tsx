@@ -23,6 +23,9 @@ import { TrustSeals } from "@/components/TrustSeals";
 import { StitchDivider } from "@/components/StitchDivider";
 import { ContactStrip } from "@/components/ContactStrip";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Eyebrow } from "@/components/ui-kit";
+import { Inview, StackedLines } from "@/lib/motion";
+import { useVisualShell } from "@/lib/visual-shell";
 
 export const Route = createFileRoute("/produto/$id")({
   // O loader existe só para o HTML do servidor sair com título e og:image
@@ -59,6 +62,7 @@ export const Route = createFileRoute("/produto/$id")({
 });
 
 function ProductPage() {
+  useVisualShell();
   const { id } = Route.useParams();
   const loaded = Route.useLoaderData();
   const { add, count, open: openCart } = useCart();
@@ -165,7 +169,7 @@ function ProductView({
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background p-2 text-foreground sm:p-3">
       <ProductHeader cartCount={cartCount} onCartClick={onCartClick} />
 
       {/* Breadcrumb */}
@@ -190,7 +194,7 @@ function ProductView({
         </div>
       </nav>
 
-      <div className="mx-auto max-w-[1600px] px-6 py-10 md:px-12 md:py-16">
+      <div className="mx-auto max-w-[1600px] rounded-[2rem] px-6 py-10 md:px-12 md:py-16">
         <div className="grid gap-10 lg:grid-cols-[1.65fr_1fr] lg:gap-16">
           {/* Coluna esquerda — foto principal contida na altura da tela, com
               miniaturas abaixo. Antes era uma pilha de fotos em tamanho cheio,
@@ -248,14 +252,19 @@ function ProductView({
               `self-start` impede que o painel estique e invada o rodapé. */}
           <div className="lg:sticky lg:top-8 lg:self-start">
             <div className="flex items-start justify-between gap-4">
-              <p className="text-[11px] tracking-luxe uppercase text-accent">A&amp;S Conccept</p>
+              <Eyebrow>A&amp;S Conccept</Eyebrow>
               <div className="flex shrink-0 gap-2">
                 <FavoriteButton productId={product.id} />
                 <ShareButton productId={product.id} productName={product.name} />
               </div>
             </div>
 
-            <h1 className="mt-3 font-serif text-3xl leading-tight md:text-4xl">{product.name}</h1>
+            {/* O nome sobe de trás de uma máscara, como os títulos da home.
+                A chave força a revelação a rodar de novo ao trocar de peça
+                pelo "Complete o Look". */}
+            <h1 className="mt-3 font-serif text-3xl leading-tight md:text-4xl">
+              <StackedLines key={product.id} lines={[product.name]} duration={800} />
+            </h1>
             <p className="mt-3 text-lg tabular-nums">{formatBRL(product.price)}</p>
             <InstallmentsNote amount={product.price} className="mt-1" />
 
@@ -328,10 +337,11 @@ function ProductView({
                 )}
             </div>
 
+            {/* Pílula com seta, como os CTAs da home. */}
             <button
               onClick={handleAdd}
               disabled={!canAdd}
-              className="asc-btn-primary mt-8 hidden w-full py-4 text-[11px] tracking-luxe uppercase disabled:cursor-not-allowed disabled:opacity-40 md:block"
+              className="group mt-8 hidden w-full items-center justify-center gap-2 rounded-full bg-asc-ink py-4 text-[11px] font-medium uppercase tracking-wide text-asc-bg transition-colors duration-asc ease-asc hover:bg-asc-gold disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-asc-ink md:inline-flex"
             >
               {soldOut
                 ? "Produto Esgotado"
@@ -340,6 +350,20 @@ function ProductView({
                   : availableQty === 0
                     ? `Tamanho ${size} esgotado`
                     : "Adicionar à Sacola"}
+              {canAdd && (
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                  className="h-4 w-4 transition-transform duration-ascfast ease-asc group-hover:translate-x-1"
+                >
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+              )}
             </button>
 
             <ProductInfoAccordion
@@ -356,7 +380,9 @@ function ProductView({
               <p>Frete grátis em pedidos acima de {formatBRL(FREE_SHIPPING_THRESHOLD)}.</p>
             </div>
 
-            <TrustSeals className="mt-8" />
+            <Inview delayIn={120} y={20}>
+              <TrustSeals className="mt-8" />
+            </Inview>
           </div>
         </div>
       </div>
@@ -371,7 +397,7 @@ function ProductView({
         <button
           onClick={handleAdd}
           disabled={!canAdd}
-          className="asc-btn-primary w-full py-4 text-[11px] tracking-luxe uppercase disabled:cursor-not-allowed disabled:opacity-40"
+          className="w-full rounded-full bg-asc-ink py-4 text-[11px] font-medium uppercase tracking-wide text-asc-bg transition-colors duration-asc ease-asc hover:bg-asc-gold disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-asc-ink"
         >
           {soldOut
             ? "Produto Esgotado"
@@ -401,7 +427,7 @@ function ProductView({
 /** Cabeçalho enxuto: o Nav da home depende do SearchProvider, que é local dela. */
 function ProductHeader({ cartCount, onCartClick }: { cartCount: number; onCartClick: () => void }) {
   return (
-    <header className="border-b border-asc-line bg-asc-bg-raised/90 backdrop-blur">
+    <header className="rounded-[2rem] border border-asc-line bg-asc-bg-raised/90 backdrop-blur">
       <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-5 md:px-12">
         <Link
           to="/"

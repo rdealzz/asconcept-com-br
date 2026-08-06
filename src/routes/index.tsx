@@ -50,7 +50,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { Loader } from "@/components/Loader";
 import { Eyebrow, PillButton } from "@/components/ui-kit";
 import { Inview, StackedLines, WordReveal, useScrollProgress } from "@/lib/motion";
-import { iniciarRolagemSuave, pararRolagemSuave } from "@/lib/smooth-scroll";
+import { useVisualShell } from "@/lib/visual-shell";
 import { EmptyCategoryState } from "@/components/EmptyCategoryState";
 
 import {
@@ -122,11 +122,6 @@ function useSearch() {
   return c;
 }
 
-/** Largura de referência do desenho e coeficiente de ampliação acima dela. */
-const BASE_W = 1920;
-const FONT_BASE = 16;
-const COEF = 0.6666;
-
 function Index() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -134,31 +129,7 @@ function Index() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pronto, setPronto] = useState(false);
 
-  // Escala adaptativa e rolagem suave valem só enquanto a home está montada:
-  // o rem mora no <html> e, solto, escalaria o checkout junto.
-  useEffect(() => {
-    const html = document.documentElement;
-    html.setAttribute("data-fluid", "1");
-
-    // Abaixo de 1920 quem manda são as media queries; acima, cresce por aqui.
-    const ajustar = () => {
-      const reducao = ((BASE_W - window.innerWidth) / BASE_W) * 100 * COEF;
-      const tamanho = FONT_BASE - (FONT_BASE * reducao) / 100;
-      if (tamanho > FONT_BASE) html.style.fontSize = `${tamanho}px`;
-      else html.style.removeProperty("font-size");
-    };
-    ajustar();
-    window.addEventListener("resize", ajustar);
-
-    iniciarRolagemSuave();
-
-    return () => {
-      window.removeEventListener("resize", ajustar);
-      html.removeAttribute("data-fluid");
-      html.style.removeProperty("font-size");
-      pararRolagemSuave();
-    };
-  }, []);
+  useVisualShell();
 
   // Quem chega na home com #produtos (voltando da página de produto, ou pelo
   // rodapé) precisa da mesma folga do cabeçalho fixo — o pulo nativo do
