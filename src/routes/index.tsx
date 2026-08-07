@@ -42,6 +42,7 @@ import {
   type SizeStock,
 } from "@/lib/catalog-context";
 import { supabase } from "@/integrations/supabase/client";
+import { productImageSrc, productImageSrcSet, uploadProductPhoto } from "@/lib/product-images";
 
 import { InstallmentsNote } from "@/components/InstallmentsNote";
 import { FavoriteButton, ShareButton } from "@/components/ProductActions";
@@ -844,8 +845,8 @@ function Products() {
           )
         ) : (
           <div className="grid grid-cols-2 gap-x-6 gap-y-14 md:grid-cols-3 md:gap-x-8 md:gap-y-20 lg:grid-cols-4">
-            {filtered.map((p) => (
-              <ProductCard key={p.id} product={p} />
+            {filtered.map((p, i) => (
+              <ProductCard key={p.id} product={p} priority={i < EAGER_CARDS} />
             ))}
           </div>
         )}
@@ -932,7 +933,23 @@ function StockBadge({ qty }: { qty: number }) {
 }
 
 /* ---------- Product Card ---------- */
-function ProductCard({ product }: { product: Product }) {
+/**
+ * Largura que o card ocupa na tela, acompanhando a grade: 2 colunas no celular,
+ * 3 a partir de md, 4 a partir de lg. É o que permite ao navegador baixar a
+ * variante de 480 no celular em vez da de 1000.
+ */
+const CARD_SIZES = "(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw";
+
+/** Quantos cards da grade entram com prioridade alta (a primeira dobra). */
+const EAGER_CARDS = 4;
+
+/**
+ * @param priority Card acima da dobra. Agora que a foto é requisição própria (e
+ *   não mais base64 dentro do JSON do catálogo), o `loading="lazy"` do restante
+ *   da grade finalmente adia alguma coisa — e vale disputar a banda inicial só
+ *   para as primeiras peças, que são o LCP da vitrine.
+ */
+function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
   const { openEdit } = useProduct();
   const { stock, deleteProduct, loadGallery } = useCatalog();
   const isAdmin = useIsAdmin();
@@ -966,9 +983,12 @@ function ProductCard({ product }: { product: Product }) {
           />
         )}
         <img
-          src={product.image}
+          src={productImageSrc(product.image, 1000)}
+          srcSet={productImageSrcSet(product.image)}
+          sizes={CARD_SIZES}
           alt={product.name}
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : undefined}
           decoding="async"
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-ascslow ease-asc ${
             soldOut ? "opacity-50 grayscale" : ""
@@ -976,7 +996,9 @@ function ProductCard({ product }: { product: Product }) {
         />
         {hoverImg && !soldOut && (
           <img
-            src={hoverImg}
+            src={productImageSrc(hoverImg, 1000)}
+            srcSet={productImageSrcSet(hoverImg)}
+            sizes={CARD_SIZES}
             alt={`${product.name} — segunda vista`}
             loading="lazy"
             decoding="async"
@@ -1073,59 +1095,15 @@ function ProductCard({ product }: { product: Product }) {
 
 /* ---------- Admin Edit / Create Modal ---------- */
 
-/** Maior lado da foto depois de redimensionada, em pixels. */
-const MAX_IMAGE_EDGE = 1400;
-
 /**
- * Lê a foto escolhida no admin, redimensiona e devolve como data URL WebP.
+ * Tamanho máximo do arquivo escolhido no painel.
  *
- * As fotos são guardadas dentro da própria tabela de produtos, então cada
- * byte aqui é baixado por todo visitante junto com o catálogo — e o base64
- * ainda infla o tamanho em ~33%. Uma foto de 2 MB direto da câmera vira algo
- * na casa das centenas de KB depois deste passo, o que muda o tempo de
- * carregamento da loja inteira.
- *
- * Fotos antigas, cadastradas antes disto, continuam do tamanho que já
- * estavam: só recadastrando é que passam por aqui.
+ * Era 2 MB porque a foto ia inteira para dentro da linha do produto, em base64,
+ * e todo visitante baixava aquilo. Agora ela é redimensionada e recomprimida em
+ * três larguras antes de subir para o Storage, então o peso do original só
+ * atrasa o envio do admin — dá para aceitar uma foto direto do celular.
  */
-async function fileToBase64(file: File): Promise<string> {
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(file);
-  });
-
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = reject;
-      el.src = dataUrl;
-    });
-
-    const scale = Math.min(1, MAX_IMAGE_EDGE / Math.max(img.width, img.height));
-    const w = Math.round(img.width * scale);
-    const h = Math.round(img.height * scale);
-
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return dataUrl;
-    ctx.drawImage(img, 0, 0, w, h);
-
-    const webp = canvas.toDataURL("image/webp", 0.82);
-    // Navegador sem suporte a WebP devolve PNG, que costuma ser maior que o
-    // original — nesse caso tenta JPEG e, por fim, fica com o arquivo cru.
-    const encoded = webp.startsWith("data:image/webp")
-      ? webp
-      : canvas.toDataURL("image/jpeg", 0.85);
-    return encoded.length < dataUrl.length ? encoded : dataUrl;
-  } catch {
-    return dataUrl;
-  }
-}
+const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 
 function AdminEditModal() {
   const { editingId, closeEdit, creatingCategory } = useProduct();
@@ -1173,6 +1151,7 @@ function AdminEditModal() {
     category: (creatingCategory ?? tab) as ProductCategory,
   });
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     setUploadError(null);
@@ -1233,20 +1212,28 @@ function AdminEditModal() {
     const accepted: string[] = [];
     const ignored = files.length > remaining;
 
-    for (const file of files.slice(0, remaining)) {
-      if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) {
-        setUploadError("Envie imagens JPG, PNG ou WEBP.");
-        continue;
+    // O envio agora vai à rede (Storage), e não mais só à memória, então o
+    // botão precisa avisar que está trabalhando.
+    setUploading(true);
+    try {
+      for (const file of files.slice(0, remaining)) {
+        if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) {
+          setUploadError("Envie imagens JPG, PNG ou WEBP.");
+          continue;
+        }
+        if (file.size > MAX_UPLOAD_BYTES) {
+          setUploadError("Cada imagem deve ter até 12 MB.");
+          continue;
+        }
+        try {
+          accepted.push(await uploadProductPhoto(file));
+        } catch (err) {
+          console.error("[fotos] envio falhou", err);
+          setUploadError("Falha ao enviar uma das imagens.");
+        }
       }
-      if (file.size > 2 * 1024 * 1024) {
-        setUploadError("Cada imagem deve ter até 2 MB.");
-        continue;
-      }
-      try {
-        accepted.push(await fileToBase64(file));
-      } catch {
-        setUploadError("Falha ao ler uma das imagens.");
-      }
+    } finally {
+      setUploading(false);
     }
 
     if (accepted.length) {
@@ -1338,7 +1325,11 @@ function AdminEditModal() {
             <div>
               <div className="aspect-[3/4] w-full overflow-hidden border border-border bg-secondary">
                 {form.gallery[0] ? (
-                  <img src={form.gallery[0]} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={productImageSrc(form.gallery[0], 480)}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-[10px] uppercase tracking-luxe text-muted-foreground">
                     Sem foto
@@ -1353,7 +1344,13 @@ function AdminEditModal() {
                       key={i}
                       className="relative aspect-[3/4] overflow-hidden border border-border"
                     >
-                      <img src={g} alt="" className="h-full w-full object-cover" />
+                      <img
+                        src={productImageSrc(g, 480)}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                      />
                       {i === 0 ? (
                         <span className="absolute inset-x-0 bottom-0 bg-charcoal/80 py-0.5 text-center text-[8px] tracking-luxe uppercase text-ivory">
                           Capa
@@ -1383,17 +1380,19 @@ function AdminEditModal() {
 
               <label
                 className={`mt-3 flex items-center justify-center gap-2 border border-accent/50 bg-accent/5 px-3 py-2 text-[10px] tracking-luxe uppercase text-accent transition-colors ${
-                  form.gallery.length >= MAX_PRODUCT_IMAGES
+                  uploading || form.gallery.length >= MAX_PRODUCT_IMAGES
                     ? "cursor-not-allowed opacity-40"
                     : "cursor-pointer hover:bg-accent hover:text-asc-ink"
                 }`}
               >
                 <Upload className="h-3.5 w-3.5" strokeWidth={1.5} />
-                Enviar Fotos ({form.gallery.length}/{MAX_PRODUCT_IMAGES})
+                {uploading
+                  ? "Enviando…"
+                  : `Enviar Fotos (${form.gallery.length}/${MAX_PRODUCT_IMAGES})`}
                 <input
                   type="file"
                   multiple
-                  disabled={form.gallery.length >= MAX_PRODUCT_IMAGES}
+                  disabled={uploading || form.gallery.length >= MAX_PRODUCT_IMAGES}
                   accept="image/jpeg,image/jpg,image/png,image/webp"
                   onChange={(e) => {
                     void onPickFiles(e.target.files);
@@ -2638,8 +2637,10 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                                 <div className="flex items-center gap-2">
                                   {i.image && (
                                     <img
-                                      src={i.image}
+                                      src={productImageSrc(i.image, 480)}
                                       alt={i.name}
+                                      loading="lazy"
+                                      decoding="async"
                                       className="h-12 w-9 flex-none object-cover border border-border/60"
                                     />
                                   )}
