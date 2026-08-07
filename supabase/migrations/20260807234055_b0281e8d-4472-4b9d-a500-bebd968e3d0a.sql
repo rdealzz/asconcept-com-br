@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION app_private.consume_order_stock(text) TO service_role;
