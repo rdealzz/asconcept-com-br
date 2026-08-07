@@ -28,7 +28,7 @@ type ProductInput = Omit<Product, "id">;
  * uma. Era isso que fazia os produtos demorarem a aparecer. As demais fotos
  * chegam depois, sob demanda, por `loadGallery`.
  */
-const LIST_COLUMNS =
+export const LIST_COLUMNS =
   "id,name,description,price,category,image,sizes,force_last_item,sort_order,created_at";
 
 type CatalogCtx = {

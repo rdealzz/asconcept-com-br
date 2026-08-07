@@ -22,11 +22,16 @@ export const getProductById = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     try {
       const { supabase } = await import("@/integrations/supabase/client");
-      const { rowToProduct, coerceSizeStock } = await import("@/lib/catalog-context");
+      const { rowToProduct, coerceSizeStock, LIST_COLUMNS } = await import("@/lib/catalog-context");
 
+      // As mesmas colunas da vitrine — de propósito sem `gallery`. O que sai
+      // daqui só alimenta o título e a prévia do link, que precisam da capa e
+      // de mais nada; puxar a galeria inteira era carregar as outras quatro
+      // fotos da peça no servidor para jogá-las fora. A galeria chega no
+      // navegador por `loadGallery`, como na home.
       const { data: row, error } = await supabase
         .from("products")
-        .select("*")
+        .select(LIST_COLUMNS)
         .eq("id", data.id)
         .maybeSingle();
 
