@@ -1,5 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { prefersReducedMotion } from "@/lib/motion";
+import { productImageSrc } from "@/lib/product-images";
+
+/** Largura em que a peça é exibida no palco, em ambos os usos. */
+const TURNTABLE_WIDTH = 1000;
 
 /**
  * A peça que gira.
@@ -112,7 +116,16 @@ export function GarmentTurntable({
   const frente = useRef<HTMLImageElement>(null);
   const verso = useRef<HTMLImageElement>(null);
 
-  const fotos = useRef<string[]>(images);
+  /**
+   * O palco troca o `src` das duas faces na mão, durante o giro, então não dá
+   * para deixar o navegador escolher a variante por `srcset` — a escolha teria
+   * de ser refeita a cada virada. Resolvemos aqui, uma vez, na largura em que a
+   * peça é exibida; a mesma URL vale para a pré-carga e para o JSX, então o
+   * cache é aproveitado em vez de dividido entre dois tamanhos.
+   */
+  const srcs = useMemo(() => images.map((s) => productImageSrc(s, TURNTABLE_WIDTH)), [images]);
+
+  const fotos = useRef<string[]>(srcs);
   const pendentes = useRef<string[] | null>(null);
   const idAtual = useRef(swapId);
 
@@ -320,20 +333,20 @@ export function GarmentTurntable({
     const s = est.current;
     if (idAtual.current === swapId) {
       // Mesma peça: a galeria só terminou de chegar. Entra sem animação.
-      fotos.current = images;
+      fotos.current = srcs;
       aplicar.current();
       return;
     }
     idAtual.current = swapId;
     if (prefersReducedMotion()) {
-      fotos.current = images;
+      fotos.current = srcs;
       s.idx = 0;
       s.trocaPeca = false;
       destinoAplicado.current = 0;
       aplicar.current();
       return;
     }
-    pendentes.current = images;
+    pendentes.current = srcs;
     s.virada = 0.0001;
     s.viradaDur = VIRADA_S;
     s.trocaPeca = true;
@@ -343,7 +356,7 @@ export function GarmentTurntable({
     s.viradaPara = Math.ceil((s.ang + 720) / 360) * 360;
     destinoAplicado.current = 0;
     acordar.current();
-  }, [swapId, images]);
+  }, [swapId, srcs]);
 
   /* ── giro até uma foto escolhida (miniaturas) ───────────────────── */
   useEffect(() => {
@@ -472,16 +485,34 @@ export function GarmentTurntable({
   /* ── pré-carga: a foto do outro lado não pode chegar durante o giro ── */
   useEffect(() => {
     if (typeof window === "undefined") return;
-    for (const src of images.slice(0, 5)) {
-      const i = new Image();
-      i.decoding = "async";
-      i.src = src;
+
+    const aquecer = (lista: string[]) => {
+      for (const src of lista) {
+        const i = new Image();
+        i.decoding = "async";
+        i.src = src;
+      }
+    };
+
+    // As duas primeiras são as faces visíveis já na primeira meia-volta, então
+    // vão junto. O resto só é preciso depois de o cliente girar algumas vezes —
+    // buscá-las agora tiraria banda da foto que ele está olhando.
+    aquecer(srcs.slice(0, 2));
+
+    const resto = srcs.slice(2, 5);
+    if (!resto.length) return;
+    const ocioso = window.requestIdleCallback;
+    if (!ocioso) {
+      const t = window.setTimeout(() => aquecer(resto), 1200);
+      return () => window.clearTimeout(t);
     }
-  }, [images]);
+    const id = ocioso(() => aquecer(resto), { timeout: 3000 });
+    return () => window.cancelIdleCallback?.(id);
+  }, [srcs]);
 
-  if (!images.length) return null;
+  if (!srcs.length) return null;
 
-  const umaFoto = images.length < 2;
+  const umaFoto = srcs.length < 2;
 
   return (
     <div
@@ -499,7 +530,7 @@ export function GarmentTurntable({
       >
         <img
           ref={frente}
-          src={images[0]}
+          src={srcs[0]}
           alt={alt}
           draggable={false}
           decoding="async"
@@ -507,7 +538,7 @@ export function GarmentTurntable({
         />
         <img
           ref={verso}
-          src={images[1] ?? images[0]}
+          src={srcs[1] ?? srcs[0]}
           alt=""
           aria-hidden
           draggable={false}

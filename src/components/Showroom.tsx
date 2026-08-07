@@ -5,6 +5,7 @@ import { useCatalog, SIZES, totalStock } from "@/lib/catalog-context";
 import { InstallmentsNote } from "@/components/InstallmentsNote";
 import { GarmentTurntable } from "@/components/GarmentTurntable";
 import { Eyebrow } from "@/components/ui-kit";
+import { productImageSrc, productImageSrcSet } from "@/lib/product-images";
 
 /**
  * Vitrine giratória — o palco da coleção.
@@ -278,7 +279,9 @@ export function Showroom({
                     }`}
                   >
                     <img
-                      src={p.image}
+                      src={productImageSrc(p.image, 480)}
+                      srcSet={productImageSrcSet(p.image)}
+                      sizes="136px"
                       alt=""
                       aria-hidden
                       loading="lazy"

@@ -4,6 +4,7 @@ import { formatBRL, type Product } from "@/lib/cart-context";
 import { FavoriteButton } from "@/components/ProductActions";
 import { ArrowButton } from "@/components/ui-kit";
 import { Inview, StackedLines } from "@/lib/motion";
+import { productImageSrc, productImageSrcSet } from "@/lib/product-images";
 
 /**
  * RelatedProducts — "Complete o Look" ao fim da página de produto.
@@ -54,8 +55,11 @@ export function RelatedProducts({
           >
             <Link to="/produto/$id" params={{ id: p.id }} className="block">
               <div className="relative mb-3 aspect-[3/4] overflow-hidden border border-asc-line bg-asc-bg-raised transition-colors duration-asc ease-asc group-hover:border-asc-gold/60">
+                {/* Card de 220–260px: a variante de 480 já cobre telas 2x. */}
                 <img
-                  src={p.image}
+                  src={productImageSrc(p.image, 480)}
+                  srcSet={productImageSrcSet(p.image)}
+                  sizes="260px"
                   alt={p.name}
                   loading="lazy"
                   decoding="async"

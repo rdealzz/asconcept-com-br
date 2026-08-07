@@ -12,6 +12,7 @@ import {
   type SizeStock,
 } from "@/lib/catalog-context";
 import { getProductById } from "@/lib/catalog.functions";
+import { isRemoteImage, productImageSrc } from "@/lib/product-images";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 import { ProductInfoAccordion } from "@/components/ProductInfoAccordion";
 import { ShippingCalculator } from "@/components/ShippingCalculator";
@@ -44,6 +45,16 @@ export const Route = createFileRoute("/produto/$id")({
     const { product } = loaderData;
     const title = `${product.name} — A&S Conccept`;
     const description = product.description || `${product.name}, por ${formatBRL(product.price)}.`;
+
+    // Só entra em meta tag foto que seja URL de verdade. Enquanto as fotos eram
+    // data URL base64, a capa inteira saía duas vezes dentro do <head> do HTML
+    // — og:image e twitter:image — e o navegador tinha de engolir tudo isso
+    // antes de chegar ao <body>. Nenhum robô de prévia lê data URL, então era
+    // peso puro. Foto antiga ainda em base64 simplesmente não gera a tag.
+    const foto = isRemoteImage(product.image) ? product.image : null;
+    const preview = foto ? productImageSrc(foto, 1600) : null;
+    const lcp = foto ? productImageSrc(foto, 1000) : null;
+
     return {
       meta: [
         { title },
@@ -51,12 +62,15 @@ export const Route = createFileRoute("/produto/$id")({
         { property: "og:title", content: title },
         { property: "og:description", content: description },
         { property: "og:type", content: "product" },
-        ...(product.image ? [{ property: "og:image", content: product.image }] : []),
+        ...(preview ? [{ property: "og:image", content: preview }] : []),
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:title", content: title },
         { name: "twitter:description", content: description },
-        ...(product.image ? [{ name: "twitter:image", content: product.image }] : []),
+        ...(preview ? [{ name: "twitter:image", content: preview }] : []),
       ],
+      // A capa é o LCP desta página. Pedir cedo evita que ela espere o
+      // JavaScript hidratar para só então descobrir que precisa da foto.
+      links: lcp ? [{ rel: "preload", as: "image", href: lcp, fetchpriority: "high" }] : [],
     };
   },
   component: ProductPage,
@@ -263,7 +277,7 @@ function ProductView({
                     }`}
                   >
                     <img
-                      src={src}
+                      src={productImageSrc(src, 480)}
                       alt=""
                       loading="lazy"
                       decoding="async"
@@ -538,7 +552,7 @@ function Lightbox({
       onClick={onClose}
     >
       <img
-        src={images[index]}
+        src={productImageSrc(images[index], 1600)}
         alt={`${alt} — foto ${index + 1}`}
         onClick={(e) => e.stopPropagation()}
         className="max-h-[92vh] max-w-[94vw] cursor-zoom-out object-contain"
