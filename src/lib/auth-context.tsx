@@ -54,6 +54,7 @@ type AuthCtx = {
   ) => Promise<{ error: string | null; justSignedUp?: boolean }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
+  resendConfirmation: (email: string) => Promise<{ error: string | null }>;
   justSignedUp: boolean;
   clearJustSignedUp: () => void;
   updateProfile: (patch: { name?: string }) => Promise<void>;
@@ -253,14 +254,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     if (error) {
+      // Sem este log, toda falha virava a mesma frase na tela e não sobrava
+      // nada para diagnosticar — nem no navegador, nem no relato do cliente.
+      console.error("[auth] signUp falhou", {
+        status: error.status,
+        code: error.code,
+        message: error.message,
+      });
+
       const message = error.message.toLowerCase();
+      const code = (error.code ?? "").toLowerCase();
+
+      if (code === "user_already_exists" || message.includes("already"))
+        return { error: "Já existe uma conta com este e-mail." };
+
       const isRateLimit =
         error.status === 429 || message.includes("rate limit") || message.includes("rate_limit");
-      if (isRateLimit) {
-        // O limite costuma ser do ENVIO de e-mail, não da criação da conta:
-        // o usuário pode ter sido criado mesmo com o 429. Sondamos com as
-        // credenciais que o próprio visitante acabou de digitar para decidir
-        // qual tela mostrar (nenhum dado de terceiros é exposto).
+      // Falha do lado do servidor: o erro fala do ENVIO do e-mail ou do banco,
+      // não da validação do formulário. Nesses casos não dá para saber pela
+      // resposta se a conta chegou a existir — o Auth às vezes cria o usuário e
+      // só depois tropeça no e-mail. Sondamos com as credenciais que o próprio
+      // visitante acabou de digitar para decidir qual tela mostrar (nenhum dado
+      // de terceiros é exposto).
+      const isServerSide =
+        isRateLimit ||
+        (error.status ?? 0) >= 500 ||
+        message.includes("database error") ||
+        message.includes("sending");
+
+      if (isServerSide) {
         const probe = await supabase.auth.signInWithPassword({
           email: cleanEmail,
           password,
@@ -271,14 +293,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           probeMsg.includes("not confirmed") ||
           probeMsg.includes("não confirmado");
         if (accountExists) return finishSignUp();
-        return { error: "Muitas tentativas de cadastro. Aguarde alguns minutos e tente novamente." };
+
+        if (isRateLimit)
+          return {
+            error: "Muitas tentativas de cadastro. Aguarde alguns minutos e tente novamente.",
+          };
+        return {
+          error:
+            "Nosso servidor não conseguiu concluir o cadastro agora. Tente novamente em alguns minutos.",
+        };
       }
-      if (message.includes("already"))
-        return { error: "Já existe uma conta com este e-mail." };
+
+      // Daqui para baixo o servidor recusou o que foi digitado — a mensagem
+      // precisa dizer o quê, senão o visitante repete o mesmo erro.
+      if (code === "signup_disabled" || message.includes("not allowed"))
+        return { error: "O cadastro está temporariamente indisponível. Tente novamente mais tarde." };
+      if (code === "weak_password" || message.includes("password"))
+        return { error: "Escolha uma senha mais forte, com ao menos 6 caracteres." };
+      if (code === "email_address_invalid" || message.includes("email"))
+        return { error: "Este e-mail não foi aceito. Confira o endereço e tente novamente." };
+
       return { error: "Não foi possível concluir o cadastro." };
     }
     return finishSignUp();
 
+  };
+
+  /** Reenvia o link de confirmação para quem criou a conta e não recebeu. */
+  const resendConfirmation: AuthCtx["resendConfirmation"] = async (email) => {
+    const cleanEmail = sanitizeEmail(email);
+    if (!cleanEmail) return { error: "Informe um e-mail válido." };
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: cleanEmail,
+      options: { emailRedirectTo: `${window.location.origin}/` },
+    });
+    if (error) {
+      console.error("[auth] resend falhou", { status: error.status, message: error.message });
+      return { error: "Não foi possível reenviar agora. Aguarde alguns minutos e tente de novo." };
+    }
+    return { error: null };
   };
 
 
@@ -337,6 +391,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         signOut,
         resetPassword,
+        resendConfirmation,
         justSignedUp,
         clearJustSignedUp: () => setJustSignedUp(false),
         updateProfile,

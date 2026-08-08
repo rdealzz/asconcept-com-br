@@ -2,7 +2,6 @@ import * as React from 'react'
 import { render } from '@react-email/render'
 import { parseEmailWebhookPayload } from '@lovable.dev/email-js'
 import { WebhookError, verifyWebhookRequest } from '@lovable.dev/webhooks-js'
-import { createClient } from '@supabase/supabase-js'
 import { createFileRoute } from '@tanstack/react-router'
 import { SignupEmail } from '@/lib/email-templates/signup'
 import { InviteEmail } from '@/lib/email-templates/invite'
@@ -123,90 +122,106 @@ export const Route = (createFileRoute("/lovable/email/auth/webhook") as any)({
           run_id,
         })
 
-        const EmailTemplate = EMAIL_TEMPLATES[emailType]
-        if (!EmailTemplate) {
-          console.error('Unknown email type', { emailType, run_id })
-          return Response.json(
-            { error: `Unknown email type: ${emailType}` },
-            { status: 400 }
-          )
-        }
-
-        // Build template props from payload.data (HookData structure)
-        const templateProps = {
-          siteName: SITE_NAME,
-          siteUrl: `https://${ROOT_DOMAIN}`,
-          recipient: payload.data.email,
-          confirmationUrl: payload.data.url,
-          token: payload.data.token,
-          email: payload.data.email,
-          oldEmail: payload.data.old_email,
-          newEmail: payload.data.new_email,
-        }
-
-        // Render React Email to HTML and plain text
-        const element = React.createElement(EmailTemplate, templateProps)
-        const html = await render(element)
-        const text = await render(element, { plainText: true })
-
-        // Enqueue email for async processing by the dispatcher (process-email-queue).
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-        const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-        if (!supabaseUrl || !supabaseServiceKey) {
-          console.error('Missing Supabase environment variables')
-          return Response.json(
-            { error: 'Server configuration error' },
-            { status: 500 }
-          )
-        }
-
-        const supabase = createClient(supabaseUrl, supabaseServiceKey)
+        // Daqui para baixo a assinatura já foi conferida e o pedido é legítimo.
+        //
+        // O Auth trata QUALQUER resposta não-2xx deste hook como falha de envio
+        // e desfaz a transação inteira do /signup — o visitante recebe um 500
+        // genérico e a conta NÃO chega a existir. Ou seja: um soluço da fila de
+        // e-mail (chave de serviço no formato novo, pgmq indisponível, template
+        // que não renderiza) derrubava o cadastro de todo mundo, não só o
+        // e-mail. Por isso, a partir daqui nada devolve erro: a falha é
+        // registrada em email_send_log com status 'failed' e respondemos 200.
+        // A conta é criada, e o visitante pede um novo link de confirmação pela
+        // própria tela de cadastro (`supabase.auth.resend`).
         const messageId = crypto.randomUUID()
+        const recipient = payload.data.email
 
-        // Log pending BEFORE enqueue so we have a record even if enqueue crashes
-        await supabase.from('email_send_log').insert({
-          message_id: messageId,
-          template_name: emailType,
-          recipient_email: payload.data.email,
-          status: 'pending',
-        })
+        const logFailure = async (reason: string) => {
+          try {
+            const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
+            await supabaseAdmin.from('email_send_log').insert({
+              message_id: messageId,
+              template_name: emailType,
+              recipient_email: recipient,
+              status: 'failed',
+              error_message: reason,
+            })
+          } catch (logError) {
+            console.error('Failed to record auth email failure', { error: logError, run_id })
+          }
+        }
 
-        const { error: enqueueError } = await supabase.rpc('enqueue_email', {
-          queue_name: 'auth_emails',
-          payload: {
-            run_id,
-            message_id: messageId,
-            to: payload.data.email,
-            from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
-            sender_domain: SENDER_DOMAIN,
-            subject: EMAIL_SUBJECTS[emailType] || 'Notification',
-            html,
-            text,
-            purpose: 'transactional',
-            label: emailType,
-            queued_at: new Date().toISOString(),
-          },
-        })
+        try {
+          const EmailTemplate = EMAIL_TEMPLATES[emailType]
+          if (!EmailTemplate) {
+            console.error('Unknown email type', { emailType, run_id })
+            await logFailure(`Unknown email type: ${emailType}`)
+            return Response.json({ success: true, queued: false })
+          }
 
-        if (enqueueError) {
-          console.error('Failed to enqueue auth email', { error: enqueueError, run_id, emailType })
-          await supabase.from('email_send_log').insert({
+          // Build template props from payload.data (HookData structure)
+          const templateProps = {
+            siteName: SITE_NAME,
+            siteUrl: `https://${ROOT_DOMAIN}`,
+            recipient,
+            confirmationUrl: payload.data.url,
+            token: payload.data.token,
+            email: recipient,
+            oldEmail: payload.data.old_email,
+            newEmail: payload.data.new_email,
+          }
+
+          // Render React Email to HTML and plain text
+          const element = React.createElement(EmailTemplate, templateProps)
+          const html = await render(element)
+          const text = await render(element, { plainText: true })
+
+          // Enqueue email for async processing by the dispatcher (process-email-queue).
+          // Usamos o cliente de serviço compartilhado: ele já remove o
+          // `Authorization: Bearer` quando a chave é do formato novo
+          // (`sb_secret_…`), que o PostgREST recusa como JWT. Montar um
+          // createClient cru aqui fazia toda chamada de serviço voltar 401.
+          const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
+
+          // Log pending BEFORE enqueue so we have a record even if enqueue crashes
+          await supabaseAdmin.from('email_send_log').insert({
             message_id: messageId,
             template_name: emailType,
-            recipient_email: payload.data.email,
-            status: 'failed',
-            error_message: 'Failed to enqueue email',
+            recipient_email: recipient,
+            status: 'pending',
           })
-          return Response.json(
-            { error: 'Failed to enqueue email' },
-            { status: 500 }
-          )
+
+          const { error: enqueueError } = await supabaseAdmin.rpc('enqueue_email', {
+            queue_name: 'auth_emails',
+            payload: {
+              run_id,
+              message_id: messageId,
+              to: recipient,
+              from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
+              sender_domain: SENDER_DOMAIN,
+              subject: EMAIL_SUBJECTS[emailType] || 'Notification',
+              html,
+              text,
+              purpose: 'transactional',
+              label: emailType,
+              queued_at: new Date().toISOString(),
+            },
+          })
+
+          if (enqueueError) {
+            console.error('Failed to enqueue auth email', { error: enqueueError, run_id, emailType })
+            await logFailure('Failed to enqueue email')
+            return Response.json({ success: true, queued: false })
+          }
+        } catch (error) {
+          console.error('Auth email hook failed', { error, run_id, emailType })
+          await logFailure('Auth email hook threw before enqueue')
+          return Response.json({ success: true, queued: false })
         }
 
         console.log('Auth email enqueued', {
           emailType,
-          email_redacted: redactEmail(payload.data.email),
+          email_redacted: redactEmail(recipient),
           run_id,
         })
 

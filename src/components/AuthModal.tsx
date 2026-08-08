@@ -97,7 +97,7 @@ function MolduraModal({
 }
 
 export function AuthModal() {
-  const { isOpen, closeAuth, signIn, signUp, resetPassword, user } = useAuth();
+  const { isOpen, closeAuth, signIn, signUp, resetPassword, resendConfirmation, user } = useAuth();
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -177,6 +177,18 @@ export function AuthModal() {
   };
 
   if (signedUpEmail) {
+    // A conta já existe neste ponto. O e-mail é enfileirado à parte, então
+    // pode demorar ou se perder — o reenvio evita que a conta fique presa.
+    const onResend = async () => {
+      setLoading(true);
+      setError(null);
+      setInfo(null);
+      const { error } = await resendConfirmation(signedUpEmail);
+      if (error) setError(error);
+      else setInfo("Reenviamos o link de confirmação.");
+      setLoading(false);
+    };
+
     return (
       <MolduraModal onClose={closeAuth} rotulo="Conta criada">
         <p className="asc-label text-[10px] text-asc-gold">Conta criada</p>
@@ -186,8 +198,26 @@ export function AuthModal() {
           <span className="text-asc-ink">{signedUpEmail}</span>. Verifique sua caixa de entrada (e o
           spam) e confirme para acessar sua conta.
         </p>
+        {error && (
+          <p className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {error}
+          </p>
+        )}
+        {info && (
+          <p className="mt-4 rounded-lg border border-asc-gold/40 bg-asc-gold/10 px-3 py-2 text-xs text-asc-gold-soft">
+            {info}
+          </p>
+        )}
         <button onClick={closeAuth} className="asc-btn-gold mt-8 w-full py-4">
           Entendi
+        </button>
+        <button
+          type="button"
+          onClick={onResend}
+          disabled={loading}
+          className="mt-4 w-full text-center text-[10px] tracking-luxe uppercase text-asc-gold underline-offset-4 hover:underline disabled:opacity-50"
+        >
+          {loading ? "Aguarde…" : "Não recebeu? Reenviar e-mail"}
         </button>
       </MolduraModal>
     );
