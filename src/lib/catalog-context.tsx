@@ -61,6 +61,13 @@ type CatalogCtx = {
    * produto. Repetir a chamada é barato: só a primeira vai à rede.
    */
   loadGallery: (id: string) => Promise<void>;
+  /**
+   * `true` quando a leitura do catálogo teve de cair para as colunas antigas
+   * porque `products.is_featured` ainda não existe. O painel usa isto para
+   * pedir a migração em vez de deixar o admin clicar num botão que só vai
+   * devolver 400.
+   */
+  featuredColumnMissing: boolean;
   updateProduct: (id: string, patch: Partial<Product>) => Promise<void>;
   /**
    * Liga/desliga a curadoria de vitrine de uma peça (só admin — quem manda é a
@@ -131,6 +138,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [stock, setStockMap] = useState<Record<string, SizeStock>>({});
   const [loading, setLoading] = useState(true);
+  const [featuredColumnMissing, setFeaturedColumnMissing] = useState(false);
 
   // Quais peças já tiveram a galeria buscada. Fica em ref, e não em estado,
   // para que duas chamadas seguidas (passar o mouse e clicar) não disparem
@@ -154,7 +162,9 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     };
 
     let { data, error } = await buscar(LIST_COLUMNS);
-    if (isMissingFeaturedColumn(error)) {
+    const semColunaDestaque = isMissingFeaturedColumn(error);
+    setFeaturedColumnMissing(semColunaDestaque);
+    if (semColunaDestaque) {
       console.warn("[catalog] coluna is_featured ausente — rode a migração de destaques");
       ({ data, error } = await buscar(LIST_COLUMNS_LEGACY));
     }
@@ -311,6 +321,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         stock,
         loading,
         loadGallery,
+        featuredColumnMissing,
         updateProduct,
         setFeatured,
         addProduct,

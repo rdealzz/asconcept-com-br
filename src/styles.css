@@ -610,13 +610,29 @@
 }
 
 /* Campos seguros do Mercado Pago (número, validade, CVV).
-   O SDK monta um <iframe> dentro de um <div> próprio; ambos vêm sem tamanho,
-   então precisam herdar a altura da moldura que desenhamos em volta. */
-.asc-secure-field,
+   O SDK monta um <iframe> dentro de um <div> próprio; ambos vêm sem tamanho.
+
+   A altura precisa ser definida AQUI, e não por utilitário do Tailwind na
+   marcação: esta regra está fora de qualquer @layer, então vence as camadas
+   utilitárias. Era o que acontecia antes — o `h-[1.375rem]` da moldura perdia
+   para o `height: 100%` daqui, que num pai de altura automática equivale a
+   `auto`, e o iframe subia para a altura natural dele. Resultado: caixas de
+   cartão com mais de 150px de altura, com o texto perdido no meio.
+
+   Com a altura fixa na raiz da cadeia, o `100%` dos filhos volta a ter contra
+   o que resolver. O !important cobre o style inline que o SDK escreve no
+   iframe. */
+.asc-secure-field {
+  display: block;
+  width: 100%;
+  height: 1.5rem;
+  border: 0;
+}
+
 .asc-secure-field > div,
 .asc-secure-field iframe {
   display: block;
   width: 100%;
-  height: 100%;
+  height: 100% !important;
   border: 0;
 }

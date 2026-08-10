@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { Check, Copy, Loader2, QrCode, ShieldCheck } from "lucide-react";
+import { Check, Copy, Loader2, QrCode, ShieldCheck, Timer } from "lucide-react";
 
 import { WHATSAPP_LINK, openWhatsApp } from "@/components/WhatsAppFab";
+import { SeloCompraSegura } from "@/components/checkout-ui";
 
 import { formatBRL } from "@/lib/cart-context";
+import { PIX_EXPIRATION_MINUTES } from "@/lib/mercadopago";
 
 export type PixCharge = {
   orderNumber: string;
@@ -14,25 +16,56 @@ export type PixCharge = {
   amount: number;
 };
 
+/**
+ * Conta regressiva até a expiração da cobrança.
+ *
+ * Devolve os segundos restantes e o rótulo já formatado. Antes formatava só
+ * `minutos:segundos`, e como a cobrança nascia com 24 horas de validade o
+ * cliente via "1439:41" — número que não se lê como tempo. Agora a cobrança
+ * dura 15 minutos (ver PIX_EXPIRATION_MINUTES), mas o formato continua
+ * preparado para horas: se algum dia o prazo mudar, o relógio acompanha em vez
+ * de estourar os minutos.
+ *
+ * Sem `expiresAt` não há relógio — melhor nenhum contador que um inventado.
+ */
 function useCountdown(expiresAt: string | null) {
   const [left, setLeft] = useState<number | null>(null);
+
   useEffect(() => {
-    if (!expiresAt) return;
+    if (!expiresAt) {
+      setLeft(null);
+      return;
+    }
     const target = new Date(expiresAt).getTime();
-    const tick = () => setLeft(Math.max(0, Math.floor((target - Date.now()) / 1000)));
+    if (!Number.isFinite(target)) {
+      setLeft(null);
+      return;
+    }
+    const tick = () => setLeft(Math.max(0, Math.ceil((target - Date.now()) / 1000)));
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
   }, [expiresAt]);
-  if (left === null) return null;
-  const m = Math.floor(left / 60);
+
+  if (left === null) return { segundos: null, rotulo: null, expirado: false };
+
+  const h = Math.floor(left / 3600);
+  const m = Math.floor((left % 3600) / 60);
   const s = left % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
+  const dd = (n: number) => String(n).padStart(2, "0");
+
+  return {
+    segundos: left,
+    rotulo: h > 0 ? `${h}:${dd(m)}:${dd(s)}` : `${dd(m)}:${dd(s)}`,
+    expirado: left === 0,
+  };
 }
 
 export function PixPanel({ charge, awaiting }: { charge: PixCharge; awaiting: boolean }) {
   const [copied, setCopied] = useState(false);
-  const countdown = useCountdown(charge.expiresAt);
+  const { rotulo: countdown, segundos, expirado } = useCountdown(charge.expiresAt);
+  // Último minuto: o relógio passa a puxar o olho.
+  const urgente = segundos !== null && segundos > 0 && segundos <= 60;
 
   const copy = async () => {
     try {
@@ -68,6 +101,30 @@ export function PixPanel({ charge, awaiting }: { charge: PixCharge; awaiting: bo
               />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Relógio logo abaixo do QR Code: é aqui que a urgência tem função —
+          o cliente acabou de olhar para o código e está decidindo se paga
+          agora ou depois. */}
+      {countdown && (
+        <div className="mt-5 flex flex-col items-center gap-1.5">
+          <span
+            aria-live="polite"
+            className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 font-serif text-lg tabular-nums transition-colors duration-asc ease-asc ${
+              expirado || urgente
+                ? "border-asc-error/50 bg-asc-error/10 text-asc-error"
+                : "border-[color:var(--gold)]/50 bg-[color:var(--gold)]/10 text-[color:var(--gold)]"
+            }`}
+          >
+            <Timer className="h-4 w-4" strokeWidth={1.5} aria-hidden />
+            {expirado ? "Expirado" : countdown}
+          </span>
+          <p className="text-[11px] font-light text-muted-foreground">
+            {expirado
+              ? "Este QR Code expirou. Refaça o pedido para gerar um novo."
+              : `Este QR Code expira em ${PIX_EXPIRATION_MINUTES} minutos.`}
+          </p>
         </div>
       )}
 
@@ -125,14 +182,15 @@ export function PixPanel({ charge, awaiting }: { charge: PixCharge; awaiting: bo
         </div>
       </aside>
 
+      <SeloCompraSegura className="mt-6" />
+
       <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-4 text-[11px] text-muted-foreground">
-        {awaiting && (
+        {awaiting && !expirado && (
           <span className="inline-flex items-center gap-2">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" strokeWidth={1.5} />
             Aguardando confirmação do pagamento…
           </span>
         )}
-        {countdown && <span>Expira em {countdown}</span>}
         <span>Pedido {charge.orderNumber}</span>
       </div>
     </section>

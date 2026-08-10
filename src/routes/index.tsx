@@ -2942,6 +2942,20 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
 }
 
 /* ---------- Admin · Produtos (curadoria da vitrine) ---------- */
+
+/**
+ * O mesmo conteúdo da migração `20260810120000_products_is_featured.sql`.
+ *
+ * Duplicado aqui de propósito: o arquivo de migração serve ao deploy, e este
+ * texto serve ao admin que abriu o painel e precisa colar o script no SQL
+ * Editor agora. Se um mudar, mude o outro.
+ */
+const SQL_DESTAQUES = `ALTER TABLE public.products
+  ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS products_is_featured_idx
+  ON public.products (is_featured)
+  WHERE is_featured;`;
 /**
  * Lista de gestão de produtos do painel.
  *
@@ -2952,11 +2966,12 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
  * então esconder o botão é conveniência, não a tranca.
  */
 function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
-  const { products, stock, setFeatured } = useCatalog();
+  const { products, stock, setFeatured, featuredColumnMissing, refresh } = useCatalog();
   const { openEdit } = useProduct();
   const isAdmin = useIsAdmin();
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState<string | null>(null);
+  const [sqlCopiado, setSqlCopiado] = useState(false);
 
   if (!isAdmin) return null;
 
@@ -2966,6 +2981,16 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
     const msg = await setFeatured(p.id, p.isFeatured !== true);
     setSalvando(null);
     if (msg) setErro(msg);
+  };
+
+  const copiarSql = async () => {
+    try {
+      await navigator.clipboard.writeText(SQL_DESTAQUES);
+      setSqlCopiado(true);
+      window.setTimeout(() => setSqlCopiado(false), 2500);
+    } catch {
+      /* área de transferência indisponível — o SQL está à vista mesmo assim */
+    }
   };
 
   return (
@@ -2979,10 +3004,40 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
         </p>
       </div>
 
-      {erro && (
-        <p className="mb-4 border border-destructive/50 bg-destructive/10 px-4 py-3 text-xs text-destructive">
-          {erro}
-        </p>
+      {/* Migração pendente: em vez de deixar o admin clicar num botão que só
+          devolve 400, a instrução vem com o SQL pronto para copiar. */}
+      {featuredColumnMissing ? (
+        <div className="mb-5 border border-accent/50 bg-accent/[0.07] px-4 py-4">
+          <p className="text-[10px] tracking-luxe uppercase text-accent">Migração pendente</p>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            A coluna <code className="text-accent">is_featured</code> ainda não existe no banco, e
+            sem ela não há como gravar a curadoria. Rode o script abaixo no SQL Editor do Supabase —
+            ele é seguro de rodar mais de uma vez.
+          </p>
+          <pre className="mt-3 overflow-x-auto border border-border bg-background/60 p-3 text-[10px] leading-relaxed text-muted-foreground">
+            {SQL_DESTAQUES}
+          </pre>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => void copiarSql()}
+              className="inline-flex items-center gap-1.5 asc-btn-primary px-3 py-1.5 text-[10px] tracking-luxe uppercase"
+            >
+              {sqlCopiado ? "SQL copiado" : "Copiar SQL"}
+            </button>
+            <button
+              onClick={() => void refresh()}
+              className="inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-[10px] tracking-luxe uppercase text-muted-foreground transition-colors hover:border-accent hover:text-accent"
+            >
+              <RotateCcw className="h-3 w-3" strokeWidth={1.5} /> Já rodei · verificar
+            </button>
+          </div>
+        </div>
+      ) : (
+        erro && (
+          <p className="mb-4 border border-destructive/50 bg-destructive/10 px-4 py-3 text-xs text-destructive">
+            {erro}
+          </p>
+        )
       )}
 
       {products.length === 0 ? (
@@ -3042,7 +3097,7 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
                     <td className="py-3 pr-3 text-right">
                       <button
                         onClick={() => void alternar(p)}
-                        disabled={salvando === p.id}
+                        disabled={salvando === p.id || featuredColumnMissing}
                         aria-pressed={destacada}
                         title={
                           destacada

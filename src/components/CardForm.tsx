@@ -3,9 +3,9 @@ import { ChevronDown, Loader2, Lock } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 
 import { getMpPublicKey } from "@/lib/payments.functions";
-import { MAX_INSTALLMENTS } from "@/lib/mercadopago";
+import { MAX_INSTALLMENTS, formatCpf, isValidCpf } from "@/lib/mercadopago";
 import { formatBRL } from "@/lib/cart-context";
-import { CampoFlutuante, CampoSeguro } from "@/components/checkout-ui";
+import { CampoFlutuante, CampoSeguro, SeloCompraSegura } from "@/components/checkout-ui";
 
 export type CardFormData = {
   token: string;
@@ -108,6 +108,7 @@ export function CardForm({
   amount,
   email,
   cpf,
+  onCpfChange,
   titular,
   onTitularChange,
   onBandeiraChange,
@@ -118,6 +119,8 @@ export function CardForm({
   email: string;
   /** CPF do comprador (só dígitos) — o emissor exige para autorizar. */
   cpf: string;
+  /** Quando informado, o CPF vira editável aqui (titular diferente do comprador). */
+  onCpfChange?: (v: string) => void;
   titular: string;
   onTitularChange: (v: string) => void;
   onBandeiraChange?: (b: CardBrandInfo | null) => void;
@@ -460,9 +463,14 @@ export function CardForm({
             />
           </CampoSeguro>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          {/* Validade e CVV pedem 5 e 4 caracteres — esticá-los pela largura da
+              coluna, como estava, fazia dois campos enormes para um punhado de
+              dígitos. Larguras fixas e proporcionais ao dado, alinhadas à
+              esquerda: é o desenho dos gateways de referência. */}
+          <div className="flex flex-wrap gap-3">
             <CampoSeguro
-              label="Validade (MM/AA)"
+              className="w-[8.5rem] shrink-0"
+              label="Validade"
               erro={erros.expirationDate}
               valido={validos.expirationDate}
               focado={focado === "expirationDate"}
@@ -481,7 +489,8 @@ export function CardForm({
             </CampoSeguro>
 
             <CampoSeguro
-              label={`Código de segurança${bandeira ? ` (${bandeira.cvvLength} dígitos)` : ""}`}
+              className="w-[7.5rem] shrink-0"
+              label={`CVV${bandeira ? ` · ${bandeira.cvvLength}` : ""}`}
               erro={erros.securityCode}
               valido={validos.securityCode}
               focado={focado === "securityCode"}
@@ -499,19 +508,38 @@ export function CardForm({
             </CampoSeguro>
           </div>
 
-          <CampoFlutuante
-            label="Nome impresso no cartão"
-            value={titular}
-            onChange={(e) => {
-              onTitularChange(e.target.value.replace(/[^\p{L} .'-]/gu, "").toUpperCase());
-              if (erros.titular) setErros((x) => ({ ...x, titular: undefined }));
-            }}
-            erro={erros.titular}
-            valido={titular.trim().length >= 3}
-            autoComplete="cc-name"
-            maxLength={60}
-            dica="Exatamente como está gravado no cartão."
-          />
+          {/* Nome e CPF na mesma linha: o nome ocupa o espaço que sobra e o CPF
+              fica na largura do dado. O CPF é o mesmo da identificação — o
+              emissor exige o do titular, então ele aparece aqui para conferência
+              em vez de ficar escondido dois passos acima. */}
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11.5rem]">
+            <CampoFlutuante
+              label="Nome impresso no cartão"
+              value={titular}
+              onChange={(e) => {
+                onTitularChange(e.target.value.replace(/[^\p{L} .'-]/gu, "").toUpperCase());
+                if (erros.titular) setErros((x) => ({ ...x, titular: undefined }));
+              }}
+              erro={erros.titular}
+              valido={titular.trim().length >= 3}
+              autoComplete="cc-name"
+              maxLength={60}
+              dica="Exatamente como está gravado no cartão."
+            />
+            <CampoFlutuante
+              label="CPF do titular"
+              value={cpf}
+              readOnly={!onCpfChange}
+              onChange={(e) => onCpfChange?.(formatCpf(e.target.value))}
+              valido={isValidCpf(cpf)}
+              erro={cpf.length > 0 && !isValidCpf(cpf) ? "Confira o CPF." : undefined}
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={14}
+              dica={onCpfChange ? "Titular do cartão." : "Informado na identificação."}
+              className={onCpfChange ? "" : "cursor-default opacity-80"}
+            />
+          </div>
 
           {/* ── parcelas ─────────────────────────────────────────── */}
           <div>
@@ -579,6 +607,8 @@ export function CardForm({
               ? "Processando…"
               : `Pagar ${formatBRL(parcelaAtual?.valorTotal ?? amount)} com segurança`}
           </button>
+
+          <SeloCompraSegura />
 
           <p className="flex items-start gap-2 text-[10px] font-light leading-relaxed text-asc-ink-inverse-muted">
             <Lock className="mt-px h-3 w-3 shrink-0" strokeWidth={1.5} />

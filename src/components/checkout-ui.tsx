@@ -1,5 +1,5 @@
 import { useRef, useState, type InputHTMLAttributes, type ReactNode } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Lock, ShieldCheck } from "lucide-react";
 
 /**
  * Peças visuais do checkout.
@@ -150,11 +150,13 @@ export function CampoSeguro({
           <span className="truncate">{label}</span>
           {selo}
         </span>
-        <div className="asc-secure-field h-[1.375rem] pr-6">{children}</div>
+        {/* A altura vem da regra .asc-secure-field no styles.css — utilitário
+            de altura aqui não vence aquela regra (ela mora fora das camadas). */}
+        <div className="asc-secure-field pr-6">{children}</div>
         {carregando && (
           <span
             aria-hidden
-            className="pointer-events-none absolute bottom-2.5 left-4 right-10 h-[1.375rem] animate-pulse rounded bg-asc-ink/10"
+            className="pointer-events-none absolute bottom-2.5 left-4 right-10 h-6 animate-pulse rounded bg-asc-ink/10"
           />
         )}
         {valido && !erro && (
@@ -310,6 +312,193 @@ export function CartaoEscolha({
         <span className="shrink-0 font-serif text-base tabular-nums text-asc-ink">{valor}</span>
       )}
     </button>
+  );
+}
+
+/* ─────────────────── abas de pagamento ─────────────────── */
+
+export type AbaPagamento = {
+  id: string;
+  icone: ReactNode;
+  titulo: string;
+  subtitulo: string;
+  /** Selo curto ao lado do título — "5% OFF". */
+  destaque?: string;
+  valor: string;
+};
+
+/**
+ * Escolha da forma de pagamento em abas lado a lado.
+ *
+ * Substitui os dois cartões soltos: aqui as opções dividem uma trilha só, e um
+ * indicador dourado desliza entre elas — a mesma gramática das abas do modal de
+ * conta. O indicador é uma camada absoluta que translada; animar `left` de dois
+ * fundos separados daria o salto que o desenho anterior tinha.
+ *
+ * O papel de `radiogroup` (e não `tablist`) é proposital: o cliente está
+ * escolhendo como pagar, não navegando entre painéis de conteúdo equivalentes.
+ */
+export function AbasPagamento({
+  abas,
+  ativa,
+  onChange,
+}: {
+  abas: AbaPagamento[];
+  ativa: string;
+  onChange: (id: string) => void;
+}) {
+  const indice = Math.max(
+    0,
+    abas.findIndex((a) => a.id === ativa),
+  );
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Forma de pagamento"
+      className="relative grid gap-2 rounded-2xl border border-asc-line bg-asc-ink/[0.03] p-1.5 sm:grid-cols-2 sm:gap-0"
+    >
+      {/* Indicador: só existe no desktop, onde as abas dividem uma linha. No
+          celular elas empilham e cada uma acende a própria borda. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-1.5 left-1.5 hidden rounded-xl border border-asc-gold bg-asc-gold/[0.09] shadow-[0_0_0_1px_var(--asc-gold)] transition-transform duration-asc ease-asc sm:block"
+        style={{
+          width: `calc((100% - 0.75rem) / ${abas.length})`,
+          transform: `translateX(calc(${indice} * 100%))`,
+        }}
+      />
+
+      {abas.map((a) => {
+        const selecionada = a.id === ativa;
+        return (
+          <button
+            key={a.id}
+            type="button"
+            role="radio"
+            aria-checked={selecionada}
+            onClick={() => onChange(a.id)}
+            // No desktop o fundo e a borda vêm do indicador que desliza; no
+            // celular, onde ele não existe, cada aba acende a própria moldura.
+            className={`relative z-10 flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-colors duration-asc ease-asc sm:border-transparent sm:bg-transparent ${
+              selecionada
+                ? "border-asc-gold bg-asc-gold/[0.09]"
+                : "border-transparent hover:bg-asc-ink/[0.05] sm:hover:bg-asc-ink/[0.04]"
+            }`}
+          >
+            <span
+              className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border transition-colors duration-asc ease-asc ${
+                selecionada ? "border-asc-gold text-asc-gold" : "border-asc-line text-asc-ink-muted"
+              }`}
+            >
+              {a.icone}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`text-sm transition-colors duration-asc ease-asc ${
+                    selecionada ? "text-asc-ink" : "text-asc-ink-inverse-muted"
+                  }`}
+                >
+                  {a.titulo}
+                </span>
+                {a.destaque && (
+                  <span className="rounded-full border border-asc-gold/50 px-2 py-0.5 text-[9px] tracking-luxe uppercase text-asc-gold">
+                    {a.destaque}
+                  </span>
+                )}
+              </span>
+              <span className="mt-0.5 block truncate text-[11px] font-light text-asc-ink-inverse-muted">
+                {a.subtitulo}
+              </span>
+            </span>
+            <span
+              className={`shrink-0 font-serif text-base tabular-nums transition-colors duration-asc ease-asc ${
+                selecionada ? "text-asc-ink" : "text-asc-ink-inverse-muted"
+              }`}
+            >
+              {a.valor}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Troca de painel com respiro: o conteúdo antigo sai e o novo entra com um
+ * fade curto. A `key` é o que faz o React remontar — sem ela a animação só
+ * rodaria na primeira montagem, e alternar as abas seria um corte seco.
+ */
+export function PainelPagamento({ chave, children }: { chave: string; children: ReactNode }) {
+  return (
+    <div key={chave} className="animate-in fade-in slide-in-from-bottom-1 duration-300">
+      {children}
+    </div>
+  );
+}
+
+/* ─────────────────── selo de compra segura ─────────────────── */
+
+/**
+ * Bandeiras em traço monocromático.
+ *
+ * Desenhadas aqui, e não baixadas: os logos oficiais são marcas registradas com
+ * regras próprias de uso e cor, e o pedido era justamente o contrário disso —
+ * uma citação discreta, em cinza, que não puxe o olho do botão de pagar. São
+ * silhuetas reconhecíveis (o duplo círculo do Mastercard, a caixa da Amex), não
+ * reproduções.
+ */
+function MarcasAceitas({ className = "" }: { className?: string }) {
+  const caixa =
+    "flex h-6 items-center justify-center rounded-[3px] border border-current px-1.5 text-[8px] font-semibold tracking-[0.12em] uppercase";
+  return (
+    <div
+      aria-label="Bandeiras aceitas: Visa, Mastercard, American Express — processadas pelo Mercado Pago"
+      className={`flex flex-wrap items-center gap-2 text-asc-ink-inverse-muted/45 ${className}`}
+    >
+      <span className={caixa}>Visa</span>
+      <span className="flex h-6 items-center gap-1 rounded-[3px] border border-current px-1.5">
+        <svg viewBox="0 0 26 16" aria-hidden className="h-3 w-[1.3rem]">
+          <circle cx="10" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.2" />
+          <circle cx="16" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.2" />
+        </svg>
+      </span>
+      <span className={caixa}>Amex</span>
+      <span className="ml-1 flex h-6 items-center gap-1.5 rounded-[3px] border border-current px-2 text-[8px] tracking-[0.12em] uppercase">
+        <ShieldCheck className="h-3 w-3" strokeWidth={1.5} aria-hidden />
+        Mercado Pago
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Bloco de compra segura, logo abaixo do botão de pagar.
+ *
+ * Discreto de propósito: cadeado fino, texto em corpo pequeno e as bandeiras em
+ * cinza. Um selo de segurança gritante tem o efeito contrário do pretendido —
+ * lembra o cliente do risco em vez de encerrar o assunto.
+ */
+export function SeloCompraSegura({ className = "" }: { className?: string }) {
+  return (
+    <section
+      aria-label="Compra segura"
+      className={`rounded-xl border border-asc-line bg-asc-ink/[0.03] px-4 py-4 ${className}`}
+    >
+      <p className="flex items-start gap-2.5 text-[11px] font-light leading-relaxed text-asc-ink-inverse-muted">
+        <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-asc-gold" strokeWidth={1.5} />
+        <span>
+          <span className="mb-0.5 block text-[10px] tracking-luxe uppercase text-asc-gold">
+            Compra segura
+          </span>
+          Pagamento processado e 100% protegido pelo Mercado Pago. Seus dados são criptografados e a
+          sua compra possui garantia total.
+        </span>
+      </p>
+      <MarcasAceitas className="mt-3.5 pl-6" />
+    </section>
   );
 }
 

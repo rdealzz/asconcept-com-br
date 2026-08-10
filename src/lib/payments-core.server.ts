@@ -1,5 +1,6 @@
 // Lógica server-only do checkout Mercado Pago.
 import { AVAILABLE_COUPONS, calcDiscount } from "@/lib/coupons";
+import { pixExpirationDate } from "@/lib/mercadopago";
 import { quoteShipping } from "@/lib/shipping";
 import {
   cardErrorMessage,
@@ -405,6 +406,8 @@ export async function createPixCore(
     description: `A&S Conccept · Pedido ${order.order_number}`,
     payment_method_id: "pix",
     external_reference: order.order_number,
+    // Sem isto a cobrança vale 24h e o contador da tela vira ficção.
+    date_of_expiration: pixExpirationDate(),
     payer: {
       email: order.customer_email,
       first_name: firstName || undefined,
@@ -419,8 +422,24 @@ export async function createPixCore(
   try {
     payment = await mpCreatePayment(body, `${order.order_number}-pix`);
   } catch (e) {
-    console.error("[mp] pix error", e);
-    return { error: e instanceof Error ? e.message : "Falha ao gerar cobrança Pix." };
+    // A janela de 15 minutos é uma escolha da loja, não um requisito do
+    // pagamento. Se a conta do Mercado Pago recusar esse prazo, vale mais uma
+    // cobrança com a validade padrão do que um Pix que não nasce — a única
+    // forma de pagar sem cartão ficaria fora do ar.
+    const msg = e instanceof Error ? e.message : "";
+    if (/expiration/i.test(msg)) {
+      console.warn("[mp] pix: prazo de expiração recusado, refazendo com o padrão", msg);
+      delete body.date_of_expiration;
+      try {
+        payment = await mpCreatePayment(body, `${order.order_number}-pix-sem-prazo`);
+      } catch (e2) {
+        console.error("[mp] pix error", e2);
+        return { error: e2 instanceof Error ? e2.message : "Falha ao gerar cobrança Pix." };
+      }
+    } else {
+      console.error("[mp] pix error", e);
+      return { error: msg || "Falha ao gerar cobrança Pix." };
+    }
   }
 
   await persistPayment(order.order_number, payment, "Aguardando Pagamento");

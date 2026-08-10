@@ -21,7 +21,7 @@ import {
   getPaymentStatus,
   payWithCardToken,
 } from "@/lib/payments.functions";
-import { formatCpf, isValidCpf } from "@/lib/mercadopago";
+import { formatCpf, isValidCpf, PIX_EXPIRATION_MINUTES } from "@/lib/mercadopago";
 import { CardForm, type CardBrandInfo, type CardFormData } from "@/components/CardForm";
 import { InstallmentsBadge, InstallmentsTable } from "@/components/InstallmentsNote";
 import { PixPanel, type PixCharge } from "@/components/PixPanel";
@@ -29,11 +29,14 @@ import { quoteShipping, formatCep, normalizeCep } from "@/lib/shipping";
 import { ContactStrip } from "@/components/ContactStrip";
 import { Wordmark } from "@/components/Wordmark";
 import {
+  AbasPagamento,
   CampoFlutuante,
   CartaoEscolha,
   CartaoMockup,
+  PainelPagamento,
   PainelVidro,
   PassoCheckout,
+  SeloCompraSegura,
   SelosConfianca,
 } from "@/components/checkout-ui";
 
@@ -667,29 +670,31 @@ function CheckoutPage() {
 
                 <PassoCheckout numero={4} titulo="Pagamento" aberto={step === 4} concluido={false}>
                   {PIX_ENABLED && (
-                    <div className="mb-6 grid gap-3 sm:grid-cols-2">
-                      <CartaoEscolha
-                        ativo={method === "card"}
-                        onClick={() => setMethod("card")}
-                        icone={<CreditCard className="h-4 w-4" strokeWidth={1.5} />}
-                        titulo="Cartão de crédito"
-                        subtitulo="Até 3× sem juros"
-                        valor={formatBRL(totalCard)}
-                      />
-                      <CartaoEscolha
-                        ativo={method === "pix"}
-                        onClick={() => setMethod("pix")}
-                        icone={<QrCode className="h-4 w-4" strokeWidth={1.5} />}
-                        titulo="Pix"
-                        destaque="5% off"
-                        subtitulo="Aprovação imediata"
-                        valor={formatBRL(totalPix)}
-                      />
-                    </div>
+                    <AbasPagamento
+                      ativa={method}
+                      onChange={(id) => setMethod(id as PayMethod)}
+                      abas={[
+                        {
+                          id: "pix",
+                          icone: <QrCode className="h-4 w-4" strokeWidth={1.5} />,
+                          titulo: "Pix",
+                          destaque: "5% off",
+                          subtitulo: "Aprovação imediata",
+                          valor: formatBRL(totalPix),
+                        },
+                        {
+                          id: "card",
+                          icone: <CreditCard className="h-4 w-4" strokeWidth={1.5} />,
+                          titulo: "Cartão de crédito",
+                          subtitulo: "Até 3× sem juros",
+                          valor: formatBRL(totalCard),
+                        },
+                      ]}
+                    />
                   )}
 
                   {method === "card" ? (
-                    <div className="animate-in fade-in duration-300">
+                    <PainelPagamento chave="card">
                       <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
                         <div className="order-2 lg:order-1">
                           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -732,9 +737,9 @@ function CheckoutPage() {
                           Processando pagamento…
                         </p>
                       )}
-                    </div>
+                    </PainelPagamento>
                   ) : (
-                    <div className="animate-in fade-in duration-300">
+                    <PainelPagamento chave="pix">
                       <div className="rounded-xl border border-asc-gold/30 bg-asc-gold/[0.06] p-5">
                         <p className="flex items-center gap-2 text-[10px] tracking-luxe uppercase text-asc-gold">
                           <QrCode className="h-3.5 w-3.5" strokeWidth={1.5} /> Pix · 5% de desconto
@@ -746,6 +751,9 @@ function CheckoutPage() {
                         <p className="mt-4 font-serif text-3xl tabular-nums text-asc-ink">
                           {formatBRL(totalPix)}
                         </p>
+                        <p className="mt-2 text-[11px] font-light text-asc-ink-inverse-muted">
+                          O QR Code gerado vale por {PIX_EXPIRATION_MINUTES} minutos.
+                        </p>
                       </div>
                       <button
                         onClick={onPixSubmit}
@@ -755,7 +763,9 @@ function CheckoutPage() {
                         {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                         {submitting ? "Gerando QR Code…" : "Gerar QR Code Pix"}
                       </button>
-                    </div>
+
+                      <SeloCompraSegura className="mt-6" />
+                    </PainelPagamento>
                   )}
                 </PassoCheckout>
 
