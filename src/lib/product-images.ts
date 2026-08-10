@@ -140,11 +140,13 @@ export async function uploadProductPhoto(file: File): Promise<string> {
   const img = await loadImage(await readAsDataUrl(file));
   const folder = crypto.randomUUID();
 
-  const longEdge = Math.max(img.width, img.height);
-  // Não faz sentido gerar uma largura acima do original — sairia borrada e
-  // maior. A canônica sempre entra, mesmo que a foto seja pequena, senão não
-  // haveria o que gravar no banco.
-  const widths = IMAGE_WIDTHS.filter((w) => w <= longEdge || w === CANONICAL_WIDTH);
+  // Todas as larguras sempre sobem. Pular a maior quando a foto original é
+  // menor deixava `1600.webp` inexistente — e tanto o `srcset` quanto o zoom da
+  // página do produto pedem exatamente esse arquivo, então a peça aparecia
+  // quebrada em tela retina. `encodeVariant` nunca amplia (escala <= 1), logo a
+  // variante "1600" de uma foto de 1400px é só a própria foto: o nome é um
+  // rótulo de slot, não uma promessa de pixels.
+  const widths = IMAGE_WIDTHS;
 
   let canonicalPath: string | null = null;
 
