@@ -68,12 +68,12 @@ async function migrarFoto(dataUrl: string): Promise<string> {
   let caminhoCanonico: string | null = null;
 
   for (const width of WIDTHS) {
-    // Mesma regra do envio pelo painel: nada de esticar a foto além do
-    // original, mas a canônica sempre existe — é ela que vai para o banco.
-    if (width > ladoMaior && width !== CANONICAL) continue;
-
+    // Todas as larguras sempre sobem, mesmo acima do original: o `srcset` e o
+    // zoom pedem os três arquivos pelo nome, e faltar um deixa a foto quebrada.
+    // `withoutEnlargement` garante que nada é esticado — o arquivo "1600" de
+    // uma foto de 1400px é a própria foto.
     const webp = await sharp(original)
-      .resize({ width, height: width, fit: "inside", withoutEnlargement: width !== CANONICAL })
+      .resize({ width, height: width, fit: "inside", withoutEnlargement: true })
       .webp({ quality: 82 })
       .toBuffer();
 
