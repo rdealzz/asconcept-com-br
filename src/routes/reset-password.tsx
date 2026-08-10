@@ -2,6 +2,8 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Wordmark } from "@/components/Wordmark";
+import { PasswordStrength } from "@/components/PasswordStrength";
+import { PASSWORD_MIN_LENGTH, isStrongPassword } from "@/lib/password-strength";
 
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
@@ -18,6 +20,7 @@ function ResetPasswordPage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const forte = isStrongPassword(password);
 
   useEffect(() => {
     const hash = typeof window !== "undefined" ? window.location.hash : "";
@@ -32,7 +35,9 @@ function ResetPasswordPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (password.length < 6) return setError("A senha deve ter ao menos 6 caracteres.");
+    // Mesma régua do cadastro: não faz sentido exigir senha forte para criar a
+    // conta e aceitar qualquer coisa na recuperação.
+    if (!forte) return setError("A senha precisa cumprir todos os requisitos abaixo.");
     if (password !== confirm) return setError("As senhas não coincidem.");
     setLoading(true);
     const { error } = await supabase.auth.updateUser({ password });
@@ -71,11 +76,13 @@ function ResetPasswordPage() {
               <input
                 type="password"
                 required
-                minLength={6}
+                minLength={PASSWORD_MIN_LENGTH}
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent"
               />
+              <PasswordStrength value={password} />
             </label>
             <label className="block">
               <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
@@ -84,7 +91,8 @@ function ResetPasswordPage() {
               <input
                 type="password"
                 required
-                minLength={6}
+                minLength={PASSWORD_MIN_LENGTH}
+                autoComplete="new-password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 className="mt-1 w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent"
@@ -93,8 +101,8 @@ function ResetPasswordPage() {
             {error && <p className="text-xs text-destructive">{error}</p>}
             <button
               type="submit"
-              disabled={loading}
-              className="w-full asc-btn-primary py-4 text-[11px] tracking-luxe uppercase disabled:opacity-50"
+              disabled={loading || !forte}
+              className="w-full asc-btn-primary py-4 text-[11px] tracking-luxe uppercase disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Salvando…" : "Salvar nova senha"}
             </button>

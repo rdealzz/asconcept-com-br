@@ -266,6 +266,7 @@ export type Database = {
           gallery: Json
           id: string
           image: string | null
+          is_featured: boolean
           long_description: string | null
           name: string
           price: number
@@ -281,6 +282,7 @@ export type Database = {
           gallery?: Json
           id?: string
           image?: string | null
+          is_featured?: boolean
           long_description?: string | null
           name: string
           price?: number
@@ -296,6 +298,7 @@ export type Database = {
           gallery?: Json
           id?: string
           image?: string | null
+          is_featured?: boolean
           long_description?: string | null
           name?: string
           price?: number

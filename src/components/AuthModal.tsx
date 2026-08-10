@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Eye, EyeOff, Lock, Mail, Phone, User, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { travarRolagem, destravarRolagem } from "@/lib/smooth-scroll";
+import { PasswordStrength } from "@/components/PasswordStrength";
+import { PASSWORD_MIN_LENGTH, evaluatePassword } from "@/lib/password-strength";
 
 /**
  * AuthModal — entrar / criar conta / recuperar senha.
@@ -152,10 +154,19 @@ export function AuthModal() {
   const passwordsMismatch =
     mode === "signup" && confirmPassword.length > 0 && confirmPassword !== password;
 
+  // A régua de força só vale no cadastro: quem já tem conta entra com a senha
+  // que tinha, mesmo que ela seja anterior a estas regras.
+  const senhaForte = evaluatePassword(password).isStrong;
+  const senhaFraca = mode === "signup" && !senhaForte;
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setInfo(null);
+    if (mode === "signup" && !senhaForte) {
+      setError("A senha precisa cumprir todos os requisitos abaixo.");
+      return;
+    }
     if (mode === "signup" && password !== confirmPassword) {
       setError("As senhas não coincidem.");
       return;
@@ -366,9 +377,12 @@ export function AuthModal() {
                 id="auth-senha"
                 type={showPassword ? "text" : "password"}
                 required
-                minLength={mode === "signup" ? 6 : 4}
+                minLength={mode === "signup" ? PASSWORD_MIN_LENGTH : 4}
+                aria-describedby={mode === "signup" ? "auth-senha-requisitos" : undefined}
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
-                placeholder={mode === "signup" ? "Mínimo de 6 caracteres" : "••••••••"}
+                placeholder={
+                  mode === "signup" ? `Mínimo de ${PASSWORD_MIN_LENGTH} caracteres` : "••••••••"
+                }
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={entradaCls}
@@ -386,6 +400,11 @@ export function AuthModal() {
                 )}
               </button>
             </CampoAuth>
+            {mode === "signup" && (
+              <div id="auth-senha-requisitos">
+                <PasswordStrength value={password} />
+              </div>
+            )}
           </div>
         )}
 
@@ -439,9 +458,17 @@ export function AuthModal() {
           </p>
         )}
 
+        {/* O botão só acende com a senha Forte — daí o aviso, para que o
+            desabilitado não pareça um defeito da tela. */}
+        {senhaFraca && password.length > 0 && (
+          <p className="text-[11px] font-light text-asc-ink-inverse-muted">
+            Complete os requisitos acima para liberar a criação da conta.
+          </p>
+        )}
+
         <button
           type="submit"
-          disabled={loading || passwordsMismatch}
+          disabled={loading || passwordsMismatch || senhaFraca}
           className="asc-btn-gold mt-2 w-full py-4 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading

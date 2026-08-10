@@ -26,10 +26,18 @@ import {
   Settings,
   MapPin,
   Package,
+  Star,
 } from "lucide-react";
 import { useOrders } from "@/lib/orders-context";
 import { isPrePaymentStatus, type Order, type OrderStatus } from "@/lib/types";
 import { useCart, formatBRL, type Product, type ProductCategory } from "@/lib/cart-context";
+import {
+  PRODUCT_CATEGORIES,
+  CATEGORY_LABELS,
+  categoryCopy,
+  categoryLabel,
+  coerceCategory,
+} from "@/lib/categories";
 import { useAuth } from "@/lib/auth-context";
 import {
   useCatalog,
@@ -259,7 +267,7 @@ function Nav({
 }) {
   const { open, count } = useCart();
   const { user, openAuth } = useAuth();
-  const { open: openSearch } = useSearch();
+  const { open: openSearch, setTab } = useSearch();
   const isAdmin = useIsAdmin();
   const isDevMaster = !!user?.isAdmin;
   const [scrolled, setScrolled] = useState(false);
@@ -307,8 +315,25 @@ function Nav({
               do cabeçalho fixo e, no caso da barra de abas (sticky), nem
               chegava a sair do lugar. */}
           <nav className="hidden items-center gap-9 md:flex">
-            <button onClick={() => scrollToSection("produtos")} className={navLink}>
+            <button
+              onClick={() => {
+                setTab("clothes");
+                scrollToSection("produtos");
+              }}
+              className={navLink}
+            >
               Coleção
+            </button>
+            {/* Acessórios leva à mesma vitrine, já filtrada — é uma categoria
+                do catálogo, não uma rota nova. */}
+            <button
+              onClick={() => {
+                setTab("acessorios");
+                scrollToSection("produtos");
+              }}
+              className={navLink}
+            >
+              {CATEGORY_LABELS.acessorios}
             </button>
             <button onClick={() => scrollToSection("edit")} className={navLink}>
               O Editorial
@@ -438,24 +463,18 @@ function MobileMenu({
 
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-6 py-8">
           <p className="mb-3 text-[10px] tracking-luxe uppercase text-muted-foreground">Coleção</p>
-          <button
-            onClick={() => {
-              setTab("clothes");
-              goTo("produtos");
-            }}
-            className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
-          >
-            Roupas
-          </button>
-          <button
-            onClick={() => {
-              setTab("sneakers");
-              goTo("produtos");
-            }}
-            className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
-          >
-            Sneakers
-          </button>
+          {PRODUCT_CATEGORIES.map((c) => (
+            <button
+              key={c}
+              onClick={() => {
+                setTab(c);
+                goTo("produtos");
+              }}
+              className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
+            >
+              {CATEGORY_LABELS[c]}
+            </button>
+          ))}
           <button
             onClick={() => {
               onClose();
@@ -629,7 +648,7 @@ function CategoryTabs() {
       className="sticky top-[68px] z-40 border-y border-border bg-background/95 backdrop-blur"
     >
       <div className="mx-auto flex max-w-[1600px] items-center justify-center gap-2 px-6 py-4 md:gap-8 md:px-12">
-        {(["clothes", "sneakers"] as ProductCategory[]).map((c) => (
+        {PRODUCT_CATEGORIES.map((c) => (
           <button
             key={c}
             // Trocar a aba também leva o cliente até as peças. Antes o conteúdo
@@ -642,7 +661,7 @@ function CategoryTabs() {
               tab === c ? "text-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {c === "clothes" ? "Roupas" : "Sneakers"}
+            {CATEGORY_LABELS[c]}
             {tab === c && <span className="absolute inset-x-2 -bottom-[1px] h-[2px] bg-accent" />}
           </button>
         ))}
@@ -653,31 +672,70 @@ function CategoryTabs() {
 
 /* ---------- Vitrine giratória ---------- */
 /**
- * O palco da aba ativa: as peças com estoque, apresentadas uma a uma no
+ * O palco da aba ativa: só as peças que o admin marcou como destaque, no
  * desenho de landing — peça girável no centro, informação de um lado, cartões
- * de vidro do outro. Some quando não há o que mostrar.
+ * de vidro do outro.
+ *
+ * A curadoria é manual de propósito: antes a vitrine pegava as oito primeiras
+ * peças com estoque, o que fazia a abertura da home mudar sozinha a cada
+ * cadastro. Peça esgotada continua fora — destacar não repõe estoque.
  */
 function ShowroomBand() {
   const { tab } = useSearch();
-  const { products, stock } = useCatalog();
+  const { products, stock, loading } = useCatalog();
+  const isAdmin = useIsAdmin();
 
   const destaques = useMemo(
     () =>
       products
-        .filter((p) => (p.category ?? "clothes") === tab)
+        .filter((p) => coerceCategory(p.category) === tab)
+        .filter((p) => p.isFeatured === true)
         .filter((p) => totalStock(stock[p.id]) > 0)
         .slice(0, 8),
     [products, stock, tab],
   );
 
-  if (destaques.length === 0) return null;
+  // Enquanto o catálogo chega, nada de anunciar vitrine vazia.
+  if (loading) return null;
 
+  if (destaques.length === 0) return <VitrineSemCuradoria isAdmin={isAdmin} />;
+
+  const copy = categoryCopy(tab);
   return (
-    <Showroom
-      products={destaques}
-      eyebrow={tab === "clothes" ? "Em exibição · Roupas" : "Em exibição · Sneakers"}
-      sideTitle={tab === "clothes" ? ["Herança", "que se veste"] : ["Cadência", "contemporânea"]}
-    />
+    <Showroom products={destaques} eyebrow={copy.showroomEyebrow} sideTitle={copy.showroomTitle} />
+  );
+}
+
+/**
+ * O lugar da vitrine quando o admin ainda não escolheu nenhuma peça.
+ * Mantém a moldura escura da seção — a home não perde o ritmo por falta de
+ * curadoria — e, para o admin, diz onde se marca um destaque.
+ */
+function VitrineSemCuradoria({ isAdmin }: { isAdmin: boolean }) {
+  return (
+    <section
+      aria-label="Vitrine de destaques"
+      className="asc-on-dark relative isolate mt-3 overflow-hidden rounded-[2rem] bg-asc-bg-dark px-6 py-24 text-center sm:px-10"
+    >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-16 top-0 h-px bg-gradient-to-r from-transparent via-asc-gold/60 to-transparent"
+      />
+      <Eyebrow tone="light" className="mb-5">
+        Curadoria
+      </Eyebrow>
+      <p
+        className="mx-auto font-display font-light leading-[0.95] text-asc-ink"
+        style={{ fontSize: "clamp(2rem, 4vw, 3.5rem)" }}
+      >
+        Nova curadoria <span className="italic text-asc-gold-soft">em breve.</span>
+      </p>
+      <p className="mx-auto mt-6 max-w-sm text-sm font-light leading-relaxed text-asc-ink-inverse-muted">
+        {isAdmin
+          ? "Nenhuma peça em destaque nesta categoria. Marque uma no Painel Admin · Produtos, em “Destacar na Vitrine”."
+          : "As próximas peças escolhidas pelo ateliê aparecem aqui. Enquanto isso, percorra a coleção completa abaixo."}
+      </p>
+    </section>
   );
 }
 
@@ -708,9 +766,11 @@ function Products() {
   const { openCreate } = useProduct();
   const isAdmin = useIsAdmin();
 
+  const copy = categoryCopy(tab);
+
   const base = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let inTab = products.filter((p) => (p.category ?? "clothes") === tab);
+    let inTab = products.filter((p) => coerceCategory(p.category) === tab);
     // Produtos sem estoque em nenhum tamanho somem da vitrine pública,
     // mas continuam visíveis para o admin (para repor estoque ou excluir).
     if (!isAdmin) {
@@ -739,18 +799,14 @@ function Products() {
     >
       <div className="relative z-10 mx-auto max-w-[1600px] px-6 md:px-12">
         <div className="mb-10 flex flex-col items-center text-center md:mb-14">
-          <Eyebrow className="mb-3">{tab === "clothes" ? "A Coleção" : "Sneakers"}</Eyebrow>
+          <Eyebrow className="mb-3">{copy.eyebrow}</Eyebrow>
           {/* Entrelinha curta: o serif em corpo grande abre demais no padrão e
               era o que empurrava as duas linhas do título para longe uma da outra. */}
           <h2 className="font-serif text-3xl leading-[1.08] md:text-5xl">
-            <StackedLines
-              lines={tab === "clothes" ? ["Essenciais com", "Propósito"] : ["A Nova", "Cadência"]}
-            />
+            <StackedLines lines={copy.lines} />
           </h2>
           <p className="mt-4 max-w-xl text-sm md:text-base text-muted-foreground font-light">
-            {tab === "clothes"
-              ? "Peças atemporais, produzidas em pequenas séries por ateliês tradicionais europeus."
-              : "Silhuetas contemporâneas, montadas artesanalmente em couros nobres."}
+            {copy.blurb}
           </p>
 
           {query && (
@@ -841,7 +897,7 @@ function Products() {
               </p>
             </div>
           ) : (
-            <EmptyCategoryState categoryName={tab === "clothes" ? "A Coleção" : "Sneakers"} />
+            <EmptyCategoryState categoryName={copy.eyebrow} />
           )
         ) : (
           <div className="grid grid-cols-2 gap-x-6 gap-y-14 md:grid-cols-3 md:gap-x-8 md:gap-y-20 lg:grid-cols-4">
@@ -1181,7 +1237,7 @@ function AdminEditModal() {
         gallery: gal,
         stock: coerceSizeStock(stock[product.id]),
         forceLastItem: product.forceLastItem === true,
-        category: (product.category ?? "clothes") as ProductCategory,
+        category: coerceCategory(product.category),
       });
     }
   }, [editingId, product, stock, isCreate, creatingCategory, tab]);
@@ -1409,8 +1465,8 @@ function AdminEditModal() {
 
             <div className="space-y-4">
               <Field label="Categoria">
-                <div className="flex gap-2">
-                  {(["clothes", "sneakers"] as ProductCategory[]).map((c) => (
+                <div className="flex flex-wrap gap-2">
+                  {PRODUCT_CATEGORIES.map((c) => (
                     <button
                       key={c}
                       type="button"
@@ -1421,7 +1477,7 @@ function AdminEditModal() {
                           : "border-border hover:border-foreground"
                       }`}
                     >
-                      {c === "clothes" ? "Roupas" : "Sneakers"}
+                      {CATEGORY_LABELS[c]}
                     </button>
                   ))}
                 </div>
@@ -2026,13 +2082,34 @@ const SUB_OPTIONS: { id: SubFilter; label: string }[] = [
 ];
 
 function FilterSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { subFilter, setSubFilter, setTab } = useSearch();
-  const select = (id: SubFilter) => {
-    setTab("clothes");
-    setSubFilter(id);
+  const { subFilter, setSubFilter, tab, setTab } = useSearch();
+
+  const irParaVitrine = () => {
     onClose();
     setTimeout(() => scrollToSection("produtos"), 120);
   };
+
+  // Categoria é a divisão principal do catálogo; o refino por tipo de peça só
+  // existe dentro de Roupas — trocar de categoria zera o refino, senão o
+  // cliente sairia de "Calça" para Acessórios com um filtro invisível ligado.
+  const selectCategory = (c: ProductCategory) => {
+    setTab(c);
+    setSubFilter("todos");
+    irParaVitrine();
+  };
+
+  const select = (id: SubFilter) => {
+    setTab("clothes");
+    setSubFilter(id);
+    irParaVitrine();
+  };
+
+  const itemCls = (active: boolean) =>
+    `flex w-full items-center justify-between border-l-2 px-4 py-3 text-left text-sm transition-colors ${
+      active
+        ? "border-accent bg-accent/10 text-foreground"
+        : "border-transparent text-muted-foreground hover:border-border hover:bg-secondary/50 hover:text-foreground"
+    }`;
   return (
     <>
       <div
@@ -2056,18 +2133,28 @@ function FilterSidebar({ open, onClose }: { open: boolean; onClose: () => void }
           </button>
         </div>
         <nav className="flex-1 overflow-y-auto px-2 py-4">
-          {SUB_OPTIONS.map((o) => {
-            const active = subFilter === o.id;
+          <p className="px-4 pb-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
+            Categorias
+          </p>
+          {PRODUCT_CATEGORIES.map((c) => {
+            const active = tab === c;
             return (
-              <button
-                key={o.id}
-                onClick={() => select(o.id)}
-                className={`flex w-full items-center justify-between border-l-2 px-4 py-3 text-left text-sm transition-colors ${
-                  active
-                    ? "border-accent bg-accent/10 text-foreground"
-                    : "border-transparent text-muted-foreground hover:border-border hover:bg-secondary/50 hover:text-foreground"
-                }`}
-              >
+              <button key={c} onClick={() => selectCategory(c)} className={itemCls(active)}>
+                <span className="font-serif text-base">{CATEGORY_LABELS[c]}</span>
+                {active && (
+                  <span className="text-[10px] tracking-luxe uppercase text-accent">Ativo</span>
+                )}
+              </button>
+            );
+          })}
+
+          <p className="mt-6 px-4 pb-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
+            Refinar Roupas
+          </p>
+          {SUB_OPTIONS.map((o) => {
+            const active = tab === "clothes" && subFilter === o.id;
+            return (
+              <button key={o.id} onClick={() => select(o.id)} className={itemCls(active)}>
                 <span className="font-serif text-base">{o.label}</span>
                 {active && (
                   <span className="text-[10px] tracking-luxe uppercase text-accent">Ativo</span>
@@ -2077,7 +2164,7 @@ function FilterSidebar({ open, onClose }: { open: boolean; onClose: () => void }
           })}
         </nav>
         <p className="border-t border-border px-6 py-4 text-[10px] leading-relaxed text-muted-foreground">
-          Selecione uma categoria para refinar a vitrine de Roupas.
+          Escolha uma categoria do catálogo ou refine a vitrine de Roupas por tipo de peça.
         </p>
       </aside>
     </>
@@ -2457,7 +2544,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
   const { user, listCustomers, refreshCustomers } = useAuth();
   const { orders, updateStatus, createOrder, refresh: refreshOrders } = useOrders();
   const { products } = useCatalog();
-  const [tab, setTab] = useState<"calc" | "pedidos" | "clientes">("pedidos");
+  const [tab, setTab] = useState<"calc" | "pedidos" | "clientes" | "produtos">("pedidos");
   const [newsletter, setNewsletter] = useState<NewsletterRow[]>([]);
   const [manual, setManual] = useState<ManualCustomerRow[]>([]);
   const [showManualOrder, setShowManualOrder] = useState(false);
@@ -2536,10 +2623,13 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
 
   const customers = listCustomers();
 
+  const featuredCount = products.filter((p) => p.isFeatured).length;
+
   const tabs = [
     { id: "calc" as const, label: "Calculadora" },
     { id: "pedidos" as const, label: `Pedidos (${orders.length})` },
     { id: "clientes" as const, label: `Clientes (${customers.length + manual.length})` },
+    { id: "produtos" as const, label: `Produtos (${products.length})` },
   ];
 
   return (
@@ -2681,6 +2771,8 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                 )}
               </>
             )}
+
+            {tab === "produtos" && <ProdutosAdmin featuredCount={featuredCount} />}
 
             {tab === "clientes" && (
               <div className="space-y-10">
@@ -2846,6 +2938,144 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
         busy={deleting}
       />
     </>
+  );
+}
+
+/* ---------- Admin · Produtos (curadoria da vitrine) ---------- */
+/**
+ * Lista de gestão de produtos do painel.
+ *
+ * O que ela faz de novo é a curadoria: "Destacar na Vitrine" liga o
+ * `is_featured` da peça, e a vitrine giratória da home passa a mostrar
+ * exatamente as peças marcadas. O botão só existe aqui dentro — o painel só
+ * abre para admin — e a RLS de `products` recusa o UPDATE de qualquer outro,
+ * então esconder o botão é conveniência, não a tranca.
+ */
+function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
+  const { products, stock, setFeatured } = useCatalog();
+  const { openEdit } = useProduct();
+  const isAdmin = useIsAdmin();
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState<string | null>(null);
+
+  if (!isAdmin) return null;
+
+  const alternar = async (p: Product) => {
+    setErro(null);
+    setSalvando(p.id);
+    const msg = await setFeatured(p.id, p.isFeatured !== true);
+    setSalvando(null);
+    if (msg) setErro(msg);
+  };
+
+  return (
+    <div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+          {products.length} peças cadastradas · {featuredCount} em destaque
+        </p>
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          As peças destacadas abrem a home. Sem nenhuma, a vitrine exibe “Nova curadoria em breve”.
+        </p>
+      </div>
+
+      {erro && (
+        <p className="mb-4 border border-destructive/50 bg-destructive/10 px-4 py-3 text-xs text-destructive">
+          {erro}
+        </p>
+      )}
+
+      {products.length === 0 ? (
+        <p className="border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
+          Nenhum produto cadastrado. Adicione o primeiro pela vitrine.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-[10px] tracking-luxe uppercase text-muted-foreground">
+                <th className="py-3 pr-3">Peça</th>
+                <th className="py-3 pr-3">Categoria</th>
+                <th className="py-3 pr-3 text-right">Preço</th>
+                <th className="py-3 pr-3 text-right">Estoque</th>
+                <th className="py-3 pr-3 text-right">Vitrine</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((p) => {
+                const destacada = p.isFeatured === true;
+                const total = totalStock(stock[p.id]);
+                return (
+                  <tr key={p.id} className="border-b border-border/50 align-middle">
+                    <td className="py-3 pr-3">
+                      <button
+                        onClick={() => openEdit(p.id)}
+                        className="flex items-center gap-3 text-left transition-colors hover:text-accent"
+                        title="Editar peça"
+                      >
+                        {p.image && (
+                          <img
+                            src={productImageSrc(p.image, 480)}
+                            alt=""
+                            aria-hidden
+                            loading="lazy"
+                            decoding="async"
+                            className="h-12 w-9 flex-none border border-border/60 object-cover"
+                          />
+                        )}
+                        <span className="font-serif leading-tight">{p.name}</span>
+                      </button>
+                    </td>
+                    <td className="py-3 pr-3 text-[11px] text-muted-foreground">
+                      {categoryLabel(p.category)}
+                    </td>
+                    <td className="py-3 pr-3 text-right font-serif tabular-nums">
+                      {formatBRL(p.price)}
+                    </td>
+                    <td className="py-3 pr-3 text-right tabular-nums">
+                      {total === 0 ? (
+                        <span className="text-destructive">Esgotado</span>
+                      ) : (
+                        `${total} un.`
+                      )}
+                    </td>
+                    <td className="py-3 pr-3 text-right">
+                      <button
+                        onClick={() => void alternar(p)}
+                        disabled={salvando === p.id}
+                        aria-pressed={destacada}
+                        title={
+                          destacada
+                            ? "Remover da vitrine de destaques"
+                            : "Destacar na vitrine da home"
+                        }
+                        className={`inline-flex items-center gap-2 whitespace-nowrap border px-3 py-1.5 text-[10px] tracking-luxe uppercase transition-colors disabled:opacity-50 ${
+                          destacada
+                            ? "border-accent bg-accent text-asc-ink hover:bg-accent/90"
+                            : "border-border text-muted-foreground hover:border-accent hover:text-accent"
+                        }`}
+                      >
+                        <Star
+                          className="h-3.5 w-3.5"
+                          strokeWidth={1.5}
+                          fill={destacada ? "currentColor" : "none"}
+                        />
+                        {destacada ? "Em destaque" : "Destacar na Vitrine"}
+                      </button>
+                      {destacada && total === 0 && (
+                        <p className="mt-1 text-[9px] leading-tight text-muted-foreground">
+                          Sem estoque · não aparece na vitrine
+                        </p>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 

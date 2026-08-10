@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Product, ProductCategory } from "@/lib/cart-context";
+import type { Product } from "@/lib/cart-context";
+import { coerceCategory } from "@/lib/categories";
 
 /**
  * Catálogo (Supabase) — extraído de routes/index.tsx para que outras rotas
@@ -29,7 +30,26 @@ type ProductInput = Omit<Product, "id">;
  * chegam depois, sob demanda, por `loadGallery`.
  */
 export const LIST_COLUMNS =
+  "id,name,description,price,category,image,sizes,force_last_item,is_featured,sort_order,created_at";
+
+/**
+ * As mesmas colunas sem `is_featured`.
+ *
+ * O código sobe antes de a migração rodar no banco (é o admin quem executa o
+ * SQL). No intervalo, pedir uma coluna inexistente derruba o SELECT inteiro e
+ * a loja fica sem catálogo — bem pior do que ficar sem destaques. Então a
+ * primeira falha por coluna ausente cai para esta lista e segue a vida.
+ */
+export const LIST_COLUMNS_LEGACY =
   "id,name,description,price,category,image,sizes,force_last_item,sort_order,created_at";
+
+/** Erro do Postgres para coluna que não existe (`undefined_column`). */
+export function isMissingFeaturedColumn(
+  error: { code?: string; message?: string } | null,
+): boolean {
+  if (!error) return false;
+  return error.code === "42703" || /is_featured/i.test(error.message ?? "");
+}
 
 type CatalogCtx = {
   products: Product[];
@@ -42,6 +62,13 @@ type CatalogCtx = {
    */
   loadGallery: (id: string) => Promise<void>;
   updateProduct: (id: string, patch: Partial<Product>) => Promise<void>;
+  /**
+   * Liga/desliga a curadoria de vitrine de uma peça (só admin — quem manda é a
+   * RLS). Devolve `null` em caso de sucesso ou a mensagem de erro pronta para
+   * a tela, porque este é o primeiro botão que encosta na coluna nova: se a
+   * migração ainda não rodou, o admin precisa saber disso, não um console.
+   */
+  setFeatured: (id: string, featured: boolean) => Promise<string | null>;
   addProduct: (p: ProductInput, stock: SizeStock) => Promise<string | null>;
   deleteProduct: (id: string) => Promise<void>;
   setStock: (id: string, stock: SizeStock) => Promise<void>;
@@ -74,6 +101,8 @@ export type ProductRow = {
   gallery?: unknown;
   sizes: unknown;
   force_last_item: boolean;
+  /** Ausente enquanto a migração de destaques não rodou. */
+  is_featured?: boolean | null;
   sort_order: number;
   created_at?: string | null;
 };
@@ -91,8 +120,9 @@ export function rowToProduct(r: ProductRow): Product {
     price: Number(r.price),
     image,
     gallery: galleryArr.length ? galleryArr : image ? [image] : [],
-    category: (r.category === "sneakers" ? "sneakers" : "clothes") as ProductCategory,
+    category: coerceCategory(r.category),
     forceLastItem: r.force_last_item || undefined,
+    isFeatured: r.is_featured === true,
     createdAt: r.created_at ?? undefined,
   };
 }
@@ -108,11 +138,26 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const galleryRequested = useRef<Record<string, boolean>>({});
 
   const refresh = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("products")
-      .select(LIST_COLUMNS)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true });
+    // A lista de colunas passou a ser variável, e com isso o supabase-js perde
+    // a inferência do formato da linha. O retorno é normalizado aqui — o
+    // `rowToProduct` abaixo já era quem validava o conteúdo.
+    const buscar = async (colunas: string) => {
+      const res = await supabase
+        .from("products")
+        .select(colunas)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+      return res as unknown as {
+        data: unknown[] | null;
+        error: { code?: string; message?: string } | null;
+      };
+    };
+
+    let { data, error } = await buscar(LIST_COLUMNS);
+    if (isMissingFeaturedColumn(error)) {
+      console.warn("[catalog] coluna is_featured ausente — rode a migração de destaques");
+      ({ data, error } = await buscar(LIST_COLUMNS_LEGACY));
+    }
     setLoading(false);
     if (error) {
       console.error("[catalog] fetch failed", error);
@@ -176,6 +221,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     if (patch.gallery !== undefined) dbPatch.gallery = patch.gallery;
     if (patch.category !== undefined) dbPatch.category = patch.category;
     if (patch.forceLastItem !== undefined) dbPatch.force_last_item = patch.forceLastItem === true;
+    if (patch.isFeatured !== undefined) dbPatch.is_featured = patch.isFeatured === true;
 
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
     const { error } = await supabase
@@ -186,6 +232,22 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       console.error("[catalog] update failed", error);
       await refresh();
     }
+  };
+
+  const setFeatured: CatalogCtx["setFeatured"] = async (id, featured) => {
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, isFeatured: featured } : p)));
+    const { error } = await supabase
+      .from("products")
+      .update({ is_featured: featured } as never)
+      .eq("id", id);
+    if (!error) return null;
+
+    console.error("[catalog] setFeatured failed", error);
+    // Desfaz o otimismo: o botão volta ao estado que o banco ainda tem.
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, isFeatured: !featured } : p)));
+    return isMissingFeaturedColumn(error)
+      ? "A coluna is_featured ainda não existe no banco. Rode a migração de destaques."
+      : "Não foi possível salvar o destaque. Tente novamente.";
   };
 
   const addProduct: CatalogCtx["addProduct"] = async (p, s) => {
@@ -250,6 +312,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         loading,
         loadGallery,
         updateProduct,
+        setFeatured,
         addProduct,
         deleteProduct,
         setStock,

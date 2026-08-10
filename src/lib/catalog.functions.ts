@@ -22,18 +22,33 @@ export const getProductById = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     try {
       const { supabase } = await import("@/integrations/supabase/client");
-      const { rowToProduct, coerceSizeStock, LIST_COLUMNS } = await import("@/lib/catalog-context");
+      const {
+        rowToProduct,
+        coerceSizeStock,
+        LIST_COLUMNS,
+        LIST_COLUMNS_LEGACY,
+        isMissingFeaturedColumn,
+      } = await import("@/lib/catalog-context");
 
       // As mesmas colunas da vitrine — de propósito sem `gallery`. O que sai
       // daqui só alimenta o título e a prévia do link, que precisam da capa e
       // de mais nada; puxar a galeria inteira era carregar as outras quatro
       // fotos da peça no servidor para jogá-las fora. A galeria chega no
       // navegador por `loadGallery`, como na home.
-      const { data: row, error } = await supabase
-        .from("products")
-        .select(LIST_COLUMNS)
-        .eq("id", data.id)
-        .maybeSingle();
+      const buscar = async (colunas: string) => {
+        const res = await supabase.from("products").select(colunas).eq("id", data.id).maybeSingle();
+        return res as unknown as {
+          data: unknown | null;
+          error: { code?: string; message?: string } | null;
+        };
+      };
+
+      // Mesmo cuidado da vitrine: enquanto a migração de destaques não roda, a
+      // coluna não existe e a página do produto não pode cair por causa disso.
+      let { data: row, error } = await buscar(LIST_COLUMNS);
+      if (isMissingFeaturedColumn(error)) {
+        ({ data: row, error } = await buscar(LIST_COLUMNS_LEGACY));
+      }
 
       if (error) {
         console.error("[catalog] getProductById failed", error);
@@ -41,7 +56,7 @@ export const getProductById = createServerFn({ method: "GET" })
       }
       if (!row) return null;
 
-      const productRow = row as ProductRow;
+      const productRow = row as unknown as ProductRow;
       return {
         product: rowToProduct(productRow),
         stock: coerceSizeStock(productRow.sizes),

@@ -1,7 +1,11 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { calcDiscount, type Coupon } from "./coupons";
+import type { ProductCategory } from "./categories";
 
-export type ProductCategory = "clothes" | "sneakers";
+// Reexportado para não quebrar os `import { type ProductCategory } from
+// "@/lib/cart-context"` espalhados pelo app — a definição mora em
+// lib/categories, junto dos rótulos.
+export type { ProductCategory } from "./categories";
 
 export type Product = {
   id: string;
@@ -13,6 +17,8 @@ export type Product = {
   gallery?: string[];
   category?: ProductCategory;
   forceLastItem?: boolean;
+  /** Curadoria do admin: a peça aparece na vitrine de destaques da home. */
+  isFeatured?: boolean;
   /** ISO timestamp de cadastro — usado para o selo "Novidade". */
   createdAt?: string;
 };

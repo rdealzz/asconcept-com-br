@@ -251,12 +251,22 @@
   --asc-ink-muted: #a8a49c;
   --asc-line: rgba(197, 160, 89, 0.2);
 
+  /* Erro e acerto também precisam voltar aos tons claros. No tema claro eles
+     são fechados (#8c3d2e / #2f4a38) para ler sobre o creme — sobre a
+     obsidiana destes blocos davam menos de 2:1, e é neles que o modal de
+     autenticação escreve "As senhas não coincidem". */
+  --asc-error: #c9736a;
+  --asc-success: #7fa98b;
+
   --accent: #c5a059;
   --gold: #c5a059;
   --ivory: #e8dcc4;
   --foreground: #e8dcc4;
   --muted-foreground: #a8a49c;
   --border: rgba(197, 160, 89, 0.2);
+  /* Derivado de --asc-error: precisa ser repetido pelo mesmo motivo do
+     --accent acima — o var() do :root já foi resolvido lá. */
+  --destructive: #c9736a;
   color-scheme: dark;
 }
 

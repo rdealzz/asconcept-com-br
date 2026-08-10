@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, ShoppingBag, X } from "lucide-react";
 import { useCart, formatBRL, type Product } from "@/lib/cart-context";
+import { categoryLabel } from "@/lib/categories";
 import {
   useCatalog,
   SIZES,
@@ -211,7 +212,7 @@ function ProductView({
             hash="produtos"
             className="text-xs text-asc-ink-muted transition-colors duration-ascfast ease-asc hover:text-asc-ink"
           >
-            {product.category === "sneakers" ? "Sneakers" : "Roupas"}
+            {categoryLabel(product.category)}
           </Link>
           <span className="text-xs text-asc-ink-muted">/</span>
           <span className="text-xs text-asc-ink">{product.name}</span>
