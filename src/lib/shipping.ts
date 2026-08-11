@@ -1,8 +1,12 @@
 // Simulação de frete a partir de Curitiba/PR para pacote pequeno.
 // O valor exibido ao cliente é 50% do custo real simulado
-// (os outros 50% já estão embutidos no preço do produto).
+// (os outros 50% já estão embutidos no preço do produto), mais uma margem
+// fixa de R$ 10 — folga para embalagem e para a variação da tabela real.
 
-export const FREE_SHIPPING_THRESHOLD = 249.99;
+export const FREE_SHIPPING_THRESHOLD = 299.9;
+
+/** Margem fixa somada a todo frete cobrado. */
+export const SHIPPING_MARKUP = 10;
 
 export type BrazilState =
   | "AC" | "AL" | "AM" | "AP" | "BA" | "CE" | "DF" | "ES" | "GO"
@@ -87,7 +91,7 @@ export type ShippingQuote = {
   state: BrazilState;
   stateName: string;
   realCost: number;
-  displayCost: number; // 50% do custo real
+  displayCost: number; // 50% do custo real + margem fixa; 0 quando é cortesia
   free: boolean;
   etaDays: [number, number];
 };
@@ -111,7 +115,9 @@ export function quoteShipping(cep: string, subtotal: number): ShippingQuote | nu
     state: uf,
     stateName: STATE_NAMES[uf],
     realCost,
-    displayCost: free ? 0 : Math.round(realCost * 50) / 100, // 50% do custo real
+    // 50% do custo real, mais a margem fixa. Acima do valor de frete grátis
+    // não se cobra nada — nem a margem.
+    displayCost: free ? 0 : Math.round(realCost * 50) / 100 + SHIPPING_MARKUP,
     free,
     etaDays: etaFor(uf),
   };

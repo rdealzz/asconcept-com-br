@@ -76,7 +76,7 @@ export function welcomeTemplate(email: string, name?: string) {
     <div style="margin:28px 0;padding:20px;border:1px solid ${BRAND.gold};background:${BRAND.ivory};">
       <div style="font-size:10px;letter-spacing:0.28em;text-transform:uppercase;color:${BRAND.gold};">Benefício de estreia</div>
       <div style="font-family:'Playfair Display',Georgia,serif;font-size:18px;margin-top:6px;color:${BRAND.charcoal};">
-        Frete cortesia acima de R$ 249,99
+        Frete cortesia acima de R$ 299,90
       </div>
     </div>
     <p style="font-size:12px;line-height:1.6;color:#57534E;margin:0;">

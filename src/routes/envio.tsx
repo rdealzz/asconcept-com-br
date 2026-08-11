@@ -8,12 +8,12 @@ export const Route = createFileRoute("/envio")({
       {
         name: "description",
         content:
-          "Prazos de produção e entrega, rastreio, frete grátis acima de R$ 249,99 e como acompanhar seu pedido na A&S Conccept.",
+          "Prazos de produção e entrega, rastreio, frete grátis acima de R$ 299,90 e como acompanhar seu pedido na A&S Conccept.",
       },
       { property: "og:title", content: "Envio e Prazos — A&S Conccept" },
       {
         property: "og:description",
-        content: "Prazos, rastreio e frete grátis acima de R$ 249,99.",
+        content: "Prazos, rastreio e frete grátis acima de R$ 299,90.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -44,7 +44,7 @@ function EnvioPage() {
       </Prose>
       <Prose title="Frete grátis">
         <p>
-          Pedidos acima de R$ 249,99 têm frete grátis para todo o Brasil, aplicado automaticamente
+          Pedidos acima de R$ 299,90 têm frete grátis para todo o Brasil, aplicado automaticamente
           no checkout.
         </p>
       </Prose>

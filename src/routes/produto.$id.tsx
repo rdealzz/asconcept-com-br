@@ -27,7 +27,7 @@ import { ContactStrip } from "@/components/ContactStrip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Wordmark } from "@/components/Wordmark";
 import { Eyebrow } from "@/components/ui-kit";
-import { GarmentTurntable } from "@/components/GarmentTurntable";
+import { ProductGallery } from "@/components/ProductGallery";
 import { Inview, StackedLines } from "@/lib/motion";
 import { useVisualShell } from "@/lib/visual-shell";
 
@@ -226,10 +226,10 @@ function ProductView({
               que empurrava preço, tamanho e botão para muito abaixo da dobra.
               Clicar abre a foto em tela cheia. */}
           <div className="lg:sticky lg:top-8 lg:self-start">
-            {/* O palco da peça: mesmo gesto da vitrine da home — arraste para
-                girar, cada meia-volta traz a próxima foto, clique curto amplia.
-                As miniaturas continuam funcionando: escolher uma faz a peça
-                girar até ela. */}
+            {/* A galeria da peça: foto parada, com uma seta de cada lado para
+                passar para a próxima. O arraste lateral continua valendo no
+                celular e o clique curto amplia; as miniaturas abaixo saltam
+                direto para a foto escolhida. */}
             <div className="relative isolate overflow-hidden rounded-[1.5rem] border border-asc-line">
               <div
                 aria-hidden
@@ -239,15 +239,13 @@ function ProductView({
                     "radial-gradient(circle at 50% 42%, rgba(197,160,89,0.14) 0%, rgba(5,7,11,0.85) 62%, #05070B 100%)",
                 }}
               />
-              <GarmentTurntable
-                swapId={product.id}
+              <ProductGallery
                 images={gallery}
                 alt={product.name}
-                goTo={activeImg}
+                index={activeImg}
                 onIndex={setActiveImg}
                 onOpen={abrirZoom}
-                hint="Arraste para girar · toque para ampliar"
-                className="asc-float mx-auto h-[46vh] w-full max-w-[38rem] md:h-[62vh]"
+                className="mx-auto h-[46vh] w-full max-w-[38rem] md:h-[62vh]"
                 imageClassName="drop-shadow-[0_24px_48px_rgba(0,0,0,0.5)]"
               />
 
