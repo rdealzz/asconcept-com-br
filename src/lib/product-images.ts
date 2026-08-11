@@ -108,10 +108,16 @@ async function encodeVariant(
   if (!ctx) return null;
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-  const webp = await canvasToBlob(canvas, "image/webp", 0.82);
+  // A maior variante é a que aparece no palco da vitrine e no zoom da página,
+  // ampliada em tela retina — é nela que a compressão aparece primeiro, e é
+  // onde o texto de uma etiqueta some. As menores são miniaturas: 0.82 ali não
+  // custa nitidez visível e economiza banda em toda a grade.
+  const qualidade = targetEdge >= 1600 ? 0.92 : 0.82;
+
+  const webp = await canvasToBlob(canvas, "image/webp", qualidade);
   if (webp && webp.type === "image/webp") return { blob: webp, ext: "webp", mime: "image/webp" };
 
-  const jpeg = await canvasToBlob(canvas, "image/jpeg", 0.85);
+  const jpeg = await canvasToBlob(canvas, "image/jpeg", Math.min(0.95, qualidade + 0.03));
   if (jpeg) return { blob: jpeg, ext: "jpg", mime: "image/jpeg" };
   return null;
 }

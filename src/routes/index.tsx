@@ -803,7 +803,7 @@ function Products() {
       id="produtos"
       className="relative isolate overflow-hidden rounded-[2rem] py-12 md:py-16"
     >
-      <div className="relative z-10 mx-auto max-w-[1600px] px-6 md:px-12">
+      <div className="relative z-10 mx-auto max-w-[1600px] px-4 sm:px-6 md:px-12">
         <div className="mb-10 flex flex-col items-center text-center md:mb-14">
           <Eyebrow className="mb-3">{copy.eyebrow}</Eyebrow>
           {/* Entrelinha curta: o serif em corpo grande abre demais no padrão e
@@ -872,7 +872,7 @@ function Products() {
           /* Esqueletos enquanto o catálogo chega: a grade já ocupa o espaço
              final das peças, então nada pula de lugar quando as fotos
              aparecem — e a página não parece vazia. */
-          <div className="grid grid-cols-2 gap-x-6 gap-y-14 md:grid-cols-3 md:gap-x-8 md:gap-y-20 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 sm:gap-y-12 md:grid-cols-3 md:gap-x-8 md:gap-y-20 lg:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="animate-pulse">
                 <div className="aspect-[3/4] w-full bg-asc-bg-raised" />
@@ -906,7 +906,7 @@ function Products() {
             <EmptyCategoryState categoryName={copy.eyebrow} />
           )
         ) : (
-          <div className="grid grid-cols-2 gap-x-6 gap-y-14 md:grid-cols-3 md:gap-x-8 md:gap-y-20 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 sm:gap-y-12 md:grid-cols-3 md:gap-x-8 md:gap-y-20 lg:grid-cols-4">
             {filtered.map((p, i) => (
               <ProductCard key={p.id} product={p} priority={i < EAGER_CARDS} />
             ))}
@@ -975,23 +975,6 @@ function SneakersComingSoon() {
       </div>
     </div>
   );
-}
-
-/* ---------- Stock Badge ---------- */
-function StockBadge({ qty }: { qty: number }) {
-  if (qty === 0)
-    return (
-      <span className="inline-flex items-center border border-destructive/60 bg-destructive/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-destructive">
-        Sold Out
-      </span>
-    );
-  if (qty === 1)
-    return (
-      <span className="inline-flex items-center gap-1 border border-accent/60 bg-accent/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-accent">
-        Última unidade
-      </span>
-    );
-  return null;
 }
 
 /* ---------- Product Card ---------- */
@@ -1068,20 +1051,20 @@ function ProductCard({ product, priority = false }: { product: Product; priority
             className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-ascslow ease-asc group-hover:opacity-100"
           />
         )}
-        <div className="absolute left-3 top-3 flex flex-col gap-1.5">
-          {novidade && !soldOut && (
-            <span className="asc-label inline-flex items-center bg-asc-bg/90 px-2 py-1 text-[10px] text-asc-ink backdrop-blur">
-              Novidade
-            </span>
-          )}
-          {showLastItem ? (
-            <span className="asc-label inline-flex items-center gap-1 bg-asc-bg/90 px-2 py-1 text-[10px] text-asc-gold backdrop-blur">
-              ✦ Último Item
-            </span>
-          ) : (
-            <StockBadge qty={total} />
-          )}
-        </div>
+        {/* Um selo, não uma pilha. Dois retângulos opacos empilhados no canto
+            tomavam a cabeça da foto — que é o produto. Fica o mais urgente:
+            escassez ganha de novidade, porque é o que muda a decisão hoje.
+            Peça esgotada não recebe selo nenhum: a tarja "Esgotado" no rodapé
+            do card já diz isso, e com mais clareza. */}
+        {!soldOut && (showLastItem || novidade) && (
+          <span
+            className={`asc-label pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border border-asc-ink-inverse/15 bg-asc-bg-dark/45 px-2.5 py-1 text-[9px] tracking-[0.16em] backdrop-blur-sm ${
+              showLastItem ? "text-asc-gold-soft" : "text-asc-ink-inverse"
+            }`}
+          >
+            {showLastItem ? "Último item" : "Novidade"}
+          </span>
+        )}
         {soldOut ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-asc-bg-dark/75 py-3 text-center backdrop-blur-sm">
             <span className="asc-label text-[10px] text-asc-ink-inverse-muted">Esgotado</span>
@@ -1093,9 +1076,15 @@ function ProductCard({ product, priority = false }: { product: Product; priority
         )}
 
         <div className="pointer-events-auto absolute right-3 top-3 z-30 flex flex-col gap-2">
+          {/* O coração fica sempre visível: cheio, ele é o que diz de relance
+              quais peças já foram salvas. */}
           <FavoriteButton productId={product.id} className="h-8 w-8" />
+          {/* Editar e excluir são ferramenta de quem administra, não parte da
+              vitrine: no desktop só aparecem com o ponteiro no card (ou com o
+              foco pelo teclado). No toque não há hover, então continuam à
+              mostra — esconder ali seria esconder de vez. */}
           {isAdmin && (
-            <>
+            <div className="flex flex-col gap-2 transition-opacity duration-asc ease-asc md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1116,41 +1105,57 @@ function ProductCard({ product, priority = false }: { product: Product; priority
               >
                 <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>
-      <div className="mt-4 flex items-start justify-between gap-3">
+      {/* No celular a grade é de duas colunas: sobra menos de 10rem por card, e
+          nome e preço lado a lado espremiam o título a ponto de cair uma
+          palavra por linha. Empilhados, o nome tem a largura inteira; do sm em
+          diante, onde há folga, a linha do preço volta para a direita. */}
+      <div className="mt-4 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div className="min-w-0">
-          <h3 className="font-display text-lg leading-snug text-asc-ink">
+          <h3 className="font-display text-[0.95rem] leading-snug text-asc-ink sm:text-lg">
             <Link
               to="/produto/$id"
               params={{ id: product.id }}
-              className="transition-colors duration-ascfast ease-asc hover:text-asc-gold"
+              className="line-clamp-2 transition-colors duration-ascfast ease-asc hover:text-asc-gold sm:line-clamp-none"
             >
               {product.name}
             </Link>
           </h3>
-          <p className="mt-1 line-clamp-1 font-sans text-xs font-light text-asc-ink-muted">
+          {/* A descrição repete o que a foto já mostra; num card de celular ela
+              é só mais uma linha cortada. Volta a partir do sm. */}
+          <p className="mt-1 hidden line-clamp-1 font-sans text-xs font-light text-asc-ink-muted sm:block">
             {product.description}
           </p>
         </div>
-        <div className="shrink-0 pt-1 text-right">
+        <div className="flex shrink-0 items-baseline gap-2 sm:block sm:pt-1 sm:text-right">
           <span className="block whitespace-nowrap font-sans text-sm tabular-nums text-asc-ink">
             {formatBRL(product.price)}
           </span>
-          <InstallmentsNote amount={product.price} className="mt-1" />
+          {/* O parcelamento pesa na decisão, mas não na varredura: no celular
+              ele fica para a página da peça. */}
+          <InstallmentsNote amount={product.price} className="hidden sm:mt-1 sm:block" />
         </div>
       </div>
 
       {isAdmin && sizeStock && (
-        <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
-          Estoque ·{" "}
-          {sizesForProduct(product.category, product.name, sizeStock)
-            .map((s) => `${s} ${sizeStock[s] ?? 0}`)
-            .join(" · ")}
+        <p className="mt-2 line-clamp-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
+          {/* O detalhe por tamanho é do painel, e no celular ele ocupava quatro
+              linhas embaixo de cada card. Ali fica só o total. */}
+          <span className="sm:hidden">Estoque · {total} un.</span>
+          <span className="hidden sm:inline">
+            Estoque ·{" "}
+            {sizesForProduct(product.category, product.name, sizeStock)
+              .map((s) => `${s} ${sizeStock[s] ?? 0}`)
+              .join(" · ")}
+          </span>
           {product.forceLastItem && (
-            <span className="ml-2 text-[color:var(--gold)]">· Último Item forçado</span>
+            <span className="ml-2 text-[color:var(--gold)]">
+              <span className="sm:hidden">· forçado</span>
+              <span className="hidden sm:inline">· Último Item forçado</span>
+            </span>
           )}
         </p>
       )}

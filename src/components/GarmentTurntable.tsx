@@ -1,9 +1,29 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { prefersReducedMotion } from "@/lib/motion";
-import { productImageSrc } from "@/lib/product-images";
+import { IMAGE_WIDTHS, productImageSrc, type ImageWidth } from "@/lib/product-images";
 
-/** Largura em que a peça é exibida no palco, em ambos os usos. */
-const TURNTABLE_WIDTH = 1000;
+/**
+ * Variante usada até o palco ser medido — é a que vai no HTML do servidor, onde
+ * não existe viewport nem densidade de tela para consultar.
+ */
+const LARGURA_PADRAO: ImageWidth = 1000;
+
+/**
+ * Variante que serve uma caixa desta largura.
+ *
+ * O palco é grande: em desktop alto ele passa de 700px de largura, e numa tela
+ * retina isso pede quase 1500px de foto. Servir 1000px fixo ali era ampliar a
+ * imagem no navegador — a peça saía macia e o texto das etiquetas, ilegível.
+ *
+ * O teto de 2 na densidade é deliberado: acima disso o ganho visível não paga
+ * os bytes. A folga de 3% cobre a escala do arrasto, senão a foto amolece
+ * justamente enquanto o cliente está girando a peça.
+ */
+function larguraParaCaixa(larguraCss: number): ImageWidth {
+  const dpr = typeof window === "undefined" ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+  const alvo = larguraCss * dpr * 1.03;
+  return IMAGE_WIDTHS.find((w) => w >= alvo) ?? IMAGE_WIDTHS[IMAGE_WIDTHS.length - 1];
+}
 
 /**
  * A peça que gira.
@@ -119,11 +139,38 @@ export function GarmentTurntable({
   /**
    * O palco troca o `src` das duas faces na mão, durante o giro, então não dá
    * para deixar o navegador escolher a variante por `srcset` — a escolha teria
-   * de ser refeita a cada virada. Resolvemos aqui, uma vez, na largura em que a
-   * peça é exibida; a mesma URL vale para a pré-carga e para o JSX, então o
+   * de ser refeita a cada virada. A escolha é nossa, feita a partir do tamanho
+   * real do palco; a mesma URL vale para a pré-carga e para o JSX, então o
    * cache é aproveitado em vez de dividido entre dois tamanhos.
    */
-  const srcs = useMemo(() => images.map((s) => productImageSrc(s, TURNTABLE_WIDTH)), [images]);
+  const [larguraVariante, setLarguraVariante] = useState<ImageWidth>(LARGURA_PADRAO);
+  const srcs = useMemo(
+    () => images.map((s) => productImageSrc(s, larguraVariante)),
+    [images, larguraVariante],
+  );
+
+  /**
+   * Mede o palco e sobe de variante quando ele pede mais pixels — no primeiro
+   * quadro do cliente, ao girar a tela e ao redimensionar a janela.
+   *
+   * Só sobe, nunca desce: baixar de volta trocaria uma foto nítida já em cache
+   * por uma menor a cada respiro do layout, e o palco encolhe o tempo todo
+   * (barra de endereço do celular, teclado abrindo).
+   */
+  useEffect(() => {
+    const el = palco.current;
+    if (!el) return;
+    const medir = () => {
+      const largura = el.getBoundingClientRect().width;
+      if (!largura) return;
+      const pedida = larguraParaCaixa(largura);
+      setLarguraVariante((atual) => (pedida > atual ? pedida : atual));
+    };
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const fotos = useRef<string[]>(srcs);
   const pendentes = useRef<string[] | null>(null);
@@ -553,8 +600,10 @@ export function GarmentTurntable({
         />
       </div>
 
+      {/* Dica, não legenda: fica acima da borda inferior, pequena e discreta, e
+          some assim que o ponteiro encosta na peça. */}
       {hint !== null && (
-        <span className="asc-label pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-asc-line bg-asc-bg-dark/60 px-3 py-1.5 text-[10px] text-asc-ink-muted opacity-70 backdrop-blur transition-opacity duration-asc ease-asc group-hover:opacity-0">
+        <span className="asc-label pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-asc-line/60 bg-asc-bg-dark/45 px-2.5 py-1 text-[9px] tracking-[0.16em] text-asc-ink-muted opacity-60 backdrop-blur-sm transition-opacity duration-asc ease-asc group-hover:opacity-0">
           {hint ?? "Arraste para girar"}
         </span>
       )}

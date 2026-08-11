@@ -151,14 +151,17 @@ export function Showroom({
 
       {/* O respiro no topo não é folga: as fotos dos cartões saltam para fora
           da moldura, e sem ele a seção cortava a cabeça delas. */}
-      <div className="relative grid items-center gap-8 px-6 pb-16 pt-24 sm:px-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,0.95fr)] lg:gap-4 lg:pb-20 lg:pt-28">
+      <div className="relative grid items-center gap-10 px-5 pb-14 pt-20 sm:gap-8 sm:px-10 sm:pb-16 sm:pt-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,0.95fr)] lg:gap-8 lg:pb-20 lg:pt-28">
         {/* ── Coluna esquerda: a peça em palavras ─────────────────── */}
-        <div className="relative z-20 flex flex-col gap-6 lg:h-full lg:justify-between lg:py-4">
+        <div className="relative z-20 flex min-w-0 flex-col gap-6 lg:h-full lg:justify-between lg:py-4">
           <div>
             <Eyebrow tone="light">{eyebrow}</Eyebrow>
+            {/* `break-words`: nomes de peça trazem palavras longas ("Trançada",
+                "Ralph") num corpo enorme — sem isso elas estouram a coluna e
+                empurram a foto para cima do texto. */}
             <h2
-              className="mt-5 font-display font-light leading-[0.88] text-asc-ink"
-              style={{ fontSize: "clamp(2.75rem, 5.2vw, 5.25rem)" }}
+              className="mt-5 break-words font-display font-light leading-[0.9] text-asc-ink"
+              style={{ fontSize: "clamp(2.25rem, 4.4vw, 4.5rem)" }}
             >
               <span className="italic text-asc-gold-soft">{primeiraPalavra(peca.name)}</span>
               {restoDoNome(peca.name) && (
@@ -236,7 +239,10 @@ export function Showroom({
         </div>
 
         {/* ── Centro: a peça que gira ─────────────────────────────── */}
-        <div className="relative z-10 flex justify-center lg:-mx-10">
+        {/* Sem margem negativa: ela puxava o palco para dentro das colunas
+            vizinhas, e em janela alta a foto passava por cima do título e dos
+            cartões. `min-w-0` deixa a coluna encolher em vez de estourar. */}
+        <div className="relative z-10 flex min-w-0 justify-center">
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0 -z-10 rounded-full opacity-70 blur-3xl"
@@ -255,14 +261,18 @@ export function Showroom({
             // Proporção 3/4, a mesma da vitrine em grade: com `cover` a foto
             // preenche a moldura e o retângulo vira um painel que gira de
             // propósito, em vez de um pedaço branco solto no escuro.
-            className="asc-float aspect-[3/4] h-[42vh] w-auto max-w-[86vw] sm:h-[50vh] lg:h-[58vh]"
+            // A altura manda no tamanho (a moldura é 3/4), mas com um teto em
+            // `vw` e outro em `rem`: só assim o palco de uma janela estreita e
+            // alta continua cabendo na própria coluna. `max-w-full` é a trava
+            // final, para o caso de a coluna ser mais estreita que a conta.
+            className="asc-float aspect-[3/4] h-[min(46vh,116vw,26rem)] w-auto max-w-full sm:h-[min(52vh,88vw,30rem)] lg:h-[min(60vh,46vw,38rem)]"
             fit="cover"
             imageClassName="rounded-[1.25rem] border border-asc-line shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
           />
         </div>
 
         {/* ── Coluna direita: cartões de vidro + assinatura ────────── */}
-        <div className="relative z-20 flex flex-col items-center gap-10 lg:h-full lg:items-end lg:justify-between lg:py-4">
+        <div className="relative z-20 flex min-w-0 flex-col items-center gap-10 lg:h-full lg:items-end lg:justify-between lg:py-4">
           <div className="flex flex-col items-center gap-5 lg:items-end">
             <div className="flex gap-4">
               {cartoes.map((p) => {
@@ -277,14 +287,14 @@ export function Showroom({
                     onMouseEnter={() => void loadGallery(p.id)}
                     aria-pressed={selecionada}
                     aria-label={`Ver ${p.name} na vitrine`}
-                    className={`group relative flex w-[8.5rem] flex-col items-center gap-4 rounded-[1.75rem] border bg-asc-ink/[0.06] px-3 pb-4 pt-20 text-center backdrop-blur transition-all duration-asc ease-asc hover:bg-asc-ink/[0.12] ${
+                    className={`group relative flex w-[7.25rem] flex-col items-center gap-4 rounded-[1.75rem] border bg-asc-ink/[0.06] px-3 pb-4 pt-20 text-center backdrop-blur transition-all duration-asc ease-asc hover:bg-asc-ink/[0.12] sm:w-[8.5rem] ${
                       selecionada ? "border-asc-gold" : "border-asc-line hover:border-asc-line-dark"
                     }`}
                   >
                     <img
                       src={productImageSrc(p.image, 480)}
                       srcSet={productImageSrcSet(p.image)}
-                      sizes="136px"
+                      sizes="(min-width: 640px) 136px, 116px"
                       alt=""
                       aria-hidden
                       loading="lazy"
@@ -329,8 +339,8 @@ export function Showroom({
           </div>
 
           <p
-            className="text-center font-display font-light leading-[0.9] text-asc-ink/90 lg:text-right"
-            style={{ fontSize: "clamp(2.25rem, 4vw, 4rem)" }}
+            className="text-center font-display font-light leading-[0.95] text-asc-ink/90 lg:text-right"
+            style={{ fontSize: "clamp(1.85rem, 3.4vw, 3.5rem)" }}
           >
             <span className="italic text-asc-gold-soft">{sideTitle[0]}</span>
             <br />
