@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { supabase } from "@/integrations/supabase/client";
 import type { Product } from "@/lib/cart-context";
 import { coerceCategory } from "@/lib/categories";
+import { SIZE_GRIDS } from "@/lib/sizes";
 
 /**
  * Catálogo (Supabase) — extraído de routes/index.tsx para que outras rotas
@@ -9,14 +10,25 @@ import { coerceCategory } from "@/lib/categories";
  * __root, dentro do CartProvider.
  */
 
-export const SIZES = ["P", "M", "G", "GG"] as const;
-export type Size = (typeof SIZES)[number];
-export type SizeStock = Record<Size, number>;
+/**
+ * Grade padrão — a das roupas. Cada peça tem a sua (ver `@/lib/sizes`): calça
+ * vai em número, sneaker em número de pé, acessório é tamanho único. Esta
+ * continua sendo o valor de partida de quem não sabe de que peça se trata.
+ */
+export const SIZES = SIZE_GRIDS.letras;
+/**
+ * O tamanho é texto livre: "M", "42", "Único". Quem manda no que aparece é a
+ * grade da peça, não o tipo.
+ */
+export type Size = string;
+export type SizeStock = Record<string, number>;
 
-export const emptyStock = (): SizeStock => ({ P: 0, M: 0, G: 0, GG: 0 });
-export const totalStock = (s: SizeStock | undefined) => (s ? s.P + s.M + s.G + s.GG : 0);
+export const emptyStock = (sizes: readonly string[] = SIZES): SizeStock =>
+  Object.fromEntries(sizes.map((s) => [s, 0]));
+export const totalStock = (s: SizeStock | undefined) =>
+  s ? Object.values(s).reduce((acc, q) => acc + (Number(q) || 0), 0) : 0;
 export const hasLastSize = (s: SizeStock | undefined) =>
-  !!s && (s.P === 1 || s.M === 1 || s.G === 1 || s.GG === 1);
+  !!s && Object.values(s).some((q) => Number(q) === 1);
 
 type ProductInput = Omit<Product, "id">;
 
@@ -83,17 +95,23 @@ type CatalogCtx = {
 };
 const CatalogContext = createContext<CatalogCtx | null>(null);
 
-export function coerceSizeStock(v: unknown): SizeStock {
-  if (v && typeof v === "object") {
-    const src = v as Partial<Record<Size, unknown>>;
-    return {
-      P: Math.max(0, Math.floor(Number(src.P) || 0)),
-      M: Math.max(0, Math.floor(Number(src.M) || 0)),
-      G: Math.max(0, Math.floor(Number(src.G) || 0)),
-      GG: Math.max(0, Math.floor(Number(src.GG) || 0)),
-    };
+/**
+ * Normaliza o `sizes` do banco: quantidades inteiras e não negativas, uma por
+ * tamanho gravado. As chaves são as que a peça tiver — "P" ou "42" ou "Único" —
+ * porque a coluna é JSONB e a grade varia com a espécie da peça.
+ *
+ * `sizes` força a presença de uma grade: o formulário do admin passa a grade da
+ * peça para que um tamanho zerado continue aparecendo como campo.
+ */
+export function coerceSizeStock(v: unknown, sizes?: readonly string[]): SizeStock {
+  const out: SizeStock = sizes ? emptyStock(sizes) : {};
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    for (const [tamanho, qtd] of Object.entries(v as Record<string, unknown>)) {
+      if (!tamanho) continue;
+      out[tamanho] = Math.max(0, Math.floor(Number(qtd) || 0));
+    }
   }
-  return emptyStock();
+  return out;
 }
 
 export type ProductRow = {

@@ -278,7 +278,7 @@ function CheckoutPage() {
   );
 
   const itemsPayload = useCallback(
-    () => items.map((i) => ({ id: i.id, quantity: i.qty, size: i.size as "P" | "M" | "G" | "GG" })),
+    () => items.map((i) => ({ id: i.id, quantity: i.qty, size: i.size })),
     [items],
   );
 

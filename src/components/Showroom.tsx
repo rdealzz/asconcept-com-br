@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatBRL, type Product } from "@/lib/cart-context";
-import { useCatalog, SIZES, totalStock } from "@/lib/catalog-context";
+import { useCatalog, totalStock } from "@/lib/catalog-context";
+import { sizesForProduct } from "@/lib/sizes";
 import { InstallmentsNote } from "@/components/InstallmentsNote";
 import { GarmentTurntable } from "@/components/GarmentTurntable";
 import { Eyebrow } from "@/components/ui-kit";
@@ -94,7 +95,9 @@ export function Showroom({
 
   const ambiente = AMBIENTES[ativo % AMBIENTES.length];
   const sizeStock = pecaId ? stock[pecaId] : undefined;
-  const disponiveis = SIZES.filter((s) => (sizeStock?.[s] ?? 0) > 0);
+  const disponiveis = sizesForProduct(peca?.category, peca?.name ?? "", sizeStock).filter(
+    (s) => (sizeStock?.[s] ?? 0) > 0,
+  );
   const total = totalStock(sizeStock);
 
   // Clique curto na peça (sem arrasto) abre a página dela.

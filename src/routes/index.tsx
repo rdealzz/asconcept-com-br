@@ -41,14 +41,20 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import {
   useCatalog,
-  SIZES,
   emptyStock,
   totalStock,
   hasLastSize,
-  coerceSizeStock,
   type Size,
   type SizeStock,
 } from "@/lib/catalog-context";
+import {
+  SIZE_GRIDS,
+  SIZE_GRID_LABELS,
+  gridOfSizes,
+  sizesForProduct,
+  suggestSizeGrid,
+  type SizeGridId,
+} from "@/lib/sizes";
 import { supabase } from "@/integrations/supabase/client";
 import { productImageSrc, productImageSrcSet, uploadProductPhoto } from "@/lib/product-images";
 
@@ -1139,7 +1145,10 @@ function ProductCard({ product, priority = false }: { product: Product; priority
 
       {isAdmin && sizeStock && (
         <p className="mt-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
-          Estoque · P{sizeStock.P} · M{sizeStock.M} · G{sizeStock.G} · GG{sizeStock.GG}
+          Estoque ·{" "}
+          {sizesForProduct(product.category, product.name, sizeStock)
+            .map((s) => `${s} ${sizeStock[s] ?? 0}`)
+            .join(" · ")}
           {product.forceLastItem && (
             <span className="ml-2 text-[color:var(--gold)]">· Último Item forçado</span>
           )}
@@ -1202,25 +1211,39 @@ function AdminEditModal() {
     longDescription: "",
     price: 0,
     gallery: [] as string[],
-    stock: emptyStock(),
+    stock: emptyStock() as SizeStock,
     forceLastItem: false,
     category: (creatingCategory ?? tab) as ProductCategory,
+    /** Grade de tamanhos da peça (letras, calças, calçados, único). */
+    sizeGrid: suggestSizeGrid(creatingCategory ?? tab, "") as SizeGridId,
   });
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  /**
+   * Enquanto ninguém encosta no seletor, a grade acompanha a categoria e o
+   * nome — digitar "Calça de Alfaiataria" já troca P/M/G/GG por 36–46. Depois
+   * de uma escolha manual, o palpite se cala.
+   */
+  const [gradeManual, setGradeManual] = useState(false);
 
   useEffect(() => {
     setUploadError(null);
     if (isCreate) {
+      const categoria = creatingCategory ?? tab;
+      const grade = suggestSizeGrid(categoria, "");
+      setGradeManual(false);
       setForm({
         name: "",
         description: "",
         longDescription: "",
         price: 0,
         gallery: [],
-        stock: { P: 1, M: 1, G: 1, GG: 1 },
+        // Uma unidade por tamanho da grade: é o cadastro mais comum e evita
+        // salvar peça sem estoque nenhum.
+        stock: Object.fromEntries(SIZE_GRIDS[grade].map((s) => [s, 1])),
         forceLastItem: false,
-        category: creatingCategory ?? tab,
+        category: categoria,
+        sizeGrid: grade,
       });
     } else if (product) {
       const gal =
@@ -1229,15 +1252,24 @@ function AdminEditModal() {
           : product.image
             ? [product.image]
             : [];
+      const gravado = stock[product.id] ?? {};
+      // Peça já cadastrada: manda o que está no banco. Se os tamanhos gravados
+      // não formam nenhuma grade conhecida (peça antiga, meio a meio), cai no
+      // palpite — e o seletor fica lá para o admin corrigir.
+      const grade =
+        gridOfSizes(Object.keys(gravado).filter((s) => (gravado[s] ?? 0) > 0)) ??
+        suggestSizeGrid(product.category, product.name);
+      setGradeManual(true);
       setForm({
         name: product.name,
         description: product.description,
         longDescription: product.longDescription ?? "",
         price: product.price,
         gallery: gal,
-        stock: coerceSizeStock(stock[product.id]),
+        stock: gravado,
         forceLastItem: product.forceLastItem === true,
         category: coerceCategory(product.category),
+        sizeGrid: grade,
       });
     }
   }, [editingId, product, stock, isCreate, creatingCategory, tab]);
@@ -1318,6 +1350,45 @@ function AdminEditModal() {
       stock: { ...f.stock, [s]: Math.max(0, Math.floor(v || 0)) },
     }));
 
+  /**
+   * Os campos de estoque: a grade escolhida, mais qualquer tamanho de outra
+   * grade que a peça ainda tenha em estoque — para que reeditar uma peça antiga
+   * não apague o que está no depósito sem o admin ver.
+   */
+  const camposDeTamanho = (() => {
+    const lista: string[] = [...SIZE_GRIDS[form.sizeGrid]];
+    for (const [s, q] of Object.entries(form.stock)) {
+      if (Number(q) > 0 && !lista.includes(s)) lista.push(s);
+    }
+    return lista;
+  })();
+
+  /** Troca a grade sem perder o que já foi digitado nos tamanhos que se repetem. */
+  const trocarGrade = (grade: SizeGridId) => {
+    setGradeManual(true);
+    setForm((f) => {
+      const stock: SizeStock = {};
+      for (const s of SIZE_GRIDS[grade]) stock[s] = f.stock[s] ?? 0;
+      for (const [s, q] of Object.entries(f.stock)) if (Number(q) > 0) stock[s] = Number(q);
+      return { ...f, sizeGrid: grade, stock };
+    });
+  };
+
+  /** Nome e categoria realimentam o palpite de grade, até alguém escolher na mão. */
+  const aoMudarNome = (name: string) =>
+    setForm((f) => ({
+      ...f,
+      name,
+      sizeGrid: gradeManual ? f.sizeGrid : suggestSizeGrid(f.category, name),
+    }));
+
+  const aoMudarCategoria = (category: ProductCategory) =>
+    setForm((f) => ({
+      ...f,
+      category,
+      sizeGrid: gradeManual ? f.sizeGrid : suggestSizeGrid(category, f.name),
+    }));
+
   const onSave = () => {
     const name = form.name.trim();
     if (!name) return alert("Informe o nome do produto.");
@@ -1325,7 +1396,10 @@ function AdminEditModal() {
     if (!gallery.length) return alert("Envie ao menos uma foto do produto.");
     const cover = gallery[0];
     const price = Math.max(0, Number(form.price) || 0);
-    const stockObj = coerceSizeStock(form.stock);
+    // Grava só os tamanhos que estavam na tela: assim uma peça que mudou de
+    // grade não fica com "M: 0" perdido no banco para sempre.
+    const stockObj: SizeStock = {};
+    for (const s of camposDeTamanho) stockObj[s] = Math.max(0, Math.floor(form.stock[s] ?? 0));
 
     if (isCreate) {
       void addProduct(
@@ -1470,7 +1544,7 @@ function AdminEditModal() {
                     <button
                       key={c}
                       type="button"
-                      onClick={() => setForm({ ...form, category: c })}
+                      onClick={() => aoMudarCategoria(c)}
                       className={`border px-3 py-1.5 text-[10px] tracking-luxe uppercase transition-colors ${
                         form.category === c
                           ? "border-foreground bg-foreground text-asc-bg"
@@ -1485,7 +1559,7 @@ function AdminEditModal() {
               <Field label="Nome do produto">
                 <input
                   value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  onChange={(e) => aoMudarNome(e.target.value)}
                   className="w-full border-b border-foreground/30 bg-transparent py-2 text-sm outline-none focus:border-accent"
                 />
               </Field>
@@ -1521,9 +1595,32 @@ function AdminEditModal() {
                   </div>
                 </Field>
               </div>
+              <Field label="Grade de tamanhos">
+                <div className="flex flex-wrap gap-2">
+                  {(Object.keys(SIZE_GRIDS) as SizeGridId[]).map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => trocarGrade(g)}
+                      className={`border px-3 py-1.5 text-[10px] tracking-luxe uppercase transition-colors ${
+                        form.sizeGrid === g
+                          ? "border-foreground bg-foreground text-asc-bg"
+                          : "border-border hover:border-foreground"
+                      }`}
+                    >
+                      {SIZE_GRID_LABELS[g]}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[9px] tracking-luxe uppercase text-muted-foreground">
+                  {gradeManual
+                    ? "Grade escolhida à mão"
+                    : "Sugerida pela categoria e pelo nome da peça"}
+                </p>
+              </Field>
               <Field label="Estoque por tamanho">
-                <div className="grid grid-cols-4 gap-2">
-                  {SIZES.map((s) => (
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                  {camposDeTamanho.map((s) => (
                     <label key={s} className="block">
                       <span className="mb-1 block text-[10px] tracking-luxe uppercase text-muted-foreground">
                         {s}
@@ -1532,7 +1629,7 @@ function AdminEditModal() {
                         type="number"
                         min={0}
                         step="1"
-                        value={form.stock[s]}
+                        value={form.stock[s] ?? 0}
                         onChange={(e) => setSizeQty(s, Number(e.target.value))}
                         className="w-full border border-border bg-transparent px-2 py-1.5 text-sm tabular-nums outline-none focus:border-accent"
                       />
@@ -3645,6 +3742,12 @@ function ManualOrderModal({
 
   const chosen = products.find((p) => p.id === productId);
 
+  // A grade segue a peça escolhida: pedido manual de sneaker oferece número,
+  // não P/M/G/GG.
+  const tamanhos = sizesForProduct(chosen?.category, chosen?.name ?? "");
+  // Trocar de peça pode deixar o tamanho selecionado fora da grade nova.
+  const tamanhoAtual = tamanhos.includes(size) ? size : (tamanhos[0] ?? "");
+
   const save = async () => {
     setErr(null);
     if (!customerEmail || !chosen) {
@@ -3663,7 +3766,7 @@ function ManualOrderModal({
             price: Number(total) / Math.max(1, qty),
             image: chosen.image,
             quantity: qty,
-            size,
+            size: tamanhoAtual,
           },
         ],
         address: {
@@ -3761,11 +3864,11 @@ function ManualOrderModal({
                   Tamanho
                 </span>
                 <select
-                  value={size}
-                  onChange={(e) => setSize(e.target.value as Size)}
+                  value={tamanhoAtual}
+                  onChange={(e) => setSize(e.target.value)}
                   className="mt-1 w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
                 >
-                  {SIZES.map((s) => (
+                  {tamanhos.map((s) => (
                     <option key={s} value={s}>
                       {s}
                     </option>

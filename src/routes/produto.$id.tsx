@@ -1,17 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, ShoppingBag, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Minus, Plus, RotateCcw, ShoppingBag, X } from "lucide-react";
 import { useCart, formatBRL, type Product } from "@/lib/cart-context";
 import { categoryLabel } from "@/lib/categories";
 import {
   useCatalog,
-  SIZES,
   emptyStock,
   totalStock,
   hasLastSize,
   type Size,
   type SizeStock,
 } from "@/lib/catalog-context";
+import { sizesForProduct, suggestSizeGrid } from "@/lib/sizes";
 import { getProductById } from "@/lib/catalog.functions";
 import { isRemoteImage, productImageSrc } from "@/lib/product-images";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
@@ -100,10 +100,17 @@ function ProductPage() {
   const [size, setSize] = useState<Size | null>(null);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
 
+  // A grade da peça: letras para roupa, número para calça e sneaker, único
+  // para acessório.
+  const sizes = useMemo(
+    () => sizesForProduct(product?.category, product?.name ?? "", sizeStock),
+    [product?.category, product?.name, sizeStock],
+  );
+
   // Seleciona o primeiro tamanho com estoque — mesma regra que o catálogo já usava.
   useEffect(() => {
-    setSize(SIZES.find((s) => (sizeStock[s] ?? 0) > 0) ?? null);
-  }, [id, sizeStock]);
+    setSize(sizes.find((s) => (sizeStock[s] ?? 0) > 0) ?? null);
+  }, [id, sizes, sizeStock]);
 
   // Sem produto: ou o catálogo ainda está carregando, ou a peça não existe.
   if (!product) {
@@ -114,6 +121,7 @@ function ProductPage() {
     <ProductView
       product={product}
       sizeStock={sizeStock}
+      sizes={sizes}
       size={size}
       setSize={setSize}
       sizeGuideOpen={sizeGuideOpen}
@@ -132,6 +140,7 @@ function ProductPage() {
 function ProductView({
   product,
   sizeStock,
+  sizes,
   size,
   setSize,
   sizeGuideOpen,
@@ -143,6 +152,8 @@ function ProductView({
 }: {
   product: Product;
   sizeStock: SizeStock;
+  /** A grade da peça — o que a lista de botões de tamanho mostra. */
+  sizes: string[];
   size: Size | null;
   setSize: (s: Size) => void;
   sizeGuideOpen: boolean;
@@ -168,6 +179,8 @@ function ProductView({
   const related = products
     .filter((p) => p.id !== product.id && p.category === product.category)
     .slice(0, 10);
+
+  const grade = suggestSizeGrid(product.category, product.name);
 
   const [activeImg, setActiveImg] = useState(0);
   const [zoomIndex, setZoomIndex] = useState<number | null>(null);
@@ -330,19 +343,25 @@ function ProductView({
 
             <StitchDivider className="mt-8" />
 
-            {/* Tamanho */}
+            {/* Tamanho — a grade muda com a espécie da peça: letras na roupa,
+                número na calça e no sneaker, único no acessório. */}
             <div className="mt-8">
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-[11px] tracking-luxe uppercase text-muted-foreground">Tamanho</p>
-                <button
-                  onClick={() => setSizeGuideOpen(true)}
-                  className="text-[11px] uppercase tracking-luxe text-asc-ink underline decoration-asc-line underline-offset-4 transition-colors duration-ascfast ease-asc hover:decoration-asc-gold"
-                >
-                  Guia de tamanhos
-                </button>
+                <p className="text-[11px] tracking-luxe uppercase text-muted-foreground">
+                  {grade === "unico" ? "Tamanho único" : "Tamanho"}
+                </p>
+                {/* O guia mede busto, ombro e manga: só faz sentido na roupa. */}
+                {grade === "letras" && (
+                  <button
+                    onClick={() => setSizeGuideOpen(true)}
+                    className="text-[11px] uppercase tracking-luxe text-asc-ink underline decoration-asc-line underline-offset-4 transition-colors duration-ascfast ease-asc hover:decoration-asc-gold"
+                  >
+                    Guia de tamanhos
+                  </button>
+                )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {SIZES.map((s) => {
+                {sizes.map((s) => {
                   const q = sizeStock[s] ?? 0;
                   const isOut = q === 0;
                   return (
@@ -508,10 +527,17 @@ function ProductHeader({ cartCount, onCartClick }: { cartCount: number; onCartCl
   );
 }
 
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 5;
+const trava = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+
 /**
- * Lightbox — a foto em tela cheia, aberta ao clicar na imagem principal.
- * É aqui que a peça aparece grande; na página ela fica contida para não
- * empurrar as informações de compra para fora da tela.
+ * Lightbox — a foto em tela cheia, com lupa de verdade.
+ *
+ * Antes era só a foto grande: o cursor virava lupa, mas nada ampliava — clicar
+ * apenas fechava. Agora a roda do mouse, a pinça, o duplo clique e os botões
+ * ampliam de fato, e com a foto ampliada o arrasto passeia por ela. Voltar a
+ * 100% devolve o gesto de arrastar para a troca de foto.
  */
 function Lightbox({
   images,
@@ -526,11 +552,63 @@ function Lightbox({
   onIndex: (i: number) => void;
   onClose: () => void;
 }) {
+  const area = useRef<HTMLDivElement | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+
+  // O laço de ponteiros lê e escreve zoom/posição fora do ciclo do React —
+  // um espelho em ref evita depender de estado defasado no meio do gesto.
+  const atual = useRef({ zoom, pos });
+  atual.current = { zoom, pos };
+
+  const total = images.length;
+  const trocar = useCallback(
+    (passo: number) => {
+      if (total < 2) return;
+      onIndex((((index + passo) % total) + total) % total);
+    },
+    [index, total, onIndex],
+  );
+
+  /** Amplia mantendo fixo o ponto (px, py) da área — o que está sob o cursor. */
+  const ampliarEm = useCallback((alvo: number, px: number, py: number) => {
+    const { zoom: z, pos: o } = atual.current;
+    const novo = trava(alvo, ZOOM_MIN, ZOOM_MAX);
+    const k = novo / z;
+    setZoom(novo);
+    setPos(novo === ZOOM_MIN ? { x: 0, y: 0 } : { x: px - (px - o.x) * k, y: py - (py - o.y) * k });
+  }, []);
+
+  const ampliarEmRef = useRef(ampliarEm);
+  ampliarEmRef.current = ampliarEm;
+
+  const passoZoom = useCallback(
+    (fator: number) => {
+      const r = area.current?.getBoundingClientRect();
+      if (!r) return;
+      ampliarEm(atual.current.zoom * fator, r.width / 2, r.height / 2);
+    },
+    [ampliarEm],
+  );
+
+  // Trocar de foto recomeça do zero: continuar ampliado numa foto que a pessoa
+  // ainda não viu inteira é desorientador.
+  useEffect(() => {
+    setZoom(1);
+    setPos({ x: 0, y: 0 });
+  }, [index]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      if (e.key === "ArrowRight") onIndex((index + 1) % images.length);
-      if (e.key === "ArrowLeft") onIndex((index - 1 + images.length) % images.length);
+      if (e.key === "Escape") return onClose();
+      if (e.key === "ArrowRight") return trocar(1);
+      if (e.key === "ArrowLeft") return trocar(-1);
+      if (e.key === "+" || e.key === "=") return passoZoom(1.4);
+      if (e.key === "-") return passoZoom(1 / 1.4);
+      if (e.key === "0") {
+        setZoom(1);
+        setPos({ x: 0, y: 0 });
+      }
     };
     window.addEventListener("keydown", onKey);
     // trava a rolagem do fundo enquanto a foto está aberta
@@ -540,58 +618,199 @@ function Lightbox({
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [index, images.length, onIndex, onClose]);
+  }, [trocar, passoZoom, onClose]);
+
+  // A roda precisa de listener não passivo para poder cancelar a rolagem da
+  // página — e o React só registra os passivos.
+  useEffect(() => {
+    const el = area.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
+      ampliarEmRef.current(
+        atual.current.zoom * Math.exp(-dy * 0.0018),
+        e.clientX - r.left,
+        e.clientY - r.top,
+      );
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  /* ── ponteiros: arrasto, pinça e troca de foto ───────────────────── */
+  const pontos = useRef(new Map<number, { x: number; y: number }>());
+  const arrasto = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+  const pinca = useRef<{ dist: number; zoom: number } | null>(null);
+  const inicio = useRef<{ x: number; y: number; t: number } | null>(null);
+
+  const distancia = () => {
+    const [a, b] = [...pontos.current.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
+
+  const onDown = (e: React.PointerEvent) => {
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    pontos.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pontos.current.size === 2) {
+      pinca.current = { dist: distancia(), zoom: atual.current.zoom };
+      arrasto.current = null;
+      return;
+    }
+    inicio.current = { x: e.clientX, y: e.clientY, t: performance.now() };
+    if (atual.current.zoom > 1) {
+      arrasto.current = { x: e.clientX, y: e.clientY, ox: pos.x, oy: pos.y };
+    }
+  };
+
+  const onMove = (e: React.PointerEvent) => {
+    if (!pontos.current.has(e.pointerId)) return;
+    pontos.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pinca.current && pontos.current.size === 2) {
+      const r = area.current?.getBoundingClientRect();
+      if (!r) return;
+      const [a, b] = [...pontos.current.values()];
+      const d = distancia();
+      if (d > 0) {
+        ampliarEm(
+          (pinca.current.zoom * d) / pinca.current.dist,
+          (a.x + b.x) / 2 - r.left,
+          (a.y + b.y) / 2 - r.top,
+        );
+      }
+      return;
+    }
+
+    const d = arrasto.current;
+    if (d) setPos({ x: d.ox + (e.clientX - d.x), y: d.oy + (e.clientY - d.y) });
+  };
+
+  const onUp = (e: React.PointerEvent) => {
+    const inicial = inicio.current;
+    pontos.current.delete(e.pointerId);
+    if (pontos.current.size < 2) pinca.current = null;
+    arrasto.current = null;
+    inicio.current = null;
+    if (!inicial || atual.current.zoom > 1) return;
+
+    // Sem zoom, o arrasto lateral troca de foto — e o toque curto fecha, que é
+    // o que se espera de uma foto aberta em tela cheia.
+    const dx = e.clientX - inicial.x;
+    const dy = e.clientY - inicial.y;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) return trocar(dx < 0 ? 1 : -1);
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8 && performance.now() - inicial.t < 400) onClose();
+  };
+
+  const ampliado = zoom > 1;
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-asc-bg-dark/95 backdrop-blur-sm"
+      className="fixed inset-0 z-[120] flex flex-col bg-asc-bg-dark/95 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label={`${alt} — foto ampliada`}
-      onClick={onClose}
     >
-      <img
-        src={productImageSrc(images[index], 1600)}
-        alt={`${alt} — foto ${index + 1}`}
-        onClick={(e) => e.stopPropagation()}
-        className="max-h-[92vh] max-w-[94vw] cursor-zoom-out object-contain"
-      />
-
-      <button
-        onClick={onClose}
-        aria-label="Fechar"
-        className="absolute right-5 top-5 text-asc-ink transition-colors duration-ascfast ease-asc hover:text-asc-gold"
-      >
-        <X className="h-6 w-6" strokeWidth={1.5} />
-      </button>
-
-      {images.length > 1 && (
-        <>
+      <div className="flex items-center justify-between px-4 py-3">
+        <span className="asc-label text-[10px] text-asc-ink-muted">
+          {alt}
+          {total > 1 && (
+            <span className="ml-2 tabular-nums">
+              {index + 1} / {total}
+            </span>
+          )}
+        </span>
+        <div className="flex items-center gap-1 text-asc-ink">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onIndex((index - 1 + images.length) % images.length);
-            }}
-            aria-label="Foto anterior"
-            className="absolute left-4 flex h-11 w-11 items-center justify-center border border-asc-line text-asc-ink transition-colors duration-ascfast ease-asc hover:border-asc-gold hover:text-asc-gold"
+            onClick={() => passoZoom(1 / 1.4)}
+            disabled={zoom <= ZOOM_MIN}
+            aria-label="Diminuir zoom"
+            className="rounded-full p-2 transition-colors duration-ascfast ease-asc hover:text-asc-gold disabled:opacity-30"
           >
-            <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
+            <Minus className="h-4 w-4" strokeWidth={1.5} />
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onIndex((index + 1) % images.length);
-            }}
-            aria-label="Próxima foto"
-            className="absolute right-4 flex h-11 w-11 items-center justify-center border border-asc-line text-asc-ink transition-colors duration-ascfast ease-asc hover:border-asc-gold hover:text-asc-gold"
-          >
-            <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
-          </button>
-          <span className="asc-label absolute bottom-5 text-[10px] tabular-nums text-asc-ink-muted">
-            {index + 1} / {images.length}
+          <span className="w-12 text-center text-[11px] tabular-nums text-asc-ink-muted">
+            {Math.round(zoom * 100)}%
           </span>
-        </>
-      )}
+          <button
+            onClick={() => passoZoom(1.4)}
+            disabled={zoom >= ZOOM_MAX}
+            aria-label="Aumentar zoom"
+            className="rounded-full p-2 transition-colors duration-ascfast ease-asc hover:text-asc-gold disabled:opacity-30"
+          >
+            <Plus className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <button
+            onClick={() => {
+              setZoom(1);
+              setPos({ x: 0, y: 0 });
+            }}
+            aria-label="Redefinir zoom"
+            className="rounded-full p-2 transition-colors duration-ascfast ease-asc hover:text-asc-gold"
+          >
+            <RotateCcw className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="rounded-full p-2 transition-colors duration-ascfast ease-asc hover:text-asc-gold"
+          >
+            <X className="h-5 w-5" strokeWidth={1.5} />
+          </button>
+        </div>
+      </div>
+
+      <div
+        ref={area}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+        onDoubleClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          ampliarEm(ampliado ? 1 : 2.5, e.clientX - r.left, e.clientY - r.top);
+        }}
+        className="relative flex-1 touch-none select-none overflow-hidden"
+        style={{ cursor: ampliado ? "grab" : "zoom-in" }}
+      >
+        <img
+          src={productImageSrc(images[index], 1600)}
+          alt={`${alt} — foto ${index + 1}`}
+          draggable={false}
+          className="absolute inset-0 h-full w-full object-contain"
+          style={{
+            transform: `translate(${pos.x}px, ${pos.y}px) scale(${zoom})`,
+            transformOrigin: "0 0",
+            transition: arrasto.current || pinca.current ? "none" : "transform 0.12s ease-out",
+          }}
+        />
+
+        {total > 1 && !ampliado && (
+          <>
+            <button
+              onClick={() => trocar(-1)}
+              aria-label="Foto anterior"
+              className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-asc-line bg-asc-bg-dark/70 text-asc-ink backdrop-blur transition-colors duration-ascfast ease-asc hover:border-asc-gold hover:text-asc-gold"
+            >
+              <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
+            </button>
+            <button
+              onClick={() => trocar(1)}
+              aria-label="Próxima foto"
+              className="absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-asc-line bg-asc-bg-dark/70 text-asc-ink backdrop-blur transition-colors duration-ascfast ease-asc hover:border-asc-gold hover:text-asc-gold"
+            >
+              <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
+            </button>
+          </>
+        )}
+      </div>
+
+      <p className="asc-label pb-4 text-center text-[10px] text-asc-ink-muted">
+        {ampliado
+          ? "Arraste para mover · duplo clique volta ao tamanho normal"
+          : "Role, pince ou dê duplo clique para ampliar · setas trocam de foto"}
+      </p>
     </div>
   );
 }

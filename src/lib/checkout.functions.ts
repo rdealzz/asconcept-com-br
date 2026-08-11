@@ -2,11 +2,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { AVAILABLE_COUPONS, calcDiscount } from "@/lib/coupons";
 import { quoteShipping, normalizeCep } from "@/lib/shipping";
+import { validSize } from "@/lib/payments-validators";
 
 type CheckoutItemInput = {
   id: string;
   quantity: number;
-  size: "P" | "M" | "G" | "GG";
+  /** "M", "42", "Único" — a grade depende da peça (ver `@/lib/sizes`). */
+  size: string;
 };
 
 type CheckoutInput = {
@@ -50,10 +52,7 @@ function validateInput(raw: unknown): CheckoutInput {
     throw new Error("Sua sacola está vazia.");
   }
   const items: CheckoutItemInput[] = d.items.map((it) => {
-    const size = it?.size;
-    if (size !== "P" && size !== "M" && size !== "G" && size !== "GG") {
-      throw new Error("Tamanho inválido em um dos itens.");
-    }
+    const size = validSize(it?.size);
     const quantity = Math.max(1, Math.min(20, Math.floor(Number(it?.quantity) || 0)));
     if (!it?.id || typeof it.id !== "string") throw new Error("Produto inválido no carrinho.");
     return { id: it.id, quantity, size };

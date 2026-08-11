@@ -4,8 +4,23 @@
 export const PIX_DISCOUNT_RATE = 0.05;
 export const MAX_INSTALLMENTS = 12;
 
-export type Size = "P" | "M" | "G" | "GG";
+/**
+ * Tamanho é texto: "M" numa camisa, "42" numa calça ou num sneaker, "Único"
+ * num acessório. A grade de cada peça vive em `@/lib/sizes`; aqui o servidor
+ * só garante que o que chegou é um rótulo curto e limpo, não um campo livre
+ * para injetar coisa.
+ */
+export type Size = string;
 export type ItemInput = { id: string; quantity: number; size: Size };
+
+/** Letras, números e acento — nada mais, até 12 caracteres. */
+const SIZE_RE = /^[\p{L}\p{N}][\p{L}\p{N}\s./-]{0,11}$/u;
+
+export function validSize(raw: unknown): string {
+  const size = typeof raw === "string" ? raw.trim() : "";
+  if (!size || !SIZE_RE.test(size)) throw new Error("Tamanho inválido em um dos itens.");
+  return size;
+}
 
 export type CustomerInput = {
   name: string;
@@ -56,10 +71,7 @@ export function sanitize(v: unknown, max = 200): string {
 export function validItems(raw: unknown): ItemInput[] {
   if (!Array.isArray(raw) || raw.length === 0) throw new Error("Sua sacola está vazia.");
   return raw.map((it) => {
-    const size = (it as ItemInput)?.size;
-    if (size !== "P" && size !== "M" && size !== "G" && size !== "GG") {
-      throw new Error("Tamanho inválido em um dos itens.");
-    }
+    const size = validSize((it as ItemInput)?.size);
     const id = (it as ItemInput)?.id;
     if (!id || typeof id !== "string") throw new Error("Produto inválido no carrinho.");
     const quantity = Math.max(
