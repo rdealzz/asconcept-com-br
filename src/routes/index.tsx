@@ -1317,7 +1317,15 @@ function AdminEditModal() {
           accepted.push(await uploadProductPhoto(file));
         } catch (err) {
           console.error("[fotos] envio falhou", err);
-          setUploadError("Falha ao enviar uma das imagens.");
+          // O motivo real ("acesso negado", "imagem grande demais") vale mais
+          // que um "falhou" genérico: é ele que diz se o problema é a foto, a
+          // sessão ou o servidor.
+          const motivo = err instanceof Error ? err.message.trim() : "";
+          setUploadError(
+            motivo
+              ? `Falha ao enviar uma das imagens: ${motivo}`
+              : "Falha ao enviar uma das imagens.",
+          );
         }
       }
     } finally {
@@ -1533,7 +1541,7 @@ function AdminEditModal() {
               </label>
               {uploadError && <p className="mt-2 text-[10px] text-destructive">{uploadError}</p>}
               <p className="mt-2 text-[9px] tracking-luxe uppercase text-muted-foreground">
-                Até {MAX_PRODUCT_IMAGES} fotos · JPG, PNG ou WEBP · 2 MB cada
+                Até {MAX_PRODUCT_IMAGES} fotos · JPG, PNG ou WEBP · 12 MB cada
               </p>
             </div>
 
