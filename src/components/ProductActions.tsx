@@ -1,10 +1,21 @@
 import { useState } from "react";
 import { Check, Heart, Link2, Share2 } from "lucide-react";
 import { useFavorites } from "@/lib/favorites";
+import { productParam } from "@/lib/variants";
 
-function productUrl(productId: string) {
-  if (typeof window === "undefined") return "";
-  return `${window.location.origin}/?produto=${encodeURIComponent(productId)}`;
+/**
+ * O link que o cliente compartilha.
+ *
+ * Era `/?produto=<id>` — um parâmetro que ninguém lê: quem recebia o link caía
+ * na home, sem a peça. Agora é a página da própria peça, na mesma URL que a
+ * vitrine usa, com a prévia (título e foto) que o `head` da rota monta. Isso
+ * também é o que faz o compartilhamento de uma variação abrir naquela cor, e
+ * não no álbum.
+ */
+function productUrl(productId: string, productName: string) {
+  const caminho = `/produto/${productParam({ id: productId, name: productName })}`;
+  if (typeof window === "undefined") return caminho;
+  return `${window.location.origin}${caminho}`;
 }
 
 export function FavoriteButton({
@@ -51,7 +62,7 @@ export function ShareButton({
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(productUrl(productId));
+      await navigator.clipboard.writeText(productUrl(productId, productName));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -79,7 +90,7 @@ export function ShareButton({
         >
           <a
             href={`https://wa.me/?text=${encodeURIComponent(
-              `${productName} — A&S Conccept ${productUrl(productId)}`,
+              `${productName} — A&S Conccept ${productUrl(productId, productName)}`,
             )}`}
             target="_blank"
             rel="noopener noreferrer"

@@ -806,7 +806,7 @@ function CheckoutPage() {
                             {i.name}
                           </p>
                           <p className="mt-1 text-[11px] font-light tracking-wide text-asc-ink-inverse-muted">
-                            Tam. {i.size} · {i.qty}×
+                            Tam. {i.size} · {i.qty}×{i.colorLabel ? ` · ${i.colorLabel}` : ""}
                           </p>
                         </div>
                         <span className="text-sm font-light tabular-nums text-asc-ink">

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   createContext,
   memo,
@@ -56,6 +56,9 @@ import {
   suggestSizeGrid,
   type SizeGridId,
 } from "@/lib/sizes";
+import { collapseVariants, groupOf, productParam } from "@/lib/variants";
+import { ColorSwatches } from "@/components/ColorSwatches";
+import { VariantsAdmin, SQL_VARIACOES } from "@/components/VariantsAdmin";
 import { supabase } from "@/integrations/supabase/client";
 import { productImageSrc, productImageSrcSet, uploadProductPhoto } from "@/lib/product-images";
 
@@ -159,6 +162,17 @@ function Index() {
     const t = setTimeout(() => scrollToSection(hash), 250);
     return () => clearTimeout(t);
   }, []);
+
+  // Link antigo de compartilhamento: `/?produto=<id>` era o que o botão
+  // "Copiar link" gerava, e ninguém lia esse parâmetro — quem recebia o link
+  // caía na home, sem a peça. Os links já espalhados por aí passam a abrir a
+  // página da peça. O botão hoje gera a URL certa (ver `ProductActions`).
+  const navegar = useNavigate();
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("produto");
+    if (!id) return;
+    void navegar({ to: "/produto/$id", params: { id }, replace: true });
+  }, [navegar]);
 
   return (
     <SearchProvider>
@@ -690,17 +704,21 @@ function CategoryTabs() {
  */
 function ShowroomBand() {
   const { tab } = useSearch();
-  const { products, stock, loading } = useCatalog();
+  const { products, stock, groups, loading } = useCatalog();
   const isAdmin = useIsAdmin();
 
+  // Duas cores da mesma peça em destaque não ocupam dois palcos: a vitrine
+  // giratória mostra o álbum uma vez só, pela peça principal.
   const destaques = useMemo(
     () =>
-      products
-        .filter((p) => coerceCategory(p.category) === tab)
-        .filter((p) => p.isFeatured === true)
-        .filter((p) => totalStock(stock[p.id]) > 0)
-        .slice(0, 8),
-    [products, stock, tab],
+      collapseVariants(
+        products
+          .filter((p) => coerceCategory(p.category) === tab)
+          .filter((p) => p.isFeatured === true)
+          .filter((p) => totalStock(stock[p.id]) > 0),
+        groups,
+      ).slice(0, 8),
+    [products, stock, groups, tab],
   );
 
   // Enquanto o catálogo chega, nada de anunciar vitrine vazia.
@@ -787,7 +805,7 @@ function matchesSub(name: string, description: string, sub: SubFilter) {
 
 function Products() {
   const { query, setQuery, tab, subFilter, setSubFilter } = useSearch();
-  const { products, stock, loading: catalogLoading, refresh: resetCatalog } = useCatalog();
+  const { products, stock, groups, loading: catalogLoading, refresh: resetCatalog } = useCatalog();
   const { openCreate } = useProduct();
   const isAdmin = useIsAdmin();
 
@@ -813,7 +831,20 @@ function Products() {
     );
   }, [query, products, tab, subFilter, isAdmin, stock]);
 
-  const filtered = base;
+  /**
+   * A vitrine mostra um card por álbum, não um por cor.
+   *
+   * Qual das cores aparece: a principal, definida pelo admin. Menos numa
+   * busca — pesquisar "camisa preta" tem de trazer a preta, ainda que a capa
+   * do álbum seja a branca. Como `base` já está filtrada pela busca, o
+   * representante é simplesmente a primeira cor que sobreviveu ao filtro.
+   */
+  const filtered = useMemo(() => {
+    const buscando = query.trim().length > 0;
+    if (!buscando) return collapseVariants(base, groups);
+    const visiveis = new Set(base.map((p) => p.id));
+    return collapseVariants(base, groups, (g) => g.members.find((m) => visiveis.has(m.id)));
+  }, [base, groups, query]);
 
   const showSneakersComingSoon = tab === "sneakers" && !isAdmin && base.length === 0;
 
@@ -1066,7 +1097,7 @@ const ProductCard = memo(function ProductCard({
   priority?: boolean;
 }) {
   const { openEdit } = useProduct();
-  const { stock, deleteProduct, loadGallery } = useCatalog();
+  const { stock, groups, deleteProduct, loadGallery } = useCatalog();
   const isAdmin = useIsAdmin();
   const sizeStock = stock[product.id];
   const total = totalStock(sizeStock);
@@ -1078,6 +1109,15 @@ const ProductCard = memo(function ProductCard({
   const novidade = !soldOut && product.forceNew === true;
 
   const hoverImg = (product.gallery ?? []).find((g) => g && g !== product.image);
+
+  // As outras cores desta peça. Cor esgotada some da fileira para o cliente —
+  // um seletor que leva a uma página "Produto Esgotado" é caminho para lugar
+  // nenhum. Para o admin ela continua à mostra, que é como ele repõe.
+  const album = groupOf(product, groups);
+  const cores = useMemo(
+    () => (album ? album.members.filter((m) => isAdmin || totalStock(stock[m.id]) > 0) : []),
+    [album, isAdmin, stock],
+  );
 
   /**
    * A segunda foto tem de estar em cache ANTES do mouse chegar.
@@ -1136,7 +1176,7 @@ const ProductCard = memo(function ProductCard({
         {!soldOut && (
           <Link
             to="/produto/$id"
-            params={{ id: product.id }}
+            params={{ id: productParam(product) }}
             aria-label={`Ver ${product.name}`}
             className="absolute inset-0 z-20"
           />
@@ -1218,6 +1258,14 @@ const ProductCard = memo(function ProductCard({
           )}
         </div>
       </div>
+      {/* As cores da peça, logo abaixo da foto — como nas vitrines das casas
+          grandes. Cada bolinha abre direto a página daquela cor: o cliente não
+          escolhe duas vezes. Fileira de altura fixa só quando existe álbum,
+          para não abrir buraco embaixo das peças de cor única. */}
+      {cores.length > 1 && (
+        <ColorSwatches members={cores} activeId={product.id} max={6} className="mt-3" />
+      )}
+
       {/* Só foto, nome e preço. Descrição e parcelamento vivem na página da
           peça, que é onde o cliente para para ler — aqui eles só empurravam o
           preço para baixo e desalinhavam a fileira. */}
@@ -2738,8 +2786,10 @@ type ManualCustomerRow = {
 function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, listCustomers, refreshCustomers } = useAuth();
   const { orders, updateStatus, createOrder, refresh: refreshOrders } = useOrders();
-  const { products } = useCatalog();
-  const [tab, setTab] = useState<"calc" | "pedidos" | "clientes" | "produtos">("pedidos");
+  const { products, groups } = useCatalog();
+  const [tab, setTab] = useState<"calc" | "pedidos" | "clientes" | "produtos" | "variacoes">(
+    "pedidos",
+  );
   const [newsletter, setNewsletter] = useState<NewsletterRow[]>([]);
   const [manual, setManual] = useState<ManualCustomerRow[]>([]);
   const [showManualOrder, setShowManualOrder] = useState(false);
@@ -2825,6 +2875,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
     { id: "pedidos" as const, label: `Pedidos (${orders.length})` },
     { id: "clientes" as const, label: `Clientes (${customers.length + manual.length})` },
     { id: "produtos" as const, label: `Produtos (${products.length})` },
+    { id: "variacoes" as const, label: `Variações (${groups.size})` },
   ];
 
   return (
@@ -2968,6 +3019,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
             )}
 
             {tab === "produtos" && <ProdutosAdmin featuredCount={featuredCount} />}
+            {tab === "variacoes" && <VariantsAdmin />}
 
             {tab === "clientes" && (
               <div className="space-y-10">
@@ -3172,6 +3224,7 @@ CREATE INDEX IF NOT EXISTS products_is_featured_idx
 CREATE INDEX IF NOT EXISTS products_force_new_idx
   ON public.products (force_new)
   WHERE force_new;`,
+  variant: SQL_VARIACOES,
 };
 /**
  * Lista de gestão de produtos do painel.

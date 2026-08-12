@@ -116,8 +116,12 @@ export function CartDrawer() {
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
+                      {/* A cor comprada, quando o cadastro a nomeia. O nome da
+                          peça costuma trazê-la, mas não é obrigado: um álbum
+                          pode ter nomes iguais e só a cor separando. */}
                       <p className="asc-label mt-1 text-[10px] text-asc-ink-muted">
                         Tamanho {i.size}
+                        {i.colorLabel ? ` · ${i.colorLabel}` : ""}
                       </p>
                       <div className="mt-auto flex items-center justify-between pt-4">
                         <div className="flex items-center border border-asc-line">

@@ -24,6 +24,15 @@ import { Eyebrow } from "@/components/ui-kit";
 import { ProductGallery } from "@/components/ProductGallery";
 import { Inview, StackedLines } from "@/lib/motion";
 import { useVisualShell } from "@/lib/visual-shell";
+import { noOcioso } from "@/lib/near-viewport";
+import { ColorSwatches } from "@/components/ColorSwatches";
+import {
+  collapseVariants,
+  groupOf,
+  colorName,
+  productIdFromParam,
+  productParam,
+} from "@/lib/variants";
 
 /** Estoque desconhecido. Constante para não virar objeto novo a cada render. */
 const SEM_ESTOQUE: SizeStock = {};
@@ -36,7 +45,8 @@ export const Route = createFileRoute("/produto/$id")({
   // pulado, e a navegação fica instantânea.
   loader: ({ params }) => {
     if (typeof window !== "undefined") return null;
-    return getProductById({ data: { id: params.id } });
+    // A URL agora é `nome-da-peca--<uuid>`; o que o banco conhece é o uuid.
+    return getProductById({ data: { id: productIdFromParam(params.id) } });
   },
   head: ({ loaderData }) => {
     if (!loaderData) return {};
@@ -53,6 +63,14 @@ export const Route = createFileRoute("/produto/$id")({
     const preview = foto ? productImageSrc(foto, 1600) : null;
     const lcp = foto ? productImageSrc(foto, 1000) : null;
 
+    // Cada cor é uma página própria, e o canônico dela é ela mesma: são
+    // produtos distintos, com SKU, estoque e preço distintos — apontar as
+    // outras cores para uma "página pai" apagaria da busca justamente o que o
+    // cliente procura ("camisa preta"). O caminho é relativo de propósito: o
+    // `head` roda sem conhecer o domínio, e um canônico com host errado é pior
+    // do que nenhum.
+    const caminho = `/produto/${productParam(product)}`;
+
     return {
       meta: [
         { title },
@@ -66,9 +84,14 @@ export const Route = createFileRoute("/produto/$id")({
         { name: "twitter:description", content: description },
         ...(preview ? [{ name: "twitter:image", content: preview }] : []),
       ],
-      // A capa é o LCP desta página. Pedir cedo evita que ela espere o
-      // JavaScript hidratar para só então descobrir que precisa da foto.
-      links: lcp ? [{ rel: "preload", as: "image", href: lcp, fetchpriority: "high" }] : [],
+      links: [
+        { rel: "canonical", href: caminho },
+        // A capa é o LCP desta página. Pedir cedo evita que ela espere o
+        // JavaScript hidratar para só então descobrir que precisa da foto.
+        ...(lcp
+          ? [{ rel: "preload", as: "image", href: lcp, fetchpriority: "high" } as const]
+          : []),
+      ],
     };
   },
   component: ProductPage,
@@ -77,10 +100,13 @@ export const Route = createFileRoute("/produto/$id")({
 
 function ProductPage() {
   useVisualShell();
-  const { id } = Route.useParams();
+  // A URL é `nome-da-peca--<uuid>`; o catálogo conhece o uuid. Link antigo,
+  // só com o uuid, continua caindo aqui do mesmo jeito.
+  const { id: param } = Route.useParams();
+  const id = productIdFromParam(param);
   const loaded = Route.useLoaderData();
   const { add, count, open: openCart } = useCart();
-  const { products, stock: liveStock, loading: catalogLoading, loadGallery } = useCatalog();
+  const { products, stock: liveStock, groups, loading: catalogLoading, loadGallery } = useCatalog();
 
   // A vitrine traz só a foto de capa; aqui buscamos o resto da galeria.
   // Se o cliente passou o mouse pelo card antes de clicar, já veio.
@@ -92,6 +118,47 @@ function ProductPage() {
   // que o catálogo do cliente hidrata, ele passa a ser a fonte de verdade —
   // é o que reflete uma edição feita no painel do admin.
   const product: Product | null = products.find((p) => p.id === id) ?? loaded?.product ?? null;
+
+  // As outras cores da peça. A troca entre elas é navegação do roteador com o
+  // catálogo já em memória — nada recarrega. O que poderia demorar são as
+  // fotos, então as galerias das irmãs são pedidas em lote assim que esta
+  // página abre (uma requisição só, ver `loadGallery`), e a capa de cada uma é
+  // baixada em prioridade baixa. Quando o clique vem, já está tudo em cache.
+  const album = groupOf(product, groups);
+  const irmas = useMemo(() => album?.members ?? [], [album]);
+
+  useEffect(() => {
+    if (irmas.length < 2) return;
+    return noOcioso(() => {
+      for (const m of irmas) {
+        if (m.id === id) continue;
+        void loadGallery(m.id);
+        if (!m.image) continue;
+        const img = new Image();
+        img.decoding = "async";
+        img.fetchPriority = "low";
+        img.src = productImageSrc(m.image, 1000);
+      }
+    });
+  }, [irmas, id, loadGallery]);
+
+  // "Complete o Look": mesma categoria, sem as cores irmãs (elas já estão nos
+  // seletores, logo acima) e com uma cor por álbum — o carrossel não repete a
+  // mesma peça em quatro tons.
+  const related = useMemo(
+    () =>
+      collapseVariants(
+        products.filter(
+          (p) =>
+            p.id !== product?.id &&
+            p.category === product?.category &&
+            (!album || p.variant?.group !== album.id),
+        ),
+        groups,
+      ).slice(0, 10),
+    [products, product?.id, product?.category, album, groups],
+  );
+
   // `emptyStock()` devolvia um objeto novo a cada render, e ele é dependência
   // do memo da grade e do efeito que escolhe o tamanho — os dois refaziam
   // trabalho a cada quadro enquanto o catálogo não chegava.
@@ -126,13 +193,14 @@ function ProductPage() {
   return (
     <ProductView
       product={product}
+      irmas={irmas}
       sizeStock={sizeStock}
       sizes={sizes}
       size={size}
       setSize={setSize}
       sizeGuideOpen={sizeGuideOpen}
       setSizeGuideOpen={setSizeGuideOpen}
-      products={products}
+      related={related}
       cartCount={count}
       onCartClick={openCart}
       // Só põe na sacola. O estoque não se mexe aqui: reservar peça na hora
@@ -145,18 +213,21 @@ function ProductPage() {
 
 function ProductView({
   product,
+  irmas,
   sizeStock,
   sizes,
   size,
   setSize,
   sizeGuideOpen,
   setSizeGuideOpen,
-  products,
+  related,
   cartCount,
   onCartClick,
   onAdd,
 }: {
   product: Product;
+  /** As cores irmãs desta peça, na ordem dos seletores. Vazio fora de um álbum. */
+  irmas: readonly Product[];
   sizeStock: SizeStock;
   /** A grade da peça — o que a lista de botões de tamanho mostra. */
   sizes: string[];
@@ -164,7 +235,8 @@ function ProductView({
   setSize: (s: Size) => void;
   sizeGuideOpen: boolean;
   setSizeGuideOpen: (v: boolean) => void;
-  products: Product[];
+  /** "Complete o Look": peças da mesma categoria, uma cor por álbum. */
+  related: Product[];
   cartCount: number;
   onCartClick: () => void;
   onAdd: (size: Size) => void;
@@ -184,9 +256,6 @@ function ProductView({
     () => (product.gallery?.length ? product.gallery : product.image ? [product.image] : []),
     [product.gallery, product.image],
   );
-  const related = products
-    .filter((p) => p.id !== product.id && p.category === product.category)
-    .slice(0, 10);
 
   // A grade que a peça realmente usa: a dos tamanhos cadastrados. O palpite
   // pelo nome ("shorts" sugere numeração) não passa por cima do cadastro.
@@ -214,6 +283,20 @@ function ProductView({
   useEffect(() => {
     document.title = `${product.name} — A&S Conccept`;
   }, [product.name]);
+
+  // Pelo mesmo motivo, o canônico: trocar de cor é navegação do roteador, e o
+  // `<link rel="canonical">` que veio do servidor continuaria apontando para a
+  // cor anterior. Cada variação é uma página própria e canônica de si mesma.
+  useEffect(() => {
+    const href = `/produto/${productParam(product)}`;
+    let tag = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!tag) {
+      tag = document.createElement("link");
+      tag.rel = "canonical";
+      document.head.appendChild(tag);
+    }
+    tag.setAttribute("href", new URL(href, window.location.origin).toString());
+  }, [product]);
 
   function handleAdd() {
     if (!canAdd || !size) return;
@@ -374,6 +457,25 @@ function ProductView({
 
             <StitchDivider className="mt-8" />
 
+            {/* Cor — os seletores do álbum. Cada bolinha é a página daquela
+                cor: o clique troca a peça inteira (fotos, nome, preço, SKU,
+                estoque e URL) numa navegação do roteador, sem recarregar a
+                página, porque o catálogo inteiro já está em memória e as fotos
+                das irmãs foram pré-carregadas ao abrir esta. */}
+            {irmas.length > 1 && (
+              <div className="mt-8">
+                <div className="mb-3 flex items-baseline justify-between gap-3">
+                  <p className="text-[11px] tracking-luxe uppercase text-muted-foreground">Cor</p>
+                  {/* O nome da cor só aparece quando existe: repetir o nome da
+                      peça ao lado do título não informa nada. */}
+                  {colorName(product) && (
+                    <p className="truncate text-[11px] text-asc-ink">{colorName(product)}</p>
+                  )}
+                </div>
+                <ColorSwatches members={irmas} activeId={product.id} size="md" />
+              </div>
+            )}
+
             {/* Tamanho — a grade muda com a espécie da peça: letras na roupa,
                 número na calça e no sneaker, único no acessório. */}
             <div className="mt-8">
@@ -511,6 +613,18 @@ function ProductView({
         selected={size}
       />
 
+      {/* Ficha da peça para o robô de busca — desta cor, não do álbum: nome,
+          foto, SKU, preço e disponibilidade da variação aberta. Vai no corpo, e
+          não no `head`, porque o `head` da rota só é montado no servidor: numa
+          troca de cor sem recarregar a página ele ficaria falando da cor
+          anterior. As demais cores entram como `isSimilarTo`, que é o que
+          conta ao buscador que elas são a mesma peça em outro tom. */}
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(fichaJsonLd(product, sizeStock, irmas)) }}
+      />
+
       {zoomIndex !== null && (
         <Lightbox
           images={gallery}
@@ -522,6 +636,50 @@ function ProductView({
       )}
     </div>
   );
+}
+
+/**
+ * Schema.org Product da variação aberta.
+ *
+ * O `sku` é o id da peça — é ele que vai para o carrinho, para o pedido e para
+ * o e-mail, então é o mesmo identificador de ponta a ponta. Preço e
+ * disponibilidade saem do que está gravado agora; sem estoque, `OutOfStock`.
+ */
+function fichaJsonLd(product: Product, sizeStock: SizeStock, irmas: readonly Product[]) {
+  const caminho = `/produto/${productParam(product)}`;
+  const emEstoque = totalStock(sizeStock) > 0;
+  const cor = product.variant?.colorLabel;
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    ...(product.description ? { description: product.description } : {}),
+    ...(isRemoteImage(product.image) ? { image: [productImageSrc(product.image, 1600)] } : {}),
+    ...(cor ? { color: cor } : {}),
+    sku: product.id,
+    brand: { "@type": "Brand", name: "A&S Conccept" },
+    url: caminho,
+    offers: {
+      "@type": "Offer",
+      price: product.price.toFixed(2),
+      priceCurrency: "BRL",
+      availability: emEstoque ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      url: caminho,
+    },
+    ...(irmas.length > 1
+      ? {
+          isSimilarTo: irmas
+            .filter((m) => m.id !== product.id)
+            .map((m) => ({
+              "@type": "Product",
+              name: m.name,
+              sku: m.id,
+              url: `/produto/${productParam(m)}`,
+            })),
+        }
+      : {}),
+  };
 }
 
 /** Cabeçalho enxuto: o Nav da home depende do SearchProvider, que é local dela. */

@@ -1,8 +1,17 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Product } from "@/lib/cart-context";
 import { coerceCategory } from "@/lib/categories";
 import { SIZE_GRIDS } from "@/lib/sizes";
+import { buildGroups, coerceVariant, type VariantGroup, type VariantMeta } from "@/lib/variants";
 
 /**
  * Catálogo (Supabase) — extraído de routes/index.tsx para que outras rotas
@@ -52,7 +61,7 @@ export const LIST_COLUMNS_BASE =
  * a loja fica sem catálogo — bem pior do que ficar sem curadoria. Então a
  * leitura desce um degrau por coluna ausente e segue a vida.
  */
-export const OPTIONAL_COLUMNS = ["is_featured", "force_new"] as const;
+export const OPTIONAL_COLUMNS = ["is_featured", "force_new", "variant"] as const;
 export type OptionalColumn = (typeof OPTIONAL_COLUMNS)[number];
 
 export const LIST_COLUMNS = [LIST_COLUMNS_BASE, ...OPTIONAL_COLUMNS].join(",");
@@ -66,6 +75,12 @@ export function isMissingColumn(error: { code?: string; message?: string } | nul
 type CatalogCtx = {
   products: Product[];
   stock: Record<string, SizeStock>;
+  /**
+   * Álbuns de cor do catálogo, por id de álbum. Derivado dos produtos — é o
+   * que a vitrine usa para mostrar um card no lugar de cinco. Ver
+   * `@/lib/variants`.
+   */
+  groups: Map<string, VariantGroup>;
   loading: boolean;
   /**
    * Busca as fotos restantes (e a descrição longa) de uma peça e as funde ao
@@ -88,6 +103,13 @@ type CatalogCtx = {
    * migração ainda não rodou, o admin precisa saber disso, não um console.
    */
   setFeatured: (id: string, featured: boolean) => Promise<string | null>;
+  /**
+   * Grava o álbum de uma vez: cada peça recebe a sua variação (ou `null`, que
+   * a tira do grupo). Devolve `null` em caso de sucesso ou a mensagem pronta
+   * para a tela — se a migração das variações ainda não rodou, o admin precisa
+   * saber disso na hora de salvar, não num console.
+   */
+  saveGroup: (entries: Array<{ id: string; meta: VariantMeta | null }>) => Promise<string | null>;
   addProduct: (p: ProductInput, stock: SizeStock) => Promise<string | null>;
   deleteProduct: (id: string) => Promise<void>;
   setStock: (id: string, stock: SizeStock) => Promise<void>;
@@ -136,6 +158,8 @@ export type ProductRow = {
   /** Ausentes enquanto a migração de curadoria correspondente não rodou. */
   is_featured?: boolean | null;
   force_new?: boolean | null;
+  /** Álbum de cores (JSONB). Ausente enquanto a migração de variações não rodou. */
+  variant?: unknown;
   sort_order: number;
   created_at?: string | null;
 };
@@ -158,6 +182,7 @@ export function rowToProduct(r: ProductRow): Product {
     forceNew: r.force_new === true,
     isFeatured: r.is_featured === true,
     createdAt: r.created_at ?? undefined,
+    variant: coerceVariant(r.variant),
   };
 }
 
@@ -329,6 +354,9 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     if (patch.isFeatured !== undefined && !missingColumns.includes("is_featured")) {
       dbPatch.is_featured = patch.isFeatured === true;
     }
+    if (patch.variant !== undefined && !missingColumns.includes("variant")) {
+      dbPatch.variant = patch.variant ?? null;
+    }
 
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
     const { error } = await supabase
@@ -339,6 +367,43 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       console.error("[catalog] update failed", error);
       await refresh();
     }
+  };
+
+  /**
+   * Salva o álbum inteiro.
+   *
+   * As linhas vão uma a uma porque o que muda é diferente em cada peça
+   * (posição, cor, quem é a principal) — um `upsert` em lote precisaria mandar
+   * a linha inteira de volta e sobrescreveria o que outra tela tivesse
+   * mudado. São poucas peças por álbum, e isto só roda no painel.
+   *
+   * O estado local é atualizado antes: a tela do admin reordena na hora, e a
+   * vitrine já mostra o card agrupado. Falhou, recarrega do banco e conta o
+   * que houve.
+   */
+  const saveGroup: CatalogCtx["saveGroup"] = async (entries) => {
+    if (missingColumns.includes("variant")) {
+      return "A coluna variant ainda não existe no banco. Rode a migração de variações.";
+    }
+    const porId = new Map(entries.map((e) => [e.id, e.meta]));
+    setProducts((prev) =>
+      prev.map((p) => (porId.has(p.id) ? { ...p, variant: porId.get(p.id) ?? null } : p)),
+    );
+
+    for (const { id, meta } of entries) {
+      const { error } = await supabase
+        .from("products")
+        .update({ variant: meta } as never)
+        .eq("id", id);
+      if (!error) continue;
+
+      console.error("[catalog] saveGroup failed", error);
+      await refresh();
+      return isMissingColumn(error)
+        ? "A coluna variant ainda não existe no banco. Rode a migração de variações."
+        : "Não foi possível salvar o álbum. Tente novamente.";
+    }
+    return null;
   };
 
   const setFeatured: CatalogCtx["setFeatured"] = async (id, featured) => {
@@ -369,6 +434,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       force_last_item: p.forceLastItem === true,
       sizes: coerceSizeStock(s),
       ...(missingColumns.includes("force_new") ? {} : { force_new: p.forceNew === true }),
+      ...(missingColumns.includes("variant") ? {} : { variant: p.variant ?? null }),
     };
     const { data, error } = await supabase
       .from("products")
@@ -412,16 +478,22 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Derivado, e não guardado: o álbum é só uma leitura dos produtos, e manter
+  // uma cópia em estado significaria duas verdades para o mesmo fato.
+  const groups = useMemo(() => buildGroups(products), [products]);
+
   return (
     <CatalogContext.Provider
       value={{
         products,
         stock,
+        groups,
         loading,
         loadGallery,
         missingColumns,
         updateProduct,
         setFeatured,
+        saveGroup,
         addProduct,
         deleteProduct,
         setStock,

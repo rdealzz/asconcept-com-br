@@ -6,6 +6,7 @@ import { ArrowButton } from "@/components/ui-kit";
 import { Inview, StackedLines } from "@/lib/motion";
 import { productImageSrc, productImageSrcSet } from "@/lib/product-images";
 import { ProductCardMeta } from "@/components/ProductCardMeta";
+import { productParam } from "@/lib/variants";
 
 /**
  * RelatedProducts — "Complete o Look" ao fim da página de produto.
@@ -54,7 +55,7 @@ export function RelatedProducts({
             y={32}
             className="group w-[220px] shrink-0 snap-start sm:w-[260px]"
           >
-            <Link to="/produto/$id" params={{ id: p.id }} className="block">
+            <Link to="/produto/$id" params={{ id: productParam(p) }} className="block">
               <div className="relative aspect-[3/4] overflow-hidden border border-asc-line bg-asc-bg-raised transition-colors duration-asc ease-asc group-hover:border-asc-gold/60">
                 {/* Card de 220–260px: a variante de 480 já cobre telas 2x. */}
                 <img

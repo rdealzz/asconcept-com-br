@@ -8,6 +8,8 @@ import { GarmentTurntable } from "@/components/GarmentTurntable";
 import { Eyebrow } from "@/components/ui-kit";
 import { productImageSrc, productImageSrcSet } from "@/lib/product-images";
 import { noOcioso } from "@/lib/near-viewport";
+import { groupOf, productParam } from "@/lib/variants";
+import { ColorSwatches } from "@/components/ColorSwatches";
 
 /**
  * Vitrine giratória — o palco da coleção.
@@ -70,7 +72,7 @@ export function Showroom({
   eyebrow: string;
   sideTitle: [string, string];
 }) {
-  const { stock, loadGallery } = useCatalog();
+  const { stock, groups: grupos, loadGallery } = useCatalog();
   const navegar = useNavigate();
   const [ativo, setAtivo] = useState(0);
   const [janela, setJanela] = useState(0);
@@ -112,6 +114,11 @@ export function Showroom({
   }, [pecaGaleria, pecaCapa]);
 
   const ambiente = AMBIENTES[ativo % AMBIENTES.length];
+  // As outras cores da peça em cartaz, quando ela é de um álbum.
+  const album = groupOf(peca, grupos);
+  const cores = album
+    ? album.members.filter((m) => totalStock(stock[m.id]) > 0 || m.id === pecaId)
+    : [];
   const sizeStock = pecaId ? stock[pecaId] : undefined;
   const disponiveis = sizesForProduct(peca?.category, peca?.name ?? "", sizeStock).filter(
     (s) => (sizeStock?.[s] ?? 0) > 0,
@@ -120,9 +127,9 @@ export function Showroom({
 
   // Clique curto na peça (sem arrasto) abre a página dela.
   const abrir = useCallback(() => {
-    if (!pecaId) return;
-    void navegar({ to: "/produto/$id", params: { id: pecaId } });
-  }, [pecaId, navegar]);
+    if (!peca) return;
+    void navegar({ to: "/produto/$id", params: { id: productParam(peca) } });
+  }, [pecaId, peca, navegar]);
 
   if (!peca || fotos.length === 0) return null;
 
@@ -216,9 +223,16 @@ export function Showroom({
               </div>
             )}
 
+            {cores.length > 1 && (
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <span className="asc-label text-[10px] text-asc-ink-inverse-muted">Cores</span>
+                <ColorSwatches members={cores} activeId={peca.id} size="md" max={8} />
+              </div>
+            )}
+
             <Link
               to="/produto/$id"
-              params={{ id: peca.id }}
+              params={{ id: productParam(peca) }}
               className="group mt-8 inline-flex w-fit items-center gap-5 rounded-full bg-asc-bg-dark/70 py-1.5 pl-6 pr-1.5 text-[11px] font-semibold uppercase tracking-wide text-asc-ink backdrop-blur transition-all duration-asc ease-asc hover:-translate-y-0.5 hover:bg-asc-bg-dark"
             >
               Ver a Peça

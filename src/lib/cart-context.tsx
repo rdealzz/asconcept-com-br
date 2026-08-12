@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { calcDiscount, type Coupon } from "./coupons";
 import { PIX_DISCOUNT_RATE } from "./payments-validators";
 import type { ProductCategory } from "./categories";
+import type { VariantMeta } from "./variants";
 
 // Reexportado para não quebrar os `import { type ProductCategory } from
 // "@/lib/cart-context"` espalhados pelo app — a definição mora em
@@ -25,6 +26,12 @@ export type Product = {
   isFeatured?: boolean;
   /** ISO timestamp de cadastro. Ordena a listagem; não decide tag nenhuma. */
   createdAt?: string;
+  /**
+   * Álbum de cores a que a peça pertence, quando pertence a algum. Cada cor
+   * continua sendo um produto inteiro — isto só diz quais deles a vitrine
+   * mostra como um card só. Ver `@/lib/variants`.
+   */
+  variant?: VariantMeta | null;
 };
 
 export type CartItem = {
@@ -34,6 +41,15 @@ export type CartItem = {
   image: string;
   size: string;
   qty: number;
+  /**
+   * A cor comprada, por extenso ("Preta com logo vermelho").
+   *
+   * O `id`, o nome, a foto e o preço já são os da variação — cada cor é um
+   * produto próprio, então a sacola nunca foi genérica. Isto é o rótulo em
+   * palavras, para a linha do carrinho dizer a cor mesmo quando o nome da peça
+   * não a traz. Opcional: sacola gravada antes desta versão não tem o campo.
+   */
+  colorLabel?: string;
 };
 
 type CartCtx = {
@@ -112,7 +128,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const existing = prev.find((i) => i.id === p.id && i.size === size);
       if (existing)
         return prev.map((i) => (i.id === p.id && i.size === size ? { ...i, qty: i.qty + 1 } : i));
-      return [...prev, { id: p.id, name: p.name, price: p.price, image: p.image, size, qty: 1 }];
+      return [
+        ...prev,
+        {
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          image: p.image,
+          size,
+          qty: 1,
+          ...(p.variant?.colorLabel ? { colorLabel: p.variant.colorLabel } : {}),
+        },
+      ];
     });
     setOpen(true);
   };

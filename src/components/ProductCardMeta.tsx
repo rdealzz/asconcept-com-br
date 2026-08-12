@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { formatBRL } from "@/lib/cart-context";
+import { productParam } from "@/lib/variants";
 
 /**
  * Nome e preço abaixo da foto — o rodapé de todo card de listagem.
@@ -34,7 +35,7 @@ export function ProductCardMeta({
       <h3 className="font-display text-[0.9rem] leading-snug text-asc-ink sm:text-base">
         <Link
           to="/produto/$id"
-          params={{ id }}
+          params={{ id: productParam({ id, name }) }}
           // `min-h` em `em` acompanha o corpo do texto em cada breakpoint, então
           // as duas linhas reservadas continuam valendo quando a fonte cresce.
           className="line-clamp-2 min-h-[2.75em] break-words transition-colors duration-ascfast ease-asc hover:text-asc-gold"
