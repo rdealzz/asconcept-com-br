@@ -59,6 +59,7 @@ import {
 import { collapseVariants, groupOf, productParam } from "@/lib/variants";
 import { ColorSwatches } from "@/components/ColorSwatches";
 import { VariantsAdmin, SQL_VARIACOES } from "@/components/VariantsAdmin";
+import { StorageSecurityNote } from "@/components/StorageSecurityNote";
 import { supabase } from "@/integrations/supabase/client";
 import { productImageSrc, productImageSrcSet, uploadProductPhoto } from "@/lib/product-images";
 
@@ -903,14 +904,17 @@ function Products() {
               >
                 <Plus className="h-3.5 w-3.5" strokeWidth={2} /> Adicionar Novo Produto
               </button>
+              {/* O botão relê o catálogo do banco — e é só isso que ele sempre
+                  fez. O rótulo dizia "Restaurar catálogo original" e o aviso
+                  prometia que "todas as edições serão perdidas": um susto por
+                  engano, que fazia parecer que o painel tinha um botão capaz de
+                  apagar o trabalho de cadastro. Nada é apagado. */}
               <button
-                onClick={() => {
-                  if (confirm("Restaurar catálogo original? Todas as edições serão perdidas."))
-                    resetCatalog();
-                }}
+                onClick={() => void resetCatalog()}
+                title="Relê as peças do banco — útil depois de editar em outra aba ou de rodar uma migração."
                 className="inline-flex items-center gap-2 border border-accent/50 px-3 py-2 text-[10px] tracking-luxe uppercase text-accent hover:bg-accent/10 transition-colors"
               >
-                <RotateCcw className="h-3 w-3" strokeWidth={1.5} /> Restaurar catálogo
+                <RotateCcw className="h-3 w-3" strokeWidth={1.5} /> Recarregar catálogo
               </button>
             </div>
           )}
@@ -1532,7 +1536,16 @@ function AdminEditModal() {
     const gallery = form.gallery.slice(0, MAX_PRODUCT_IMAGES);
     if (!gallery.length) return alert("Envie ao menos uma foto do produto.");
     const cover = gallery[0];
+    // Preço tem de ser maior que zero.
+    //
+    // Salvar com 0 fazia a peça entrar na vitrine anunciando "R$ 0,00" e, pior,
+    // virar um beco sem saída: o cliente escolhe o tamanho, vai pagar, e o
+    // servidor recusa o pedido com "Preço inválido" — ele recalcula tudo pelo
+    // banco e não aceita peça sem preço (ver `createPendingOrderCore`). Melhor
+    // barrar aqui, onde ainda dá para digitar o número certo.
     const price = Math.max(0, Number(form.price) || 0);
+    if (price <= 0)
+      return alert("Informe o preço da peça — ela não pode ir para a vitrine sem preço.");
     // Grava só os tamanhos que estavam na tela: assim uma peça que mudou de
     // grade não fica com "M: 0" perdido no banco para sempre.
     const stockObj: SizeStock = {};
@@ -3342,6 +3355,7 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
                 const destacada = p.isFeatured === true;
                 const total = totalStock(stock[p.id]);
                 const gradeMista = temGradeMista(stock[p.id]);
+                const semPreco = !(Number(p.price) > 0);
                 return (
                   <tr key={p.id} className="border-b border-border/50 align-middle">
                     <td className="py-3 pr-3">
@@ -3380,7 +3394,16 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
                       {categoryLabel(p.category)}
                     </td>
                     <td className="py-3 pr-3 text-right font-serif tabular-nums">
-                      {formatBRL(p.price)}
+                      {semPreco ? (
+                        <span
+                          className="text-destructive"
+                          title="Peça sem preço: aparece como R$ 0,00 na vitrine e o pagamento é recusado. Abra a peça e informe o preço."
+                        >
+                          Sem preço
+                        </span>
+                      ) : (
+                        formatBRL(p.price)
+                      )}
                     </td>
                     <td className="py-3 pr-3 text-right tabular-nums">
                       {total === 0 ? (
@@ -3425,6 +3448,8 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
           </table>
         </div>
       )}
+
+      <StorageSecurityNote />
     </div>
   );
 }

@@ -634,7 +634,7 @@ function ProductView({
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(fichaJsonLd(product, sizeStock, irmas)) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdSeguro(fichaJsonLd(product, sizeStock, irmas)) }}
       />
 
       {zoomIndex !== null && (
@@ -648,6 +648,19 @@ function ProductView({
       )}
     </div>
   );
+}
+
+/**
+ * JSON pronto para ir dentro de uma `<script>`.
+ *
+ * O conteúdo é montado a partir do cadastro, e um nome de peça que contivesse
+ * `</script>` fecharia a tag ali no meio — o resto viraria HTML da página. É o
+ * caminho clássico de injeção por dentro de dado "confiável". Escapar `<`
+ * fecha isso, e não muda nada para quem lê o JSON: `<` é o mesmo
+ * caractere.
+ */
+function jsonLdSeguro(ficha: unknown): string {
+  return JSON.stringify(ficha).replace(/</g, "\\u003c");
 }
 
 /**
