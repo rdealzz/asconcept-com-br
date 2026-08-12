@@ -59,7 +59,6 @@ import {
 import { collapseVariants, groupOf, productParam } from "@/lib/variants";
 import { ColorSwatches } from "@/components/ColorSwatches";
 import { VariantsAdmin, SQL_VARIACOES } from "@/components/VariantsAdmin";
-import { StorageSecurityNote } from "@/components/StorageSecurityNote";
 import { supabase } from "@/integrations/supabase/client";
 import { productImageSrc, productImageSrcSet, uploadProductPhoto } from "@/lib/product-images";
 
@@ -3448,8 +3447,6 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
           </table>
         </div>
       )}
-
-      <StorageSecurityNote />
     </div>
   );
 }
