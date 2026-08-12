@@ -3,14 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Minus, Plus, RotateCcw, ShoppingBag, X } from "lucide-react";
 import { useCart, formatBRL, type Product } from "@/lib/cart-context";
 import { categoryLabel } from "@/lib/categories";
-import {
-  useCatalog,
-  emptyStock,
-  totalStock,
-  type Size,
-  type SizeStock,
-} from "@/lib/catalog-context";
-import { sizesForProduct, suggestSizeGrid } from "@/lib/sizes";
+import { useCatalog, totalStock, type Size, type SizeStock } from "@/lib/catalog-context";
+import { gridForProduct, sizesForProduct } from "@/lib/sizes";
 import { getProductById } from "@/lib/catalog.functions";
 import { isRemoteImage, productImageSrc } from "@/lib/product-images";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
@@ -30,6 +24,9 @@ import { Eyebrow } from "@/components/ui-kit";
 import { ProductGallery } from "@/components/ProductGallery";
 import { Inview, StackedLines } from "@/lib/motion";
 import { useVisualShell } from "@/lib/visual-shell";
+
+/** Estoque desconhecido. Constante para não virar objeto novo a cada render. */
+const SEM_ESTOQUE: SizeStock = {};
 
 export const Route = createFileRoute("/produto/$id")({
   // O loader existe só para o HTML do servidor sair com título e og:image
@@ -98,8 +95,11 @@ function ProductPage() {
   // `emptyStock()` devolvia um objeto novo a cada render, e ele é dependência
   // do memo da grade e do efeito que escolhe o tamanho — os dois refaziam
   // trabalho a cada quadro enquanto o catálogo não chegava.
+  // Sem estoque conhecido, um objeto vazio — e não `emptyStock()`, que devolve
+  // a grade de letras zerada e faria uma calça exibir P/M/G/GG esgotados
+  // enquanto o catálogo não chega.
   const sizeStock: SizeStock = useMemo(
-    () => liveStock[id] ?? loaded?.stock ?? emptyStock(),
+    () => liveStock[id] ?? loaded?.stock ?? SEM_ESTOQUE,
     [liveStock, id, loaded?.stock],
   );
 
@@ -188,7 +188,10 @@ function ProductView({
     .filter((p) => p.id !== product.id && p.category === product.category)
     .slice(0, 10);
 
-  const grade = suggestSizeGrid(product.category, product.name);
+  // A grade que a peça realmente usa: a dos tamanhos cadastrados. O palpite
+  // pelo nome ("shorts" sugere numeração) não passa por cima do cadastro.
+  const grade = gridForProduct(product.category, product.name, sizes);
+  const tamanhoUnico = grade === "unico" && sizes.length <= 1;
   // A tabela de medidas da peça — `null` em acessório, que é tamanho único.
   // Sai dos tamanhos que a peça oferece, e não da grade genérica.
   const guide = sizeGuideFor(product.category, product.name, sizes);
@@ -388,7 +391,10 @@ function ProductView({
                   </button>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2">
+              {/* Peça de tamanho único não ganha seletor: um botão "Único"
+                  embaixo do rótulo "Tamanho único" é a mesma informação duas
+                  vezes, e não há escolha a fazer. */}
+              <div className={`flex flex-wrap gap-2 ${tamanhoUnico ? "hidden" : ""}`}>
                 {sizes.map((s) => {
                   const q = sizeStock[s] ?? 0;
                   const isOut = q === 0;

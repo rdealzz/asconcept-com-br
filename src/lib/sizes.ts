@@ -69,25 +69,79 @@ export function suggestSizes(
   return SIZE_GRIDS[suggestSizeGrid(category, name)];
 }
 
+/** Ordem de leitura das letras. Fora daqui, número sobe e o resto vai ao fim. */
+const ORDEM_LETRAS = ["PP", "P", "M", "G", "GG", "XGG", "XXGG"];
+
 /**
- * Os tamanhos que uma peça já cadastrada mostra na loja.
+ * Ordena tamanhos cadastrados fora de ordem.
  *
- * Parte da grade sugerida e acrescenta, no fim, todo tamanho que o estoque
- * gravado ainda tem em mãos e que não pertence a ela. É o que segura as peças
- * antigas: uma calça cadastrada quando só existia P/M/G/GG continua vendendo o
- * que está no depósito até alguém reeditá-la, em vez de sumir da loja.
+ * O estoque é JSONB: a ordem das chaves é a que o banco devolver, não a que faz
+ * sentido para quem compra. Letras saem na ordem de sempre, números em ordem
+ * crescente e qualquer rótulo estranho fica no fim, sem sumir.
+ */
+function ordenarTamanhos(lista: readonly string[]): string[] {
+  const peso = (s: string): [number, number, string] => {
+    const letra = ORDEM_LETRAS.indexOf(s.toUpperCase());
+    if (letra >= 0) return [0, letra, s];
+    const n = Number(s.replace(",", "."));
+    if (Number.isFinite(n)) return [1, n, s];
+    return [2, 0, s.toLowerCase()];
+  };
+  return [...lista].sort((a, b) => {
+    const [ga, va, ta] = peso(a);
+    const [gb, vb, tb] = peso(b);
+    return ga - gb || va - vb || ta.localeCompare(tb, "pt-BR");
+  });
+}
+
+/**
+ * Os tamanhos que uma peça mostra na loja.
+ *
+ * **Manda o cadastro, não a categoria.** Se a peça tem estoque gravado, a lista
+ * é exatamente a das chaves dele — inclusive as zeradas, que aparecem como
+ * esgotadas, porque foram cadastradas de propósito. A grade da espécie só entra
+ * quando não há estoque nenhum, que é o caso de uma peça recém-criada.
+ *
+ * Era o contrário: a lista partia da grade palpitada pelo nome e só acrescentava
+ * o que o estoque tivesse além dela. Um shorts cadastrado em P aparecia com
+ * 36-46 riscados na frente do P — a grade de calça, que ninguém cadastrou,
+ * empurrada por cima da que o admin escolheu.
  */
 export function sizesForProduct(
   category: ProductCategory | string | null | undefined,
   name: string,
   stock?: Record<string, number> | null,
 ): string[] {
-  const grade = [...suggestSizes(category, name)];
-  if (!stock) return grade;
-  for (const [tamanho, qtd] of Object.entries(stock)) {
-    if (Number(qtd) > 0 && !grade.includes(tamanho)) grade.push(tamanho);
-  }
-  return grade;
+  const cadastrados = Object.keys(stock ?? {}).filter((s) => s.trim() !== "");
+  if (cadastrados.length) return ordenarTamanhos(cadastrados);
+  return [...suggestSizes(category, name)];
+}
+
+/**
+ * A grade a que a peça pertence de verdade — o que decide a tabela de medidas
+ * e o rótulo do seletor.
+ *
+ * O palpite pelo nome só vale enquanto não contradiz o cadastro. "Shorts" faz
+ * palpitar numeração, mas se a peça foi cadastrada em P/M/G quem está certo é
+ * o cadastro: exibir cintura e quadril para uma peça vendida em letras é
+ * informação errada na cara do cliente.
+ */
+export function gridForProduct(
+  category: ProductCategory | string | null | undefined,
+  name: string,
+  sizes?: readonly string[] | Record<string, number> | null,
+): SizeGridId {
+  const palpite = suggestSizeGrid(category, name);
+  const lista = Array.isArray(sizes) ? sizes : Object.keys(sizes ?? {});
+  const cadastrados = lista.filter((s) => typeof s === "string" && s.trim() !== "");
+  if (!cadastrados.length) return palpite;
+
+  // Cabendo no palpite, o palpite fica: é ele que separa uma calça 36-44 de um
+  // calçado 36-44, que compartilham numeração mas não a tabela de medidas.
+  const gradePalpitada = SIZE_GRIDS[palpite] as readonly string[];
+  if (cadastrados.every((s) => gradePalpitada.includes(s))) return palpite;
+
+  return gridOfSizes(cadastrados) ?? palpite;
 }
 
 /** A grade a que um conjunto de tamanhos gravados pertence, se for de alguma. */

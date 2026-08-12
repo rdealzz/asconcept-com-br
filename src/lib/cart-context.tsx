@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { calcDiscount, type Coupon } from "./coupons";
+import { PIX_DISCOUNT_RATE } from "./payments-validators";
 import type { ProductCategory } from "./categories";
 
 // Reexportado para não quebrar os `import { type ProductCategory } from
@@ -171,8 +172,15 @@ export function useCart() {
 export const formatBRL = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-/** Desconto silencioso aplicado quando o cliente escolhe Pix. */
-export const PIX_DISCOUNT_RATE = 0.05;
+/**
+ * Desconto silencioso aplicado quando o cliente escolhe Pix.
+ *
+ * Reexportado de `payments-validators`, que é onde o servidor lê a mesma taxa
+ * ao fechar o pedido. Eram três cópias do 0,05 espalhadas — vitrine, checkout e
+ * servidor — e bastava mudar uma para o cliente ver um total e o pedido nascer
+ * com outro.
+ */
+export { PIX_DISCOUNT_RATE };
 export const applyPixDiscount = (v: number) => Math.max(0, v * (1 - PIX_DISCOUNT_RATE));
 
 /**

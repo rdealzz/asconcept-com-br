@@ -1,4 +1,4 @@
-import { SIZE_GRIDS, suggestSizeGrid, type SizeGridId } from "@/lib/sizes";
+import { SIZE_GRIDS, gridForProduct, type SizeGridId } from "@/lib/sizes";
 import type { ProductCategory } from "@/lib/categories";
 
 /**
@@ -129,7 +129,9 @@ export function sizeGuideFor(
   name = "",
   sizes?: readonly string[],
 ): SizeGuide | null {
-  const gridId = suggestSizeGrid(category, name);
+  // A grade vem do cadastro da peça quando ele contradiz o palpite pelo nome —
+  // shorts vendido em P/M/G não pode exibir tabela de cintura e quadril.
+  const gridId = gridForProduct(category, name, sizes);
   if (gridId === "unico") return null;
 
   const tabela = tabelaDaGrade(gridId);

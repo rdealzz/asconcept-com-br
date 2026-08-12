@@ -748,16 +748,41 @@ function VitrineSemCuradoria({ isAdmin }: { isAdmin: boolean }) {
 }
 
 /* ---------- Products ---------- */
-const SUB_PATTERNS: Record<Exclude<SubFilter, "todos">, RegExp> = {
-  blusa: /(blusa|su[ée]ter|polo)/i,
-  camiseta: /(camisa|camiseta|t-?shirt)/i,
-  calca: /(cal[çc]a|pants|trouser)/i,
-};
+/**
+ * Que peça é esta, para o filtro de tipo.
+ *
+ * A ordem importa e é o coração da correção: antes cada tipo tinha seu regex e
+ * o produto passava em todos que casassem, então "Shorts de Banho Polo Ralph
+ * Lauren" aparecia em Blusa (por causa de "polo", que ali é marca) e em Calça
+ * ao mesmo tempo. Agora cada peça recebe UM tipo, decidido de baixo para cima:
+ * peça de baixo primeiro, depois camisa/camiseta, e só então o guarda-chuva
+ * das peças de cima.
+ *
+ * O nome manda. A descrição só é consultada quando o nome não diz nada — é ela
+ * que costuma citar "polo" ou "camisa" de passagem, ao descrever o tecido.
+ */
+const TIPOS_DE_PECA: Array<{ id: Exclude<SubFilter, "todos">; re: RegExp }> = [
+  {
+    id: "calca",
+    re: /\b(cal[çc]as?|bermudas?|shorts?|jeans|legging|pantalona|jogger|cargo|saias?|pants|trousers?)\b/i,
+  },
+  { id: "camiseta", re: /\b(camisetas?|camisas?|t-?shirts?|regatas?)\b/i },
+  {
+    id: "blusa",
+    re: /\b(blusas?|su[ée]teres?|su[ée]ter|moletom|moletons|jaquetas?|casacos?|tricot|cardig[ãa]|polos?)\b/i,
+  },
+];
+
+/** O tipo de uma peça, ou `null` quando nada no texto denuncia a espécie. */
+function tipoDaPeca(name: string, description: string): Exclude<SubFilter, "todos"> | null {
+  for (const { id, re } of TIPOS_DE_PECA) if (re.test(name)) return id;
+  for (const { id, re } of TIPOS_DE_PECA) if (re.test(description)) return id;
+  return null;
+}
 
 function matchesSub(name: string, description: string, sub: SubFilter) {
   if (sub === "todos") return true;
-  const re = SUB_PATTERNS[sub];
-  return re.test(name) || re.test(description);
+  return tipoDaPeca(name, description) === sub;
 }
 
 function Products() {
@@ -827,7 +852,7 @@ function Products() {
             <div className="mt-4 flex items-center gap-3 border border-accent/50 bg-accent/5 px-4 py-2 text-xs">
               <span className="text-muted-foreground">Filtro:</span>
               <span className="font-serif italic capitalize">
-                {subFilter === "calca" ? "Calça" : subFilter}
+                {SUB_OPTIONS.find((o) => o.id === subFilter)?.label ?? subFilter}
               </span>
               <button
                 onClick={() => setSubFilter("todos")}
@@ -2246,9 +2271,9 @@ function SearchOverlay() {
 /* ---------- Filter Sidebar ---------- */
 const SUB_OPTIONS: { id: SubFilter; label: string }[] = [
   { id: "todos", label: "Todos os produtos" },
-  { id: "blusa", label: "Blusa" },
-  { id: "camiseta", label: "Camiseta" },
-  { id: "calca", label: "Calça" },
+  { id: "blusa", label: "Blusas e casacos" },
+  { id: "camiseta", label: "Camisas e camisetas" },
+  { id: "calca", label: "Calças e shorts" },
 ];
 
 function FilterSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -3114,6 +3139,20 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
 /* ---------- Admin · Produtos (curadoria da vitrine) ---------- */
 
 /**
+ * Cadastro com resto de duas grades — "P" e "40" na mesma peça.
+ *
+ * Vinha de quando a loja completava os tamanhos pela categoria: o admin trocava
+ * a grade e o que sobrou continuava gravado, invisível, porque a vitrine
+ * mostrava a grade palpitada de qualquer jeito. Agora que ela mostra o que está
+ * gravado, esse resto aparece para o cliente — então o painel aponta onde está.
+ */
+function temGradeMista(stock: SizeStock | undefined): boolean {
+  const tamanhos = Object.keys(stock ?? {});
+  if (tamanhos.length < 2) return false;
+  return gridOfSizes(tamanhos) === null;
+}
+
+/**
  * O SQL de cada coluna de curadoria, igual ao da migração correspondente.
  *
  * Duplicado aqui de propósito: o arquivo de migração serve ao deploy, e este
@@ -3249,6 +3288,7 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
               {products.map((p) => {
                 const destacada = p.isFeatured === true;
                 const total = totalStock(stock[p.id]);
+                const gradeMista = temGradeMista(stock[p.id]);
                 return (
                   <tr key={p.id} className="border-b border-border/50 align-middle">
                     <td className="py-3 pr-3">
@@ -3269,6 +3309,19 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
                         )}
                         <span className="font-serif leading-tight">{p.name}</span>
                       </button>
+                      {/* Diagnóstico de cadastro antigo: a loja passou a
+                          respeitar exatamente os tamanhos gravados, então uma
+                          peça com resto de duas grades ("P" e "40" juntos)
+                          aparece assim para o cliente. Nada é apagado por
+                          conta própria — o aviso mostra onde reeditar. */}
+                      {gradeMista && (
+                        <span
+                          className="mt-1 block text-[10px] tracking-luxe uppercase text-[color:var(--gold)]"
+                          title="Os tamanhos gravados misturam grades diferentes. Abra a peça e escolha a grade certa."
+                        >
+                          Grade mista · revisar tamanhos
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 pr-3 text-[11px] text-muted-foreground">
                       {categoryLabel(p.category)}

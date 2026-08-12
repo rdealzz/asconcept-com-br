@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { AVAILABLE_COUPONS, calcDiscount } from "@/lib/coupons";
 import { quoteShipping, normalizeCep } from "@/lib/shipping";
-import { validSize } from "@/lib/payments-validators";
+import { PIX_DISCOUNT_RATE, validSize } from "@/lib/payments-validators";
 
 type CheckoutItemInput = {
   id: string;
@@ -27,13 +27,24 @@ type CheckoutResult = {
   status: string;
 };
 
-const PIX_DISCOUNT_RATE = 0.05;
 /**
  * Todo pedido nasce aqui: seja o manual do admin, seja o do cliente depois que
  * o pagamento é confirmado. Quem tira o pedido deste estado é o administrador,
  * clicando em avançar no painel — nunca o gateway de pagamento sozinho.
  */
 const INITIAL_STATUS = "Aguardando Aprovação";
+
+/** O `sizes` do banco é JSONB: chega como objeto solto e sai daqui inteiro. */
+function normalizarEstoque(v: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    for (const [tamanho, qtd] of Object.entries(v as Record<string, unknown>)) {
+      if (!tamanho) continue;
+      out[tamanho] = Math.max(0, Math.floor(Number(qtd) || 0));
+    }
+  }
+  return out;
+}
 
 function sanitize(v: unknown, max = 200): string {
   const s = typeof v === "string" ? v : "";
@@ -88,7 +99,7 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
     const ids = Array.from(new Set(data.items.map((i) => i.id)));
     const { data: rows, error: fetchErr } = await supabase
       .from("products")
-      .select("id, name, price, image")
+      .select("id, name, price, image, sizes")
       .in("id", ids);
 
     if (fetchErr) throw new Error("Falha ao validar preços dos produtos.");
@@ -96,9 +107,44 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
       throw new Error("Um ou mais produtos não foram encontrados.");
     }
 
-    const priceMap = new Map<string, { name: string; price: number; image: string | null }>();
+    const priceMap = new Map<
+      string,
+      { name: string; price: number; image: string | null; sizes: Record<string, number> }
+    >();
     for (const r of rows) {
-      priceMap.set(r.id, { name: r.name, price: Number(r.price), image: r.image });
+      priceMap.set(r.id, {
+        name: r.name,
+        price: Number(r.price),
+        image: r.image,
+        sizes: normalizarEstoque((r as { sizes?: unknown }).sizes),
+      });
+    }
+
+    /**
+     * O tamanho pedido existe e tem peça?
+     *
+     * O carrinho vive no navegador: ele pode carregar um tamanho que a peça
+     * deixou de ter (o admin trocou a grade, alguém levou a última) e, até
+     * aqui, o pedido nascia assim mesmo — a recusa só aparecia lá na frente,
+     * quando o pagamento aprovado tentava baixar o estoque e não conseguia. O
+     * cliente pagava por um tamanho que não existe.
+     *
+     * Peça sem nenhum tamanho gravado passa: não há o que conferir, e barrar
+     * seria impedir a venda de um cadastro antigo que ainda funciona.
+     */
+    for (const it of data.items) {
+      const p = priceMap.get(it.id)!;
+      const cadastrados = Object.keys(p.sizes);
+      if (!cadastrados.length) continue;
+      const disponivel = p.sizes[it.size] ?? 0;
+      if (disponivel <= 0) {
+        throw new Error(`${p.name}: o tamanho ${it.size} não está mais disponível.`);
+      }
+      if (disponivel < it.quantity) {
+        throw new Error(
+          `${p.name}: restam ${disponivel} no tamanho ${it.size}, menos do que o pedido.`,
+        );
+      }
     }
 
     const orderItems = data.items.map((it) => {
