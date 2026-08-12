@@ -19,6 +19,7 @@ import { ShippingCalculator } from "@/components/ShippingCalculator";
 import { InstallmentsNote } from "@/components/InstallmentsNote";
 import { FavoriteButton, ShareButton } from "@/components/ProductActions";
 import { SizeGuideModal } from "@/components/SizeGuide";
+import { sizeGuideFor } from "@/lib/size-guide";
 import { RelatedProducts } from "@/components/RelatedProducts";
 import { TrustSeals } from "@/components/TrustSeals";
 import { StitchDivider } from "@/components/StitchDivider";
@@ -182,6 +183,9 @@ function ProductView({
     .slice(0, 10);
 
   const grade = suggestSizeGrid(product.category, product.name);
+  // A tabela de medidas da peça — `null` em acessório, que é tamanho único.
+  // Sai dos tamanhos que a peça oferece, e não da grade genérica.
+  const guide = sizeGuideFor(product.category, product.name, sizes);
 
   const [activeImg, setActiveImg] = useState(0);
   const [zoomIndex, setZoomIndex] = useState<number | null>(null);
@@ -360,8 +364,8 @@ function ProductView({
                 <p className="text-[11px] tracking-luxe uppercase text-muted-foreground">
                   {grade === "unico" ? "Tamanho único" : "Tamanho"}
                 </p>
-                {/* O guia mede busto, ombro e manga: só faz sentido na roupa. */}
-                {grade === "letras" && (
+                {/* Acessório não tem tabela — nada a abrir. */}
+                {guide && (
                   <button
                     onClick={() => setSizeGuideOpen(true)}
                     className="text-[11px] uppercase tracking-luxe text-asc-ink underline decoration-asc-line underline-offset-4 transition-colors duration-ascfast ease-asc hover:decoration-asc-gold"
@@ -436,9 +440,11 @@ function ProductView({
             </button>
 
             <ProductInfoAccordion
-              productId={product.id}
               productName={product.name}
               description={product.longDescription ?? product.description}
+              category={product.category}
+              sizes={sizes}
+              selectedSize={size}
             />
 
             <div className="mt-8">
@@ -478,7 +484,12 @@ function ProductView({
         </button>
       </div>
 
-      <SizeGuideModal open={sizeGuideOpen} onClose={() => setSizeGuideOpen(false)} />
+      <SizeGuideModal
+        open={sizeGuideOpen}
+        onClose={() => setSizeGuideOpen(false)}
+        guide={guide}
+        selected={size}
+      />
 
       {zoomIndex !== null && (
         <Lightbox

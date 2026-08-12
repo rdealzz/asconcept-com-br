@@ -15,6 +15,12 @@ import { coerceCategory, type ProductCategory } from "@/lib/categories";
 export const SIZE_GRIDS = {
   /** Roupas em geral: camisas, casacos, vestidos. */
   letras: ["P", "M", "G", "GG"],
+  /**
+   * A mesma grade de letras, aberta nas pontas. Fica como escolha do admin, e
+   * não como padrão, porque a peça que só vai de P a GG não deve exibir PP e
+   * XGG riscados na página — opção morta é ruído.
+   */
+  letras_amplas: ["PP", "P", "M", "G", "GG", "XGG"],
   /** Calças, bermudas e saias — numeração brasileira de cintura. */
   calcas: ["36", "38", "40", "42", "44", "46"],
   /** Calçados — numeração brasileira de pé. */
@@ -27,6 +33,7 @@ export type SizeGridId = keyof typeof SIZE_GRIDS;
 
 export const SIZE_GRID_LABELS: Record<SizeGridId, string> = {
   letras: "Roupas · P ao GG",
+  letras_amplas: "Roupas · PP ao XGG",
   calcas: "Calças · 36 ao 46",
   calcados: "Calçados · 36 ao 44",
   unico: "Tamanho único",
