@@ -43,6 +43,12 @@ DROP FUNCTION IF EXISTS public.decrement_product_stock(uuid, text, int);
 -- o cadastro manual do painel — que é do admin.
 DROP POLICY IF EXISTS "Users create own orders" ON public.orders;
 
+-- A própria policy nova também cai antes de nascer: `CREATE POLICY` estoura em
+-- "already exists" na segunda vez, e este script tem de poder rodar de novo
+-- sem susto — que é como ele acaba sendo usado, colado no SQL Editor depois de
+-- o deploy já ter aplicado.
+DROP POLICY IF EXISTS "Admins create orders" ON public.orders;
+
 CREATE POLICY "Admins create orders" ON public.orders
   FOR INSERT TO authenticated
   WITH CHECK (app_private.has_role(auth.uid(), 'admin'::public.app_role));
