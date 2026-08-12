@@ -1327,7 +1327,7 @@ const ProductCard = memo(function ProductCard({
           baixo e a fileira inteira sai em degraus. Quatro cores é o teto na
           grade — a quinta quebraria linha na coluna estreita do celular, e aí
           a altura do card mudaria de novo. O resto vira "+N". */}
-      <div className="mt-2 flex h-8 items-center">
+      <div className="mt-1.5 flex h-9 items-center sm:h-10">
         {cores.length > 1 && (
           <ColorSwatches members={cores} activeId={product.id} max={4} onPreview={preverCor} />
         )}
