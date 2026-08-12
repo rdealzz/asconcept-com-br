@@ -7,7 +7,6 @@ import {
   useCatalog,
   emptyStock,
   totalStock,
-  hasLastSize,
   type Size,
   type SizeStock,
 } from "@/lib/catalog-context";
@@ -165,8 +164,10 @@ function ProductView({
 }) {
   const total = totalStock(sizeStock);
   const soldOut = total === 0;
-  const lastItem =
-    !soldOut && (product.forceLastItem === true || hasLastSize(sizeStock) || total === 1);
+  // Tag por curadoria, não por dedução: estoque em 1 não faz a peça virar
+  // "Último Item" sozinha — quem decide isso é o admin, no formulário.
+  const lastItem = !soldOut && product.forceLastItem === true;
+  const novidade = !soldOut && product.forceNew === true;
   const availableQty = size ? (sizeStock[size] ?? 0) : 0;
   const canAdd = !soldOut && size !== null && availableQty > 0;
 
@@ -321,16 +322,25 @@ function ProductView({
             <p className="mt-3 text-lg tabular-nums">{formatBRL(product.price)}</p>
             <InstallmentsNote amount={product.price} className="mt-1" />
 
-            {(soldOut || lastItem) && (
-              <div className="mt-3">
+            {(soldOut || lastItem || novidade) && (
+              <div className="mt-3 flex flex-wrap gap-2">
                 {soldOut ? (
                   <span className="inline-flex items-center border border-destructive/60 bg-destructive/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-destructive">
                     Sold Out
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 border border-[color:var(--gold)]/70 bg-[color:var(--gold)]/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
-                    ✦ Último Item
-                  </span>
+                  <>
+                    {lastItem && (
+                      <span className="inline-flex items-center gap-1 border border-[color:var(--gold)]/70 bg-[color:var(--gold)]/10 px-2 py-1 text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
+                        ✦ Último Item
+                      </span>
+                    )}
+                    {novidade && (
+                      <span className="inline-flex items-center border border-border px-2 py-1 text-[10px] tracking-luxe uppercase text-muted-foreground">
+                        Novidade
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             )}

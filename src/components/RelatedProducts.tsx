@@ -1,10 +1,11 @@
 import { useRef } from "react";
 import { Link } from "@tanstack/react-router";
-import { formatBRL, type Product } from "@/lib/cart-context";
+import { type Product } from "@/lib/cart-context";
 import { FavoriteButton } from "@/components/ProductActions";
 import { ArrowButton } from "@/components/ui-kit";
 import { Inview, StackedLines } from "@/lib/motion";
 import { productImageSrc, productImageSrcSet } from "@/lib/product-images";
+import { ProductCardMeta } from "@/components/ProductCardMeta";
 
 /**
  * RelatedProducts — "Complete o Look" ao fim da página de produto.
@@ -54,23 +55,20 @@ export function RelatedProducts({
             className="group w-[220px] shrink-0 snap-start sm:w-[260px]"
           >
             <Link to="/produto/$id" params={{ id: p.id }} className="block">
-              <div className="relative mb-3 aspect-[3/4] overflow-hidden border border-asc-line bg-asc-bg-raised transition-colors duration-asc ease-asc group-hover:border-asc-gold/60">
+              <div className="relative aspect-[3/4] overflow-hidden border border-asc-line bg-asc-bg-raised transition-colors duration-asc ease-asc group-hover:border-asc-gold/60">
                 {/* Card de 220–260px: a variante de 480 já cobre telas 2x. */}
                 <img
                   src={productImageSrc(p.image, 480)}
                   srcSet={productImageSrcSet(p.image)}
-                  sizes="260px"
+                  sizes="(min-width: 640px) 260px, 220px"
                   alt={p.name}
                   loading="lazy"
                   decoding="async"
                   className="h-full w-full object-cover transition-transform duration-ascslow ease-asc group-hover:scale-105"
                 />
               </div>
-              <h3 className="font-serif text-base leading-snug text-asc-ink transition-colors duration-ascfast ease-asc group-hover:text-asc-gold">
-                {p.name}
-              </h3>
-              <p className="mt-1 text-sm tabular-nums text-asc-ink-muted">{formatBRL(p.price)}</p>
             </Link>
+            <ProductCardMeta id={p.id} name={p.name} price={p.price} />
             <FavoriteButton productId={p.id} className="mt-2" />
           </Inview>
         ))}

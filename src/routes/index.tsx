@@ -43,7 +43,7 @@ import {
   useCatalog,
   emptyStock,
   totalStock,
-  hasLastSize,
+  type OptionalColumn,
   type Size,
   type SizeStock,
 } from "@/lib/catalog-context";
@@ -58,13 +58,13 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { productImageSrc, productImageSrcSet, uploadProductPhoto } from "@/lib/product-images";
 
-import { InstallmentsNote } from "@/components/InstallmentsNote";
 import { FavoriteButton, ShareButton } from "@/components/ProductActions";
 import { StitchDivider } from "@/components/StitchDivider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Loader } from "@/components/Loader";
 import { Eyebrow, PillButton } from "@/components/ui-kit";
 import { Showroom } from "@/components/Showroom";
+import { ProductCardMeta } from "@/components/ProductCardMeta";
 import { Inview, StackedLines, WordReveal, useScrollProgress } from "@/lib/motion";
 import { useVisualShell } from "@/lib/visual-shell";
 import { EmptyCategoryState } from "@/components/EmptyCategoryState";
@@ -758,14 +758,6 @@ function matchesSub(name: string, description: string, sub: SubFilter) {
   return re.test(name) || re.test(description);
 }
 
-/** Peças cadastradas nos últimos 15 dias recebem o selo "Novidade". */
-function isNewArrival(p: Product): boolean {
-  if (!p.createdAt) return false;
-  const ts = new Date(p.createdAt).getTime();
-  if (!Number.isFinite(ts)) return false;
-  return Date.now() - ts <= 15 * 86400000;
-}
-
 function Products() {
   const { query, setQuery, tab, subFilter, setSubFilter } = useSearch();
   const { products, stock, loading: catalogLoading, refresh: resetCatalog } = useCatalog();
@@ -874,10 +866,18 @@ function Products() {
              aparecem — e a página não parece vazia. */
           <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 sm:gap-y-12 md:grid-cols-3 md:gap-x-8 md:gap-y-20 lg:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
+              // O esqueleto copia a medida do card real — foto 3/4, duas
+              // linhas de nome e uma de preço. É isso que faz a grade não
+              // pular de lugar quando as peças chegam.
               <div key={i} className="animate-pulse">
                 <div className="aspect-[3/4] w-full bg-asc-bg-raised" />
-                <div className="mt-4 h-4 w-2/3 bg-asc-bg-raised" />
-                <div className="mt-2 h-3 w-1/3 bg-asc-bg-raised" />
+                <div className="mt-3 flex flex-col gap-1">
+                  <div className="min-h-[2.75em] space-y-1.5 text-[0.9rem] leading-snug sm:text-base">
+                    <div className="h-[0.9em] w-5/6 bg-asc-bg-raised" />
+                    <div className="h-[0.9em] w-3/5 bg-asc-bg-raised" />
+                  </div>
+                  <div className="h-4 w-1/3 bg-asc-bg-raised" />
+                </div>
               </div>
             ))}
           </div>
@@ -978,12 +978,49 @@ function SneakersComingSoon() {
 }
 
 /* ---------- Product Card ---------- */
+
+/** Caixa de marcação das tags de curadoria, no formulário do admin. */
+function TagSwitch({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3 border border-[color:var(--gold)]/40 bg-[color:var(--gold)]/5 px-3 py-2">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 shrink-0 accent-[color:var(--gold)]"
+      />
+      <span className="text-[11px] tracking-luxe uppercase text-[color:var(--gold)]">{label}</span>
+    </label>
+  );
+}
+
+/** Tag de curadoria sobre a foto: pequena, translúcida, sempre numa linha. */
+function CardTag({ children, tone = "ink" }: { children: React.ReactNode; tone?: "ink" | "gold" }) {
+  return (
+    <span
+      className={`asc-label inline-flex items-center whitespace-nowrap rounded-full border border-asc-ink-inverse/15 bg-asc-bg-dark/45 px-2.5 py-1 text-[9px] tracking-[0.16em] backdrop-blur-sm ${
+        tone === "gold" ? "text-asc-gold-soft" : "text-asc-ink-inverse"
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
 /**
  * Largura que o card ocupa na tela, acompanhando a grade: 2 colunas no celular,
  * 3 a partir de md, 4 a partir de lg. É o que permite ao navegador baixar a
  * variante de 480 no celular em vez da de 1000.
  */
-const CARD_SIZES = "(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw";
+const CARD_SIZES = "(min-width: 1024px) 23vw, (min-width: 768px) 30vw, 46vw";
 
 /** Quantos cards da grade entram com prioridade alta (a primeira dobra). */
 const EAGER_CARDS = 4;
@@ -1001,11 +1038,13 @@ function ProductCard({ product, priority = false }: { product: Product; priority
   const sizeStock = stock[product.id];
   const total = totalStock(sizeStock);
   const soldOut = total === 0;
-  const showLastItem =
-    !soldOut && (product.forceLastItem === true || hasLastSize(sizeStock) || total === 1);
+  // As duas tags são decisão do admin, e só dele: nada de deduzir "último
+  // item" de um estoque que chegou a 1, nem "novidade" da data de cadastro. Se
+  // a peça não está marcada, ela não aparece nessas seções.
+  const showLastItem = !soldOut && product.forceLastItem === true;
+  const novidade = !soldOut && product.forceNew === true;
 
   const hoverImg = (product.gallery ?? []).find((g) => g && g !== product.image);
-  const novidade = isNewArrival(product);
 
   return (
     // Encostar no card já busca as fotos restantes da peça: serve para a troca
@@ -1051,19 +1090,15 @@ function ProductCard({ product, priority = false }: { product: Product; priority
             className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-ascslow ease-asc group-hover:opacity-100"
           />
         )}
-        {/* Um selo, não uma pilha. Dois retângulos opacos empilhados no canto
-            tomavam a cabeça da foto — que é o produto. Fica o mais urgente:
-            escassez ganha de novidade, porque é o que muda a decisão hoje.
-            Peça esgotada não recebe selo nenhum: a tarja "Esgotado" no rodapé
-            do card já diz isso, e com mais clareza. */}
-        {!soldOut && (showLastItem || novidade) && (
-          <span
-            className={`asc-label pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border border-asc-ink-inverse/15 bg-asc-bg-dark/45 px-2.5 py-1 text-[9px] tracking-[0.16em] backdrop-blur-sm ${
-              showLastItem ? "text-asc-gold-soft" : "text-asc-ink-inverse"
-            }`}
-          >
-            {showLastItem ? "Último item" : "Novidade"}
-          </span>
+        {/* Pílulas translúcidas em vez das tarjas opacas que tomavam a cabeça
+            da foto. Lado a lado e não empilhadas: quando o admin marca as duas,
+            elas cabem numa linha só. Peça esgotada não recebe tag nenhuma — a
+            tarja "Esgotado" no rodapé do card já diz isso, e com mais clareza. */}
+        {(showLastItem || novidade) && (
+          <div className="pointer-events-none absolute left-3 top-3 flex flex-wrap gap-1.5 pr-14">
+            {showLastItem && <CardTag tone="gold">Último item</CardTag>}
+            {novidade && <CardTag>Novidade</CardTag>}
+          </div>
         )}
         {soldOut ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-asc-bg-dark/75 py-3 text-center backdrop-blur-sm">
@@ -1109,54 +1144,18 @@ function ProductCard({ product, priority = false }: { product: Product; priority
           )}
         </div>
       </div>
-      {/* No celular a grade é de duas colunas: sobra menos de 10rem por card, e
-          nome e preço lado a lado espremiam o título a ponto de cair uma
-          palavra por linha. Empilhados, o nome tem a largura inteira; do sm em
-          diante, onde há folga, a linha do preço volta para a direita. */}
-      <div className="mt-4 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-        <div className="min-w-0">
-          <h3 className="font-display text-[0.95rem] leading-snug text-asc-ink sm:text-lg">
-            <Link
-              to="/produto/$id"
-              params={{ id: product.id }}
-              className="line-clamp-2 transition-colors duration-ascfast ease-asc hover:text-asc-gold sm:line-clamp-none"
-            >
-              {product.name}
-            </Link>
-          </h3>
-          {/* A descrição repete o que a foto já mostra; num card de celular ela
-              é só mais uma linha cortada. Volta a partir do sm. */}
-          <p className="mt-1 hidden line-clamp-1 font-sans text-xs font-light text-asc-ink-muted sm:block">
-            {product.description}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-baseline gap-2 sm:block sm:pt-1 sm:text-right">
-          <span className="block whitespace-nowrap font-sans text-sm tabular-nums text-asc-ink">
-            {formatBRL(product.price)}
-          </span>
-          {/* O parcelamento pesa na decisão, mas não na varredura: no celular
-              ele fica para a página da peça. */}
-          <InstallmentsNote amount={product.price} className="hidden sm:mt-1 sm:block" />
-        </div>
-      </div>
+      {/* Só foto, nome e preço. Descrição e parcelamento vivem na página da
+          peça, que é onde o cliente para para ler — aqui eles só empurravam o
+          preço para baixo e desalinhavam a fileira. */}
+      <ProductCardMeta id={product.id} name={product.name} price={product.price} />
 
+      {/* Linha de serviço do admin, fora da leitura da vitrine: uma linha só,
+          truncada, para não voltar a empilhar texto embaixo do card. */}
       {isAdmin && sizeStock && (
-        <p className="mt-2 line-clamp-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
-          {/* O detalhe por tamanho é do painel, e no celular ele ocupava quatro
-              linhas embaixo de cada card. Ali fica só o total. */}
-          <span className="sm:hidden">Estoque · {total} un.</span>
-          <span className="hidden sm:inline">
-            Estoque ·{" "}
-            {sizesForProduct(product.category, product.name, sizeStock)
-              .map((s) => `${s} ${sizeStock[s] ?? 0}`)
-              .join(" · ")}
-          </span>
-          {product.forceLastItem && (
-            <span className="ml-2 text-[color:var(--gold)]">
-              <span className="sm:hidden">· forçado</span>
-              <span className="hidden sm:inline">· Último Item forçado</span>
-            </span>
-          )}
+        <p className="mt-2 truncate text-[10px] tracking-luxe uppercase text-muted-foreground">
+          Estoque · {total} un.
+          {product.forceLastItem && <span className="ml-2 text-[color:var(--gold)]">· último</span>}
+          {product.forceNew && <span className="ml-2 text-[color:var(--gold)]">· novidade</span>}
         </p>
       )}
     </article>
@@ -1218,6 +1217,7 @@ function AdminEditModal() {
     gallery: [] as string[],
     stock: emptyStock() as SizeStock,
     forceLastItem: false,
+    forceNew: false,
     category: (creatingCategory ?? tab) as ProductCategory,
     /** Grade de tamanhos da peça (letras, calças, calçados, único). */
     sizeGrid: suggestSizeGrid(creatingCategory ?? tab, "") as SizeGridId,
@@ -1247,6 +1247,7 @@ function AdminEditModal() {
         // salvar peça sem estoque nenhum.
         stock: Object.fromEntries(SIZE_GRIDS[grade].map((s) => [s, 1])),
         forceLastItem: false,
+        forceNew: false,
         category: categoria,
         sizeGrid: grade,
       });
@@ -1273,6 +1274,7 @@ function AdminEditModal() {
         gallery: gal,
         stock: gravado,
         forceLastItem: product.forceLastItem === true,
+        forceNew: product.forceNew === true,
         category: coerceCategory(product.category),
         sizeGrid: grade,
       });
@@ -1424,7 +1426,8 @@ function AdminEditModal() {
           image: cover,
           gallery,
           category: form.category,
-          forceLastItem: form.forceLastItem || undefined,
+          forceLastItem: form.forceLastItem,
+          forceNew: form.forceNew,
         },
         stockObj,
       );
@@ -1437,7 +1440,11 @@ function AdminEditModal() {
         image: cover,
         gallery,
         category: form.category,
-        forceLastItem: form.forceLastItem || undefined,
+        // Booleano de verdade, não `|| undefined`: com `undefined` o patch
+        // simplesmente não levava o campo, e DESMARCAR a tag nunca chegava ao
+        // banco — a peça continuava marcada depois de salva.
+        forceLastItem: form.forceLastItem,
+        forceNew: form.forceNew,
       });
       setStock(product.id, stockObj);
     }
@@ -1650,17 +1657,21 @@ function AdminEditModal() {
                   ))}
                 </div>
               </Field>
-              <label className="flex cursor-pointer items-center gap-3 border border-[color:var(--gold)]/40 bg-[color:var(--gold)]/5 px-3 py-2">
-                <input
-                  type="checkbox"
+              {/* As duas tags da vitrine saem daqui, e só daqui: nenhuma peça
+                  recebe "Último Item" por estoque baixo nem "Novidade" por
+                  data de cadastro. */}
+              <div className="grid gap-2 sm:grid-cols-2">
+                <TagSwitch
+                  label='Forçar tag "Último Item"'
                   checked={form.forceLastItem}
-                  onChange={(e) => setForm({ ...form, forceLastItem: e.target.checked })}
-                  className="h-4 w-4 accent-[color:var(--gold)]"
+                  onChange={(v) => setForm({ ...form, forceLastItem: v })}
                 />
-                <span className="text-[11px] tracking-luxe uppercase text-[color:var(--gold)]">
-                  Forçar tag "Último Item"
-                </span>
-              </label>
+                <TagSwitch
+                  label='Forçar tag "Novidade"'
+                  checked={form.forceNew}
+                  onChange={(v) => setForm({ ...form, forceNew: v })}
+                />
+              </div>
             </div>
           </div>
 
@@ -3054,18 +3065,26 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
 /* ---------- Admin · Produtos (curadoria da vitrine) ---------- */
 
 /**
- * O mesmo conteúdo da migração `20260810120000_products_is_featured.sql`.
+ * O SQL de cada coluna de curadoria, igual ao da migração correspondente.
  *
  * Duplicado aqui de propósito: o arquivo de migração serve ao deploy, e este
  * texto serve ao admin que abriu o painel e precisa colar o script no SQL
  * Editor agora. Se um mudar, mude o outro.
  */
-const SQL_DESTAQUES = `ALTER TABLE public.products
+const SQL_CURADORIA: Record<OptionalColumn, string> = {
+  is_featured: `ALTER TABLE public.products
   ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT false;
 
 CREATE INDEX IF NOT EXISTS products_is_featured_idx
   ON public.products (is_featured)
-  WHERE is_featured;`;
+  WHERE is_featured;`,
+  force_new: `ALTER TABLE public.products
+  ADD COLUMN IF NOT EXISTS force_new BOOLEAN NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS products_force_new_idx
+  ON public.products (force_new)
+  WHERE force_new;`,
+};
 /**
  * Lista de gestão de produtos do painel.
  *
@@ -3076,7 +3095,7 @@ CREATE INDEX IF NOT EXISTS products_is_featured_idx
  * então esconder o botão é conveniência, não a tranca.
  */
 function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
-  const { products, stock, setFeatured, featuredColumnMissing, refresh } = useCatalog();
+  const { products, stock, setFeatured, missingColumns, refresh } = useCatalog();
   const { openEdit } = useProduct();
   const isAdmin = useIsAdmin();
   const [erro, setErro] = useState<string | null>(null);
@@ -3093,9 +3112,13 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
     if (msg) setErro(msg);
   };
 
+  // Uma coluna faltando ou duas, o que o admin cola no SQL Editor é um script
+  // só — e ele é seguro de rodar de novo.
+  const sqlPendente = missingColumns.map((c) => SQL_CURADORIA[c]).join("\n\n");
+
   const copiarSql = async () => {
     try {
-      await navigator.clipboard.writeText(SQL_DESTAQUES);
+      await navigator.clipboard.writeText(sqlPendente);
       setSqlCopiado(true);
       window.setTimeout(() => setSqlCopiado(false), 2500);
     } catch {
@@ -3116,16 +3139,23 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
 
       {/* Migração pendente: em vez de deixar o admin clicar num botão que só
           devolve 400, a instrução vem com o SQL pronto para copiar. */}
-      {featuredColumnMissing ? (
+      {missingColumns.length > 0 ? (
         <div className="mb-5 border border-accent/50 bg-accent/[0.07] px-4 py-4">
           <p className="text-[10px] tracking-luxe uppercase text-accent">Migração pendente</p>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            A coluna <code className="text-accent">is_featured</code> ainda não existe no banco, e
-            sem ela não há como gravar a curadoria. Rode o script abaixo no SQL Editor do Supabase —
-            ele é seguro de rodar mais de uma vez.
+            {missingColumns.length > 1 ? "As colunas " : "A coluna "}
+            {missingColumns.map((c, i) => (
+              <span key={c}>
+                {i > 0 && " e "}
+                <code className="text-accent">{c}</code>
+              </span>
+            ))}
+            {missingColumns.length > 1 ? " ainda não existem" : " ainda não existe"} no banco, e sem
+            {missingColumns.length > 1 ? " elas" : " ela"} não há como gravar a curadoria. Rode o
+            script abaixo no SQL Editor do Supabase — ele é seguro de rodar mais de uma vez.
           </p>
           <pre className="mt-3 overflow-x-auto border border-border bg-background/60 p-3 text-[10px] leading-relaxed text-muted-foreground">
-            {SQL_DESTAQUES}
+            {sqlPendente}
           </pre>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
@@ -3207,7 +3237,7 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
                     <td className="py-3 pr-3 text-right">
                       <button
                         onClick={() => void alternar(p)}
-                        disabled={salvando === p.id || featuredColumnMissing}
+                        disabled={salvando === p.id || missingColumns.includes("is_featured")}
                         aria-pressed={destacada}
                         title={
                           destacada

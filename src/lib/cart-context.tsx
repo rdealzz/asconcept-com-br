@@ -16,10 +16,13 @@ export type Product = {
   image: string;
   gallery?: string[];
   category?: ProductCategory;
+  /** Curadoria do admin: a peça leva a tag "Último item". */
   forceLastItem?: boolean;
+  /** Curadoria do admin: a peça leva a tag "Novidade". */
+  forceNew?: boolean;
   /** Curadoria do admin: a peça aparece na vitrine de destaques da home. */
   isFeatured?: boolean;
-  /** ISO timestamp de cadastro — usado para o selo "Novidade". */
+  /** ISO timestamp de cadastro. Ordena a listagem; não decide tag nenhuma. */
   createdAt?: string;
 };
 
@@ -88,7 +91,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (!hydratedRef.current) return;
     try {
       localStorage.setItem(CART_KEY, JSON.stringify(items));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [items]);
 
   useEffect(() => {
@@ -96,20 +101,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       if (coupon) localStorage.setItem(COUPON_KEY, JSON.stringify(coupon));
       else localStorage.removeItem(COUPON_KEY);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [coupon]);
 
   const add = (p: Product, size: string = "M") => {
     setItems((prev) => {
       const existing = prev.find((i) => i.id === p.id && i.size === size);
       if (existing)
-        return prev.map((i) =>
-          i.id === p.id && i.size === size ? { ...i, qty: i.qty + 1 } : i,
-        );
-      return [
-        ...prev,
-        { id: p.id, name: p.name, price: p.price, image: p.image, size, qty: 1 },
-      ];
+        return prev.map((i) => (i.id === p.id && i.size === size ? { ...i, qty: i.qty + 1 } : i));
+      return [...prev, { id: p.id, name: p.name, price: p.price, image: p.image, size, qty: 1 }];
     });
     setOpen(true);
   };
@@ -171,8 +173,7 @@ export const formatBRL = (n: number) =>
 
 /** Desconto silencioso aplicado quando o cliente escolhe Pix. */
 export const PIX_DISCOUNT_RATE = 0.05;
-export const applyPixDiscount = (v: number) =>
-  Math.max(0, v * (1 - PIX_DISCOUNT_RATE));
+export const applyPixDiscount = (v: number) => Math.max(0, v * (1 - PIX_DISCOUNT_RATE));
 
 /**
  * Feature flag: exibição pública do Pix como forma de pagamento.

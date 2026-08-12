@@ -25,9 +25,9 @@ export const getProductById = createServerFn({ method: "GET" })
       const {
         rowToProduct,
         coerceSizeStock,
-        LIST_COLUMNS,
-        LIST_COLUMNS_LEGACY,
-        isMissingFeaturedColumn,
+        LIST_COLUMNS_BASE,
+        OPTIONAL_COLUMNS,
+        isMissingColumn,
       } = await import("@/lib/catalog-context");
 
       // As mesmas colunas da vitrine — de propósito sem `gallery`. O que sai
@@ -43,11 +43,15 @@ export const getProductById = createServerFn({ method: "GET" })
         };
       };
 
-      // Mesmo cuidado da vitrine: enquanto a migração de destaques não roda, a
+      // Mesmo cuidado da vitrine: enquanto a migração de curadoria não roda, a
       // coluna não existe e a página do produto não pode cair por causa disso.
-      let { data: row, error } = await buscar(LIST_COLUMNS);
-      if (isMissingFeaturedColumn(error)) {
-        ({ data: row, error } = await buscar(LIST_COLUMNS_LEGACY));
+      // Uma tentativa por coluna opcional, derrubando a culpada a cada erro.
+      let opcionais = [...OPTIONAL_COLUMNS];
+      let { data: row, error } = await buscar([LIST_COLUMNS_BASE, ...opcionais].join(","));
+      while (error && isMissingColumn(error) && opcionais.length) {
+        const culpada = opcionais.find((c) => (error?.message ?? "").includes(c)) ?? opcionais[0];
+        opcionais = opcionais.filter((c) => c !== culpada);
+        ({ data: row, error } = await buscar([LIST_COLUMNS_BASE, ...opcionais].join(",")));
       }
 
       if (error) {

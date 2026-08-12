@@ -41,26 +41,26 @@ type ProductInput = Omit<Product, "id">;
  * uma. Era isso que fazia os produtos demorarem a aparecer. As demais fotos
  * chegam depois, sob demanda, por `loadGallery`.
  */
-export const LIST_COLUMNS =
-  "id,name,description,price,category,image,sizes,force_last_item,is_featured,sort_order,created_at";
+export const LIST_COLUMNS_BASE =
+  "id,name,description,price,category,image,sizes,force_last_item,sort_order,created_at";
 
 /**
- * As mesmas colunas sem `is_featured`.
+ * Colunas que só existem depois da migração correspondente.
  *
  * O código sobe antes de a migração rodar no banco (é o admin quem executa o
  * SQL). No intervalo, pedir uma coluna inexistente derruba o SELECT inteiro e
- * a loja fica sem catálogo — bem pior do que ficar sem destaques. Então a
- * primeira falha por coluna ausente cai para esta lista e segue a vida.
+ * a loja fica sem catálogo — bem pior do que ficar sem curadoria. Então a
+ * leitura desce um degrau por coluna ausente e segue a vida.
  */
-export const LIST_COLUMNS_LEGACY =
-  "id,name,description,price,category,image,sizes,force_last_item,sort_order,created_at";
+export const OPTIONAL_COLUMNS = ["is_featured", "force_new"] as const;
+export type OptionalColumn = (typeof OPTIONAL_COLUMNS)[number];
+
+export const LIST_COLUMNS = [LIST_COLUMNS_BASE, ...OPTIONAL_COLUMNS].join(",");
 
 /** Erro do Postgres para coluna que não existe (`undefined_column`). */
-export function isMissingFeaturedColumn(
-  error: { code?: string; message?: string } | null,
-): boolean {
+export function isMissingColumn(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false;
-  return error.code === "42703" || /is_featured/i.test(error.message ?? "");
+  return error.code === "42703" || /does not exist/i.test(error.message ?? "");
 }
 
 type CatalogCtx = {
@@ -74,12 +74,12 @@ type CatalogCtx = {
    */
   loadGallery: (id: string) => Promise<void>;
   /**
-   * `true` quando a leitura do catálogo teve de cair para as colunas antigas
-   * porque `products.is_featured` ainda não existe. O painel usa isto para
+   * Colunas de curadoria que o banco ainda não tem — a leitura teve de descer
+   * um degrau para não derrubar o catálogo inteiro. O painel usa isto para
    * pedir a migração em vez de deixar o admin clicar num botão que só vai
    * devolver 400.
    */
-  featuredColumnMissing: boolean;
+  missingColumns: OptionalColumn[];
   updateProduct: (id: string, patch: Partial<Product>) => Promise<void>;
   /**
    * Liga/desliga a curadoria de vitrine de uma peça (só admin — quem manda é a
@@ -126,8 +126,9 @@ export type ProductRow = {
   gallery?: unknown;
   sizes: unknown;
   force_last_item: boolean;
-  /** Ausente enquanto a migração de destaques não rodou. */
+  /** Ausentes enquanto a migração de curadoria correspondente não rodou. */
   is_featured?: boolean | null;
+  force_new?: boolean | null;
   sort_order: number;
   created_at?: string | null;
 };
@@ -147,6 +148,7 @@ export function rowToProduct(r: ProductRow): Product {
     gallery: galleryArr.length ? galleryArr : image ? [image] : [],
     category: coerceCategory(r.category),
     forceLastItem: r.force_last_item || undefined,
+    forceNew: r.force_new === true,
     isFeatured: r.is_featured === true,
     createdAt: r.created_at ?? undefined,
   };
@@ -156,7 +158,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [stock, setStockMap] = useState<Record<string, SizeStock>>({});
   const [loading, setLoading] = useState(true);
-  const [featuredColumnMissing, setFeaturedColumnMissing] = useState(false);
+  const [missingColumns, setMissingColumns] = useState<OptionalColumn[]>([]);
 
   // Quais peças já tiveram a galeria buscada. Fica em ref, e não em estado,
   // para que duas chamadas seguidas (passar o mouse e clicar) não disparem
@@ -179,13 +181,23 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       };
     };
 
-    let { data, error } = await buscar(LIST_COLUMNS);
-    const semColunaDestaque = isMissingFeaturedColumn(error);
-    setFeaturedColumnMissing(semColunaDestaque);
-    if (semColunaDestaque) {
-      console.warn("[catalog] coluna is_featured ausente — rode a migração de destaques");
-      ({ data, error } = await buscar(LIST_COLUMNS_LEGACY));
+    // Escada: pede tudo e, a cada "coluna não existe", derruba a culpada e
+    // tenta de novo. O Postgres nomeia a coluna na mensagem; quando não der
+    // para identificar, cai a primeira da lista — o laço termina do mesmo
+    // jeito, no pior caso sem nenhuma coluna opcional.
+    let opcionais: OptionalColumn[] = [...OPTIONAL_COLUMNS];
+    const ausentes: OptionalColumn[] = [];
+    let { data, error } = await buscar([LIST_COLUMNS_BASE, ...opcionais].join(","));
+
+    while (error && isMissingColumn(error) && opcionais.length) {
+      const culpada = opcionais.find((c) => (error?.message ?? "").includes(c)) ?? opcionais[0];
+      console.warn(`[catalog] coluna ${culpada} ausente — rode a migração de curadoria`);
+      ausentes.push(culpada);
+      opcionais = opcionais.filter((c) => c !== culpada);
+      ({ data, error } = await buscar([LIST_COLUMNS_BASE, ...opcionais].join(",")));
     }
+
+    setMissingColumns(ausentes);
     setLoading(false);
     if (error) {
       console.error("[catalog] fetch failed", error);
@@ -249,7 +261,15 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     if (patch.gallery !== undefined) dbPatch.gallery = patch.gallery;
     if (patch.category !== undefined) dbPatch.category = patch.category;
     if (patch.forceLastItem !== undefined) dbPatch.force_last_item = patch.forceLastItem === true;
-    if (patch.isFeatured !== undefined) dbPatch.is_featured = patch.isFeatured === true;
+    // Coluna que o banco ainda não tem fica de fora: mandá-la faria o UPDATE
+    // inteiro voltar 400, e o admin perderia também o nome e o preço que
+    // acabou de digitar.
+    if (patch.forceNew !== undefined && !missingColumns.includes("force_new")) {
+      dbPatch.force_new = patch.forceNew === true;
+    }
+    if (patch.isFeatured !== undefined && !missingColumns.includes("is_featured")) {
+      dbPatch.is_featured = patch.isFeatured === true;
+    }
 
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
     const { error } = await supabase
@@ -273,7 +293,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     console.error("[catalog] setFeatured failed", error);
     // Desfaz o otimismo: o botão volta ao estado que o banco ainda tem.
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, isFeatured: !featured } : p)));
-    return isMissingFeaturedColumn(error)
+    return isMissingColumn(error)
       ? "A coluna is_featured ainda não existe no banco. Rode a migração de destaques."
       : "Não foi possível salvar o destaque. Tente novamente.";
   };
@@ -289,6 +309,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       category: p.category ?? "clothes",
       force_last_item: p.forceLastItem === true,
       sizes: coerceSizeStock(s),
+      ...(missingColumns.includes("force_new") ? {} : { force_new: p.forceNew === true }),
     };
     const { data, error } = await supabase
       .from("products")
@@ -339,7 +360,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         stock,
         loading,
         loadGallery,
-        featuredColumnMissing,
+        missingColumns,
         updateProduct,
         setFeatured,
         addProduct,
