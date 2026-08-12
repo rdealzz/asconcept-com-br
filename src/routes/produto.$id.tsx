@@ -271,11 +271,23 @@ function ProductView({
   // Clique curto sobre a peça (sem arrasto) abre a foto que está de frente.
   const abrirZoom = useCallback(() => setZoomIndex(activeImg), [activeImg]);
 
-  // Ao trocar de peça (via "Complete o Look"), volta para a primeira foto.
-  useEffect(() => {
+  /**
+   * Peça nova (outra cor do álbum, ou o "Complete o Look") começa na primeira
+   * foto — e o ajuste é no próprio render, não num efeito.
+   *
+   * Num efeito ele só rodaria depois de pintar: quem estivesse na terceira
+   * foto da camiseta branca e clicasse no seletor da preta veria, por um
+   * quadro, a TERCEIRA foto da preta antes de a galeria voltar para a
+   * primeira. A cor até estaria certa, mas a foto de abertura, não. Ajustar
+   * durante o render (o padrão de estado derivado do React) descarta o quadro
+   * errado antes de ele existir.
+   */
+  const [pecaMostrada, setPecaMostrada] = useState(product.id);
+  if (pecaMostrada !== product.id) {
+    setPecaMostrada(product.id);
     setActiveImg(0);
     setZoomIndex(null);
-  }, [product.id]);
+  }
 
   // Como o loader não roda no navegador, o `head` da rota não tem dados para
   // montar o título numa navegação interna — então ele é ajustado aqui. No
