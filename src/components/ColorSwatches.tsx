@@ -17,11 +17,22 @@ import { productParam, swatchBackground, swatchLabel } from "@/lib/variants";
  * que troca a foto: é o que faz o meio do mouse abrir em outra aba, o robô de
  * busca enxergar as variações e o clique levar direto à variação escolhida —
  * sem ter de escolher de novo lá dentro.
+ *
+ * Sobre o desenho, que foi refeito depois de ver as bolinhas na loja: elas
+ * eram pequenas demais e sumiam no fundo. O que dá presença a um seletor de
+ * cor é o contorno, não o tamanho — uma bolinha branca sobre fundo claro (ou
+ * preta sobre fundo escuro) precisa de dois fios: um claro por dentro e um
+ * escuro por fora. Com os dois, qualquer cor se destaca de qualquer fundo, nos
+ * dois temas. A cor ativa ganha anel dourado com folga, e o ponteiro levanta a
+ * bolinha alguns pixels — o suficiente para o cliente entender que aquilo se
+ * clica.
  */
 
 const MEDIDAS = {
-  sm: { bolinha: "h-4 w-4", area: "h-7 w-7", gap: "gap-1" },
-  md: { bolinha: "h-5 w-5", area: "h-8 w-8", gap: "gap-1.5" },
+  /** Grade da vitrine: cabe numa coluna de celular com quatro cores. */
+  sm: { bolinha: "h-[18px] w-[18px]", area: "h-8 w-8", gap: "gap-1.5" },
+  /** Página da peça e vitrine giratória, onde há espaço para respirar. */
+  md: { bolinha: "h-6 w-6", area: "h-10 w-10", gap: "gap-2" },
 } as const;
 
 export function ColorSwatches({
@@ -31,9 +42,10 @@ export function ColorSwatches({
   max,
   className = "",
   onSelect,
+  onPreview,
 }: {
   members: readonly Product[];
-  /** Cor em exibição — ganha o anel. */
+  /** Cor em exibição — ganha o anel dourado. */
   activeId?: string;
   size?: keyof typeof MEDIDAS;
   /** Acima disto a fileira encerra com "+N", para não quebrar o card. */
@@ -41,6 +53,12 @@ export function ColorSwatches({
   className?: string;
   /** Chamado antes de navegar (fechar um modal, por exemplo). */
   onSelect?: (p: Product) => void;
+  /**
+   * Ponteiro sobre uma cor (ou saindo de todas, com `null`). É o que permite
+   * ao card da vitrine trocar a foto enquanto o cliente passeia pelas cores,
+   * antes mesmo de clicar.
+   */
+  onPreview?: (p: Product | null) => void;
 }) {
   const medida = MEDIDAS[size];
 
@@ -49,16 +67,20 @@ export function ColorSwatches({
    *
    * A troca em si é instantânea — o catálogo inteiro já está em memória, e a
    * navegação é do roteador, sem recarregar a página. O que sobraria de espera
-   * é a capa da variação, então ela é baixada ao passar o mouse (ou ao encostar
-   * o dedo), enquanto o cliente ainda está decidindo.
+   * é a capa da variação, então ela é baixada assim que o ponteiro chega à
+   * fileira (não a cada bolinha): quando o cliente decidir, todas já estão
+   * prontas.
    */
-  const preaquecer = useCallback((p: Product) => {
-    if (!p.image || typeof window === "undefined") return;
-    const img = new Image();
-    img.decoding = "async";
-    img.fetchPriority = "low";
-    img.src = productImageSrc(p.image, 1000);
-  }, []);
+  const preaquecerTodas = useCallback(() => {
+    if (typeof window === "undefined") return;
+    for (const p of members) {
+      if (!p.image) continue;
+      const img = new Image();
+      img.decoding = "async";
+      img.fetchPriority = "low";
+      img.src = productImageSrc(p.image, 1000);
+    }
+  }, [members]);
 
   if (members.length < 2) return null;
 
@@ -70,6 +92,9 @@ export function ColorSwatches({
       className={`flex flex-wrap items-center ${medida.gap} ${className}`}
       role="group"
       aria-label="Cores disponíveis"
+      onMouseEnter={preaquecerTodas}
+      onTouchStart={preaquecerTodas}
+      onMouseLeave={() => onPreview?.(null)}
     >
       {visiveis.map((p) => {
         const rotulo = swatchLabel(p);
@@ -82,23 +107,31 @@ export function ColorSwatches({
             title={rotulo}
             aria-label={`Ver na cor ${rotulo}`}
             aria-current={ativa ? "true" : undefined}
-            onMouseEnter={() => preaquecer(p)}
-            onTouchStart={() => preaquecer(p)}
+            onMouseEnter={() => onPreview?.(p)}
+            onFocus={() => onPreview?.(p)}
             onClick={() => onSelect?.(p)}
-            className={`grid ${medida.area} place-items-center rounded-full transition-transform duration-ascfast ease-asc hover:scale-110 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-asc-gold ${
-              ativa ? "ring-1 ring-asc-gold ring-offset-2 ring-offset-background" : ""
-            }`}
+            // A área clicável é bem maior que a bolinha — é ela que dá o alvo
+            // de dedo no celular sem inchar o desenho.
+            className={`group/cor grid ${medida.area} place-items-center rounded-full focus-visible:outline-none`}
           >
             <span
               aria-hidden
-              className={`${medida.bolinha} rounded-full border border-asc-ink/15 shadow-[0_1px_2px_rgba(0,0,0,0.18)]`}
               style={{ background: swatchBackground(p.variant, p.name) }}
+              className={`${medida.bolinha} rounded-full ring-1 ring-asc-ink/25 transition-[transform,box-shadow] duration-[240ms] ease-asc
+                shadow-[inset_0_0_0_1px_rgba(255,255,255,0.22),0_1px_2px_rgba(0,0,0,0.25)]
+                group-hover/cor:-translate-y-[3px] group-hover/cor:scale-110
+                group-hover/cor:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.3),0_6px_12px_rgba(0,0,0,0.35)]
+                group-focus-visible/cor:-translate-y-[3px] group-focus-visible/cor:scale-110 ${
+                  ativa
+                    ? "scale-105 ring-2 ring-asc-gold ring-offset-2 ring-offset-background shadow-[inset_0_0_0_1px_rgba(255,255,255,0.3),0_0_0_1px_rgba(197,160,89,0.35),0_4px_10px_rgba(0,0,0,0.3)]"
+                    : ""
+                }`}
             />
           </Link>
         );
       })}
       {resto > 0 && (
-        <span className="pl-0.5 text-[10px] tabular-nums text-muted-foreground">+{resto}</span>
+        <span className="pl-0.5 text-[11px] tabular-nums text-asc-ink-muted">+{resto}</span>
       )}
     </div>
   );

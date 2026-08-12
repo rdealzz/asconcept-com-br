@@ -113,10 +113,19 @@ export function ProductGallery({
     setMontadas((prev) => (prev.has(atual) ? prev : new Set(prev).add(atual)));
   }, [atual]);
 
-  // Peça diferente, pilha diferente: a peça nova começa da primeira foto.
-  useEffect(() => {
+  /**
+   * Peça diferente, pilha diferente: a peça nova começa da primeira foto.
+   *
+   * O ajuste é no render, e não num efeito. Num efeito ele só rodaria depois
+   * de pintar, e o quadro do meio montava as fotos ANTIGAS já com as URLs
+   * novas — pedindo à rede fotos que ninguém ia ver, e piscando na troca de
+   * cor, que é justamente quando a pilha inteira é substituída de uma vez.
+   */
+  const [pilhaAtual, setPilhaAtual] = useState(srcs);
+  if (pilhaAtual !== srcs) {
+    setPilhaAtual(srcs);
     setMontadas(new Set([0]));
-  }, [srcs]);
+  }
 
   /* ── pré-carga das vizinhas: a próxima já chega pronta ───────────── */
   useEffect(() => {

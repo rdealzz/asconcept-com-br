@@ -56,7 +56,7 @@ import {
   suggestSizeGrid,
   type SizeGridId,
 } from "@/lib/sizes";
-import { collapseVariants, groupOf, productParam } from "@/lib/variants";
+import { collapseVariants, groupOf, productParam, swatchLabel } from "@/lib/variants";
 import { ColorSwatches } from "@/components/ColorSwatches";
 import { VariantsAdmin, SQL_VARIACOES } from "@/components/VariantsAdmin";
 import { supabase } from "@/integrations/supabase/client";
@@ -1163,6 +1163,45 @@ const ProductCard = memo(function ProductCard({
     };
   }, [perto, hoverImg, soldOut]);
 
+  /**
+   * Prévia de cor no próprio card.
+   *
+   * Passar o ponteiro por uma bolinha troca a foto do card para a daquela cor,
+   * sem sair do lugar — é como as vitrines grandes deixam o cliente percorrer
+   * o álbum antes de escolher. `ultimaPrevia` continua montada depois que o
+   * ponteiro sai: é ela que faz o retorno à capa ser um cruzamento suave, e
+   * não um corte seco.
+   */
+  const [previaId, setPreviaId] = useState<string | null>(null);
+  const [ultimaPrevia, setUltimaPrevia] = useState<Product | null>(null);
+  const preverCor = useCallback((p: Product | null) => {
+    setPreviaId(p?.id ?? null);
+    if (p) setUltimaPrevia(p);
+  }, []);
+  const previaVisivel = previaId !== null && previaId !== product.id;
+
+  // As capas das outras cores, baixadas no tempo ocioso quando o card se
+  // aproxima da tela. É o que faz a prévia aparecer sem piscar já no primeiro
+  // passar de ponteiro. Mesmas ressalvas da segunda foto: sem hover ou com
+  // economia de dados, não vale o tráfego.
+  const capasDoAlbum = cores
+    .filter((c) => c.id !== product.id)
+    .slice(0, 4)
+    .map((c) => c.image)
+    .filter(Boolean)
+    .join("|");
+  useEffect(() => {
+    if (!perto || !capasDoAlbum || soldOut || !temHover() || economizandoDados()) return;
+    return noOcioso(() => {
+      for (const src of capasDoAlbum.split("|")) {
+        const img = new Image();
+        img.decoding = "async";
+        img.fetchPriority = "low";
+        img.src = productImageSrc(src, 1000);
+      }
+    });
+  }, [perto, capasDoAlbum, soldOut]);
+
   return (
     <article
       ref={cardRef as React.Ref<HTMLElement>}
@@ -1205,6 +1244,23 @@ const ProductCard = memo(function ProductCard({
             decoding="async"
             aria-hidden
             className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-asc ease-asc group-hover:opacity-100"
+          />
+        )}
+        {/* A cor que o ponteiro está percorrendo, por cima das outras duas
+            fotos (z-10, ainda abaixo do link em z-20). Fica montada mesmo
+            depois que o ponteiro sai da bolinha — some por opacidade, e é isso
+            que faz a volta à capa ser um cruzamento suave em vez de um corte. */}
+        {ultimaPrevia && !soldOut && (
+          <img
+            src={productImageSrc(ultimaPrevia.image, 1000)}
+            srcSet={productImageSrcSet(ultimaPrevia.image)}
+            sizes={CARD_SIZES}
+            alt={`${product.name} — ${swatchLabel(ultimaPrevia)}`}
+            decoding="async"
+            aria-hidden={!previaVisivel}
+            className={`pointer-events-none absolute inset-0 z-10 h-full w-full object-cover transition-opacity duration-[240ms] ease-asc ${
+              previaVisivel ? "opacity-100" : "opacity-0"
+            }`}
           />
         )}
         {/* Pílulas translúcidas em vez das tarjas opacas que tomavam a cabeça
@@ -1265,9 +1321,17 @@ const ProductCard = memo(function ProductCard({
           grandes. Cada bolinha abre direto a página daquela cor: o cliente não
           escolhe duas vezes. Fileira de altura fixa só quando existe álbum,
           para não abrir buraco embaixo das peças de cor única. */}
-      {cores.length > 1 && (
-        <ColorSwatches members={cores} activeId={product.id} max={6} className="mt-3" />
-      )}
+      {/* Faixa das cores.
+          A altura é reservada em TODOS os cards, mesmo nos que não têm álbum:
+          sem isso, o card com bolinhas empurra o próprio nome e preço para
+          baixo e a fileira inteira sai em degraus. Quatro cores é o teto na
+          grade — a quinta quebraria linha na coluna estreita do celular, e aí
+          a altura do card mudaria de novo. O resto vira "+N". */}
+      <div className="mt-2 flex h-8 items-center">
+        {cores.length > 1 && (
+          <ColorSwatches members={cores} activeId={product.id} max={4} onPreview={preverCor} />
+        )}
+      </div>
 
       {/* Só foto, nome e preço. Descrição e parcelamento vivem na página da
           peça, que é onde o cliente para para ler — aqui eles só empurravam o

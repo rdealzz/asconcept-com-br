@@ -406,37 +406,112 @@ export type SugestaoAlbum = {
   products: Product[];
 };
 
+/** Palavras que não dizem nada sobre o modelo — não contam na comparação. */
+const CONECTORES = new Set(["de", "da", "do", "das", "dos", "com", "em", "para", "the"]);
+
+/** Palavras significativas do nome, já sem cor e sem conectores. */
+function palavras(base: string): Set<string> {
+  return new Set(base.split(/\s+/).filter((t) => t.length >= 3 && !CONECTORES.has(t)));
+}
+
+/** Quanto dois nomes se parecem, de 0 a 1 (interseção sobre união). */
+function semelhanca(a: Set<string>, b: Set<string>): number {
+  let comuns = 0;
+  for (const t of a) if (b.has(t)) comuns++;
+  const uniao = a.size + b.size - comuns;
+  return uniao ? comuns / uniao : 0;
+}
+
+/** A partir daqui dois nomes são parecidos o bastante para virar proposta. */
+const LIMIAR = 0.5;
+
 /**
  * Desconfia de peças que são o mesmo modelo em cores diferentes.
  *
- * Nunca agrupa nada: devolve propostas para o admin aprovar, uma a uma. O
- * critério é conservador de propósito — mesma categoria, mesmo nome depois de
- * remover as palavras de cor, e cores distintas entre os membros. Peça que já
- * está num álbum não entra em proposta nenhuma.
+ * Nunca agrupa nada: devolve propostas para o admin aprovar, uma a uma.
+ *
+ * A primeira versão exigia o nome IDÊNTICO depois de tirar a cor, e na loja
+ * real isso quase nunca acontece: "Shorts de Praia Premium Polo Ralph Lauren"
+ * e "Shorts de Banho/Praia Polo Ralph Lauren" são o mesmo modelo em duas
+ * cores, e nenhuma proposta aparecia. Agora a comparação é por palavras em
+ * comum, com duas travas contra proposta boba:
+ *
+ *   1. **mesma espécie de peça** — a primeira palavra do nome tem de ser a
+ *      mesma. É ela que separa "Camiseta Polo Ralph Lauren" de "Camisa Polo
+ *      Ralph Lauren", que compartilham três palavras de marca e não são o
+ *      mesmo modelo;
+ *   2. **metade das palavras em comum**, contando só as que significam algo
+ *      (fora "de", "com", "para") e ignorando as de cor.
+ *
+ * Mesmo passando nas duas, nada é agrupado sem o admin aprovar — e as peças
+ * ficam à vista na proposta, com foto e cor, para ele conferir.
  */
 export function suggestGroups(products: readonly Product[]): SugestaoAlbum[] {
-  const porChave = new Map<string, Product[]>();
+  type Candidato = {
+    produto: Product;
+    /** Espécie da peça: a primeira palavra do nome sem cor ("shorts"). */
+    especie: string;
+    palavras: Set<string>;
+    categoria: string;
+    chave: string;
+  };
+
+  const candidatos: Candidato[] = [];
   for (const p of products) {
     if (p.variant?.group) continue;
     const base = nomeBase(p.name);
-    // Nome que sobra em nada (a peça se chama só "Preta") não dá chave: juntaria
+    // Nome que sobra em nada (a peça se chama só "Preta") não entra: juntaria
     // coisas sem relação nenhuma.
     if (base.length < 4) continue;
     if (!detectarCores(p.name).color) continue;
-    const chave = `${coerceCategory(p.category)}:${base}`;
-    const lista = porChave.get(chave);
-    if (lista) lista.push(p);
-    else porChave.set(chave, [p]);
+    const categoria = coerceCategory(p.category);
+    candidatos.push({
+      produto: p,
+      especie: base.split(/\s+/)[0] ?? "",
+      palavras: palavras(base),
+      categoria,
+      chave: `${categoria}:${base}`,
+    });
   }
 
+  const usados = new Set<string>();
   const out: SugestaoAlbum[] = [];
-  for (const [chave, membros] of porChave) {
-    if (membros.length < 2) continue;
+
+  for (const semente of candidatos) {
+    if (usados.has(semente.produto.id)) continue;
+    usados.add(semente.produto.id);
+
+    const grupo = [semente];
+    for (const outro of candidatos) {
+      if (usados.has(outro.produto.id)) continue;
+      if (outro.categoria !== semente.categoria) continue;
+      if (outro.especie !== semente.especie) continue;
+      if (semelhanca(semente.palavras, outro.palavras) < LIMIAR) continue;
+      grupo.push(outro);
+      usados.add(outro.produto.id);
+    }
+
+    if (grupo.length < 2) {
+      // Sozinha não vira proposta — e volta para a fila, porque pode ser
+      // parecida com uma peça que ainda nem foi visitada.
+      usados.delete(semente.produto.id);
+      continue;
+    }
+
+    // Todas da mesma cor não é álbum de cores: é repetição de cadastro, e
+    // agrupar isso esconderia peça na vitrine sem dar escolha nenhuma.
+    const membros = grupo.map((c) => c.produto);
     const cores = new Set(membros.map((m) => JSON.stringify(detectarCores(m.name))));
-    if (cores.size < 2) continue;
+    if (cores.size < 2) {
+      for (const c of grupo) usados.delete(c.produto.id);
+      usados.add(semente.produto.id);
+      continue;
+    }
+
     membros.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-    out.push({ id: chave, label: rotuloDaSugestao(membros), products: membros });
+    out.push({ id: semente.chave, label: rotuloDaSugestao(membros), products: membros });
   }
+
   return out.sort((a, b) => b.products.length - a.products.length);
 }
 

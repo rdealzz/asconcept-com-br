@@ -205,6 +205,49 @@ describe("sugestão automática", () => {
     expect(suggestGroups(lista)).toEqual([]);
   });
 
+  it("propõe o mesmo modelo mesmo quando o nome não é idêntico", () => {
+    // O caso real da loja: os dois são o mesmo shorts, em cores diferentes,
+    // cadastrados com nomes que não batem palavra por palavra.
+    const lista = [
+      peca("a", "Shorts de Praia Premium Polo Ralph Lauren - Azul Marinho"),
+      peca("b", "Shorts de Banho/Praia Polo Ralph Lauren - Bege Texturizado"),
+    ];
+    const s = suggestGroups(lista);
+    expect(s).toHaveLength(1);
+    expect(s[0].products.map((p) => p.id).sort()).toEqual(["a", "b"]);
+  });
+
+  it("não junta camisa com camiseta só porque a marca é a mesma", () => {
+    // Três palavras de marca em comum ("polo ralph lauren") não podem bastar:
+    // a espécie da peça é a primeira palavra, e ela tem de bater.
+    const lista = [
+      peca("a", "Camiseta Básica Polo Ralph Lauren - Preta"),
+      peca("b", "Camisa Social Polo Ralph Lauren - Branca"),
+    ];
+    expect(suggestGroups(lista)).toEqual([]);
+  });
+
+  it("não propõe álbum de peças todas da mesma cor", () => {
+    const lista = [
+      peca("a", "Suéter de Malha Trançada Polo Ralph Lauren - Branco"),
+      peca("b", "Suéter de Malha Canelada Polo Ralph Lauren - Branco"),
+    ];
+    expect(suggestGroups(lista)).toEqual([]);
+  });
+
+  it("peça sem par volta para a fila e entra no álbum de outra semente", () => {
+    // A calça é visitada primeiro e não forma grupo; isso não pode impedi-la
+    // de ser comparada com as peças seguintes.
+    const lista = [
+      peca("z", "Calça de Alfaiataria Bege"),
+      peca("a", "Suéter de Malha Trançada Polo Ralph Lauren - Branco"),
+      peca("b", "Suéter de Malha Trançada Polo Ralph Lauren - Cinza"),
+    ];
+    const s = suggestGroups(lista);
+    expect(s).toHaveLength(1);
+    expect(s[0].products.map((p) => p.id).sort()).toEqual(["a", "b"]);
+  });
+
   it("o nome sem cor é o que aproxima duas peças", () => {
     expect(nomeBase("Camiseta Básica Polo – Preta com Logo Vermelho")).toBe("camiseta basica polo");
   });
