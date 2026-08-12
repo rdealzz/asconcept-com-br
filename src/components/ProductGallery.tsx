@@ -3,6 +3,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -22,8 +23,9 @@ const GALLERY_WIDTH = 1000;
  * gesto que todo mundo já tenta; clique curto amplia.
  *
  * A troca é uma transição suave de opacidade entre as fotos empilhadas, sem
- * biblioteca de animação: as fotos ficam todas montadas e só a atual fica
- * visível, então passar de uma para outra não recarrega nada.
+ * biblioteca de animação. Só entra na pilha a foto que já foi mostrada: quem
+ * abriu a peça e não trocou de foto baixa uma imagem, não a galeria inteira.
+ * Uma vez montada, ela fica — é o que faz a volta ser instantânea.
  */
 export function ProductGallery({
   images,
@@ -92,15 +94,52 @@ export function ProductGallery({
     }
   };
 
+  /* ── quais fotos existem no DOM ──────────────────────────────────── */
+  /**
+   * Só a foto que já foi vista entra na página.
+   *
+   * Antes as cinco fotos da peça eram montadas de uma vez, empilhadas no mesmo
+   * quadro. O `loading="lazy"` não adiava nada ali: para o navegador todas
+   * estavam na tela, então ele baixava as cinco em 1000px no mesmo instante em
+   * que a página abria — mais as cinco miniaturas. Era esse pacote de dez
+   * requisições que travava a abertura da peça no celular.
+   *
+   * A que já foi mostrada continua montada, porque é ela que faz o cruzamento
+   * suave de opacidade na troca.
+   */
+  const [montadas, setMontadas] = useState<Set<number>>(() => new Set([0]));
+
+  useEffect(() => {
+    setMontadas((prev) => (prev.has(atual) ? prev : new Set(prev).add(atual)));
+  }, [atual]);
+
+  // Peça diferente, pilha diferente: a peça nova começa da primeira foto.
+  useEffect(() => {
+    setMontadas(new Set([0]));
+  }, [srcs]);
+
   /* ── pré-carga das vizinhas: a próxima já chega pronta ───────────── */
   useEffect(() => {
     if (typeof window === "undefined" || n < 2) return;
-    for (const passo of [1, -1]) {
-      const i = (((atual + passo) % n) + n) % n;
-      const img = new Image();
-      img.decoding = "async";
-      img.src = srcs[i];
+
+    // Depois do primeiro quadro, e no tempo ocioso: a foto que o cliente está
+    // olhando não divide banda com as que ele ainda nem pediu.
+    const aquecer = () => {
+      for (const passo of [1, -1]) {
+        const i = (((atual + passo) % n) + n) % n;
+        const img = new Image();
+        img.decoding = "async";
+        img.src = srcs[i];
+      }
+    };
+
+    const ocioso = window.requestIdleCallback;
+    if (!ocioso) {
+      const t = window.setTimeout(aquecer, 700);
+      return () => window.clearTimeout(t);
     }
+    const id = ocioso(aquecer, { timeout: 2500 });
+    return () => window.cancelIdleCallback?.(id);
   }, [atual, n, srcs]);
 
   if (!n) return null;
@@ -117,20 +156,24 @@ export function ProductGallery({
         onKeyDown={onKeyDown}
         className="relative h-full w-full cursor-zoom-in touch-pan-y select-none outline-none"
       >
-        {srcs.map((src, i) => (
-          <img
-            key={src + i}
-            src={src}
-            alt={i === atual ? alt : ""}
-            aria-hidden={i !== atual}
-            draggable={false}
-            decoding="async"
-            loading={i === 0 ? "eager" : "lazy"}
-            className={`pointer-events-none absolute inset-0 mx-auto h-full w-full object-contain transition-opacity duration-asc ease-asc ${
-              i === atual ? "opacity-100" : "opacity-0"
-            } ${imageClassName}`}
-          />
-        ))}
+        {srcs.map((src, i) =>
+          montadas.has(i) ? (
+            <img
+              key={src + i}
+              src={src}
+              alt={i === atual ? alt : ""}
+              aria-hidden={i !== atual}
+              draggable={false}
+              decoding="async"
+              // A primeira é o LCP da página e tem prioridade; as outras só
+              // são montadas depois de escolhidas, então já chegam pedidas.
+              fetchPriority={i === 0 ? "high" : undefined}
+              className={`pointer-events-none absolute inset-0 mx-auto h-full w-full object-contain transition-opacity duration-asc ease-asc ${
+                i === atual ? "opacity-100" : "opacity-0"
+              } ${imageClassName}`}
+            />
+          ) : null,
+        )}
       </div>
 
       {n > 1 && (

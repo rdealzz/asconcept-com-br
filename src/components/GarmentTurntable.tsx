@@ -541,11 +541,10 @@ export function GarmentTurntable({
       }
     };
 
-    // As duas primeiras são as faces visíveis já na primeira meia-volta, então
-    // vão junto. O resto só é preciso depois de o cliente girar algumas vezes —
-    // buscá-las agora tiraria banda da foto que ele está olhando.
-    aquecer(srcs.slice(0, 2));
-
+    // As duas primeiras já estão no DOM (frente e verso do palco), então o
+    // navegador as busca de qualquer jeito. O resto só é preciso depois de o
+    // cliente girar algumas vezes — buscá-las agora tiraria banda da foto que
+    // ele está olhando, por isso vão no tempo ocioso.
     const resto = srcs.slice(2, 5);
     if (!resto.length) return;
     const ocioso = window.requestIdleCallback;

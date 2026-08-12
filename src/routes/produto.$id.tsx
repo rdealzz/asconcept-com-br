@@ -95,7 +95,13 @@ function ProductPage() {
   // que o catálogo do cliente hidrata, ele passa a ser a fonte de verdade —
   // é o que reflete uma edição feita no painel do admin.
   const product: Product | null = products.find((p) => p.id === id) ?? loaded?.product ?? null;
-  const sizeStock: SizeStock = liveStock[id] ?? loaded?.stock ?? emptyStock();
+  // `emptyStock()` devolvia um objeto novo a cada render, e ele é dependência
+  // do memo da grade e do efeito que escolhe o tamanho — os dois refaziam
+  // trabalho a cada quadro enquanto o catálogo não chegava.
+  const sizeStock: SizeStock = useMemo(
+    () => liveStock[id] ?? loaded?.stock ?? emptyStock(),
+    [liveStock, id, loaded?.stock],
+  );
 
   const [size, setSize] = useState<Size | null>(null);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
@@ -217,7 +223,7 @@ function ProductView({
 
       {/* Breadcrumb */}
       <nav aria-label="Trilha de navegação" className="border-b border-asc-line">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-2 px-6 py-4 md:px-12">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-2 px-4 py-3 sm:px-6 sm:py-4 md:px-12">
           <Link
             to="/"
             className="text-xs text-asc-ink-muted transition-colors duration-ascfast ease-asc hover:text-asc-ink"
@@ -233,11 +239,13 @@ function ProductView({
             {categoryLabel(product.category)}
           </Link>
           <span className="text-xs text-asc-ink-muted">/</span>
-          <span className="text-xs text-asc-ink">{product.name}</span>
+          <span className="max-w-[60vw] truncate text-xs text-asc-ink sm:max-w-none">
+            {product.name}
+          </span>
         </div>
       </nav>
 
-      <div className="mx-auto max-w-[1600px] rounded-[2rem] px-6 py-10 md:px-12 md:py-16">
+      <div className="mx-auto max-w-[1600px] rounded-[2rem] px-4 py-8 sm:px-6 sm:py-10 md:px-12 md:py-16">
         <div className="grid gap-10 lg:grid-cols-[1.65fr_1fr] lg:gap-16">
           {/* Coluna esquerda — foto principal contida na altura da tela, com
               miniaturas abaixo. Antes era uma pilha de fotos em tamanho cheio,
@@ -263,7 +271,10 @@ function ProductView({
                 index={activeImg}
                 onIndex={setActiveImg}
                 onOpen={abrirZoom}
-                className="mx-auto h-[46vh] w-full max-w-[38rem] md:h-[62vh]"
+                // No celular a moldura toma a proporção da própria peça (3/4):
+                // com altura em vh sobrava faixa preta dos dois lados, porque
+                // a foto é retrato e o quadro, largo.
+                className="mx-auto aspect-[3/4] w-full max-w-[24rem] sm:max-w-[26rem] md:aspect-auto md:h-[62vh] md:max-w-[38rem]"
                 imageClassName="drop-shadow-[0_24px_48px_rgba(0,0,0,0.5)]"
               />
 
@@ -298,6 +309,9 @@ function ProductView({
                       alt=""
                       loading="lazy"
                       decoding="async"
+                      // Miniatura não disputa banda com a foto grande, que é o
+                      // LCP da página.
+                      fetchPriority="low"
                       className="h-full w-full object-cover"
                     />
                   </button>
@@ -468,7 +482,7 @@ function ProductView({
       {/* CTA fixo no mobile — o painel sticky só existe a partir de lg.
           O pr-20 abre espaço para o botão flutuante do WhatsApp, que é fixo
           no canto inferior direito e ficaria por cima do CTA. */}
-      <div className="sticky bottom-0 z-30 border-t border-asc-line bg-background/95 py-3 pl-4 pr-20 backdrop-blur md:hidden">
+      <div className="sticky bottom-0 z-30 border-t border-asc-line bg-background/95 pl-4 pr-20 pt-3 backdrop-blur md:hidden [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
         <button
           onClick={handleAdd}
           disabled={!canAdd}
