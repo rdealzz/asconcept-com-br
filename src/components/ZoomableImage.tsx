@@ -22,17 +22,13 @@ export function ZoomableImage({ src, alt, className = "" }: Props) {
 
   return (
     <>
-      <div
-        className="relative h-full w-full cursor-zoom-in"
-        onClick={() => setOpen(true)}
-      >
+      <div className="relative h-full w-full cursor-zoom-in" onClick={() => setOpen(true)}>
         <img src={src} alt={alt} className={`h-full w-full ${className}`} />
         <span className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 bg-charcoal/70 px-2.5 py-1 text-[10px] tracking-luxe uppercase text-ivory">
           <ZoomIn className="h-3 w-3" strokeWidth={1.5} />
           Ampliar
         </span>
       </div>
-
 
       {open && <ZoomViewer src={src} alt={alt} onClose={() => setOpen(false)} />}
     </>
@@ -58,9 +54,7 @@ function ZoomViewer({ src, alt, onClose }: { src: string; alt: string; onClose: 
     const k = clamped / z;
     setZoom(clamped);
     setOffset(
-      clamped === MIN_ZOOM
-        ? { x: 0, y: 0 }
-        : { x: px - (px - o.x) * k, y: py - (py - o.y) * k },
+      clamped === MIN_ZOOM ? { x: 0, y: 0 } : { x: px - (px - o.x) * k, y: py - (py - o.y) * k },
     );
   }, []);
 

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   createContext,
+  memo,
   useCallback,
   useContext,
   useEffect,
@@ -65,6 +66,7 @@ import { Loader } from "@/components/Loader";
 import { Eyebrow, PillButton } from "@/components/ui-kit";
 import { Showroom } from "@/components/Showroom";
 import { ProductCardMeta } from "@/components/ProductCardMeta";
+import { economizandoDados, noOcioso, temHover, useNearViewport } from "@/lib/near-viewport";
 import { Inview, StackedLines, WordReveal, useScrollProgress } from "@/lib/motion";
 import { useVisualShell } from "@/lib/visual-shell";
 import { EmptyCategoryState } from "@/components/EmptyCategoryState";
@@ -1031,7 +1033,13 @@ const EAGER_CARDS = 4;
  *   da grade finalmente adia alguma coisa — e vale disputar a banda inicial só
  *   para as primeiras peças, que são o LCP da vitrine.
  */
-function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
+const ProductCard = memo(function ProductCard({
+  product,
+  priority = false,
+}: {
+  product: Product;
+  priority?: boolean;
+}) {
   const { openEdit } = useProduct();
   const { stock, deleteProduct, loadGallery } = useCatalog();
   const isAdmin = useIsAdmin();
@@ -1046,11 +1054,53 @@ function ProductCard({ product, priority = false }: { product: Product; priority
 
   const hoverImg = (product.gallery ?? []).find((g) => g && g !== product.image);
 
+  /**
+   * A segunda foto tem de estar em cache ANTES do mouse chegar.
+   *
+   * Antes o hover fazia duas viagens à rede em sequência: buscar a galeria da
+   * peça no banco e só então baixar a foto. Dava para ver o efeito acontecendo
+   * tarde. Agora, quando o card se aproxima da tela, a galeria é pedida (em
+   * lote com os vizinhos) e a foto do hover é baixada no tempo ocioso. Só
+   * depois de ela estar pronta é que o `<img>` entra na página — trocar de
+   * opacidade para uma imagem já decodificada é trabalho de GPU, sem rede e
+   * sem layout no meio.
+   */
+  const [cardRef, perto] = useNearViewport<HTMLElement>();
+  const [hoverPronto, setHoverPronto] = useState(false);
+
+  useEffect(() => {
+    if (!perto) return;
+    void loadGallery(product.id);
+  }, [perto, product.id, loadGallery]);
+
+  useEffect(() => {
+    // Sem hover (celular) a segunda foto nunca aparece: baixá-la ali seria
+    // dobrar os bytes da vitrine por um efeito que o aparelho não exibe.
+    if (!perto || !hoverImg || soldOut || !temHover() || economizandoDados()) return;
+    let vivo = true;
+    const cancelar = noOcioso(() => {
+      const img = new Image();
+      img.decoding = "async";
+      // Prioridade baixa: é uma foto que o cliente talvez nunca veja, e ela
+      // não pode competir com as capas que ele está rolando agora.
+      img.fetchPriority = "low";
+      img.onload = () => vivo && setHoverPronto(true);
+      img.src = productImageSrc(hoverImg, 1000);
+      // Já em cache: `complete` é verdadeiro sem esperar o onload.
+      if (img.complete) setHoverPronto(true);
+    });
+    return () => {
+      vivo = false;
+      cancelar();
+    };
+  }, [perto, hoverImg, soldOut]);
+
   return (
-    // Encostar no card já busca as fotos restantes da peça: serve para a troca
-    // de imagem no hover e adianta o que a página de produto vai precisar.
     <article
+      ref={cardRef as React.Ref<HTMLElement>}
       className="group flex flex-col"
+      // Rede de segurança para quem chega no card antes do observador: uma
+      // chamada repetida de `loadGallery` é descartada na origem.
       onMouseEnter={() => void loadGallery(product.id)}
       onTouchStart={() => void loadGallery(product.id)}
     >
@@ -1074,20 +1124,19 @@ function ProductCard({ product, priority = false }: { product: Product; priority
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : undefined}
           decoding="async"
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-ascslow ease-asc ${
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-asc ease-asc ${
             soldOut ? "opacity-50 grayscale" : ""
-          } ${hoverImg && !soldOut ? "group-hover:opacity-0" : ""}`}
+          } ${hoverImg && !soldOut && hoverPronto ? "group-hover:opacity-0" : ""}`}
         />
-        {hoverImg && !soldOut && (
+        {hoverImg && !soldOut && hoverPronto && (
           <img
             src={productImageSrc(hoverImg, 1000)}
             srcSet={productImageSrcSet(hoverImg)}
             sizes={CARD_SIZES}
             alt={`${product.name} — segunda vista`}
-            loading="lazy"
             decoding="async"
             aria-hidden
-            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-ascslow ease-asc group-hover:opacity-100"
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-asc ease-asc group-hover:opacity-100"
           />
         )}
         {/* Pílulas translúcidas em vez das tarjas opacas que tomavam a cabeça
@@ -1160,7 +1209,7 @@ function ProductCard({ product, priority = false }: { product: Product; priority
       )}
     </article>
   );
-}
+});
 
 /* ---------- Admin Edit / Create Modal ---------- */
 

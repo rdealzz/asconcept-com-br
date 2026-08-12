@@ -537,6 +537,7 @@ export function GarmentTurntable({
       for (const src of lista) {
         const i = new Image();
         i.decoding = "async";
+        i.fetchPriority = "low";
         i.src = src;
       }
     };

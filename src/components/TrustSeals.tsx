@@ -35,8 +35,8 @@ export function TrustSeals({
       </div>
       <p className="mt-3 flex items-start gap-2 text-[11px] font-light leading-relaxed">
         <Lock className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={1.5} />
-        Seus dados estão protegidos com criptografia de ponta a ponta. O pagamento é
-        processado pelo Mercado Pago — não armazenamos os dados do seu cartão.
+        Seus dados estão protegidos com criptografia de ponta a ponta. O pagamento é processado pelo
+        Mercado Pago — não armazenamos os dados do seu cartão.
       </p>
     </div>
   );

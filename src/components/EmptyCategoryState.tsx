@@ -28,8 +28,8 @@ export function EmptyCategoryState({ categoryName }: { categoryName: string }) {
         Esta peça ainda está sendo talhada.
       </h2>
       <p className="mb-10 font-sans text-sm leading-relaxed text-asc-ink-muted">
-        Cada coleção da A&amp;S Conccept nasce sem pressa. Deixe seu e-mail e
-        avisamos no instante em que este drop chegar ao ateliê.
+        Cada coleção da A&amp;S Conccept nasce sem pressa. Deixe seu e-mail e avisamos no instante
+        em que este drop chegar ao ateliê.
       </p>
 
       <StitchDivider className="mb-10" />
@@ -39,10 +39,7 @@ export function EmptyCategoryState({ categoryName }: { categoryName: string }) {
           Anotado. Você será o primeiro a saber.
         </p>
       ) : (
-        <form
-          onSubmit={handleSubmit}
-          className="mx-auto flex max-w-sm flex-col gap-3 sm:flex-row"
-        >
+        <form onSubmit={handleSubmit} className="mx-auto flex max-w-sm flex-col gap-3 sm:flex-row">
           <input
             type="email"
             required

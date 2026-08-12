@@ -96,6 +96,13 @@ type CatalogCtx = {
 const CatalogContext = createContext<CatalogCtx | null>(null);
 
 /**
+ * Quantas galerias cabem numa requisição. O limite existe porque o `in (...)`
+ * viaja na URL: uma vitrine grande rolada de ponta a ponta estouraria o
+ * tamanho de URL que o servidor aceita.
+ */
+const MAX_LOTE_GALERIA = 30;
+
+/**
  * Normaliza o `sizes` do banco: quantidades inteiras e não negativas, uma por
  * tamanho gravado. As chaves são as que a peça tiver — "P" ou "42" ou "Único" —
  * porque a coluna é JSONB e a grade varia com a espécie da peça.
@@ -165,6 +172,12 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   // duas requisições por causa de closure desatualizada.
   const galleryRequested = useRef<Record<string, boolean>>({});
 
+  // Fila do lote de galerias (ver `loadGallery`).
+  const fila = useRef<Set<string>>(new Set());
+  const loteAgendado = useRef<number | null>(null);
+  const loteEmEspera = useRef<Promise<void> | null>(null);
+  const resolverLote = useRef<(() => void) | null>(null);
+
   const refresh = useCallback(async () => {
     // A lista de colunas passou a ser variável, e com isso o supabase-js perde
     // a inferência do formato da linha. O retorno é normalizado aqui — o
@@ -211,40 +224,86 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     setStockMap(nextStock);
   }, []);
 
-  const loadGallery: CatalogCtx["loadGallery"] = useCallback(async (id) => {
-    if (!id || galleryRequested.current[id]) return;
-    galleryRequested.current[id] = true;
+  /**
+   * Busca as galerias em lote.
+   *
+   * A grade pede a galeria de cada card que se aproxima da tela, e antes cada
+   * pedido virava uma requisição própria: rolar a vitrine disparava dezenas
+   * delas, em fila, e a foto de hover só chegava depois da sua vez. Os pedidos
+   * feitos no mesmo instante viram um `in (...)` só.
+   */
+  const executarLote = useCallback(async () => {
+    loteAgendado.current = null;
+    const ids = [...fila.current];
+    fila.current.clear();
+    const concluir = resolverLote.current;
+    resolverLote.current = null;
+    loteEmEspera.current = null;
+    if (!ids.length) {
+      concluir?.();
+      return;
+    }
 
     const { data, error } = await supabase
       .from("products")
       .select("id,gallery,long_description")
-      .eq("id", id)
-      .maybeSingle();
+      .in("id", ids);
 
     if (error || !data) {
-      // Libera para tentar de novo — a peça pode ter sido só uma falha de rede.
-      galleryRequested.current[id] = false;
+      // Libera para tentar de novo — pode ter sido só uma falha de rede.
+      for (const id of ids) galleryRequested.current[id] = false;
       if (error) console.error("[catalog] loadGallery failed", error);
+      concluir?.();
       return;
     }
 
-    const row = data as { gallery?: unknown; long_description?: string | null };
-    const gal = Array.isArray(row.gallery)
-      ? (row.gallery as unknown[]).filter((g): g is string => typeof g === "string")
-      : [];
+    const linhas = data as unknown as Array<{
+      id: string;
+      gallery?: unknown;
+      long_description?: string | null;
+    }>;
+    const porId = new Map(linhas.map((r) => [r.id, r]));
 
     setProducts((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              gallery: gal.length ? gal : p.gallery,
-              longDescription: row.long_description ?? p.longDescription,
-            }
-          : p,
-      ),
+      prev.map((p) => {
+        const row = porId.get(p.id);
+        if (!row) return p;
+        const gal = Array.isArray(row.gallery)
+          ? (row.gallery as unknown[]).filter((g): g is string => typeof g === "string")
+          : [];
+        return {
+          ...p,
+          gallery: gal.length ? gal : p.gallery,
+          longDescription: row.long_description ?? p.longDescription,
+        };
+      }),
     );
+    concluir?.();
   }, []);
+
+  const loadGallery: CatalogCtx["loadGallery"] = useCallback(
+    (id) => {
+      if (!id || galleryRequested.current[id]) return Promise.resolve();
+      galleryRequested.current[id] = true;
+      fila.current.add(id);
+
+      if (!loteEmEspera.current) {
+        loteEmEspera.current = new Promise<void>((r) => {
+          resolverLote.current = r;
+        });
+      }
+      // Lote cheio parte na hora; o resto espera um quadro para juntar o que
+      // vier junto (a grade inteira entrando na tela de uma vez).
+      if (fila.current.size >= MAX_LOTE_GALERIA) {
+        if (loteAgendado.current) window.clearTimeout(loteAgendado.current);
+        void executarLote();
+      } else if (loteAgendado.current === null) {
+        loteAgendado.current = window.setTimeout(() => void executarLote(), 16);
+      }
+      return loteEmEspera.current;
+    },
+    [executarLote],
+  );
 
   useEffect(() => {
     void refresh();

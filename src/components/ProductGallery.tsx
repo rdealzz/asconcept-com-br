@@ -129,6 +129,7 @@ export function ProductGallery({
         const i = (((atual + passo) % n) + n) % n;
         const img = new Image();
         img.decoding = "async";
+        img.fetchPriority = "low";
         img.src = srcs[i];
       }
     };

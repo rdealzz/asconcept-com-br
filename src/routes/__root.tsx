@@ -20,6 +20,16 @@ import { CartDrawer } from "../components/CartDrawer";
 import { AuthModal } from "../components/AuthModal";
 import { THEME_INIT_SCRIPT } from "../components/ThemeToggle";
 
+/** Origem das fotos (o Storage do Supabase), para o `preconnect` do <head>. */
+const FOTOS_ORIGIN = (() => {
+  const url = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  try {
+    return url ? new URL(url).origin : null;
+  } catch {
+    return null;
+  }
+})();
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -129,6 +139,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       // 16 pixels na aba.
       { rel: "icon", href: "/favicon.png", type: "image/png", sizes: "64x64" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+      // As fotos das peças vivem noutro domínio (o Storage). Sem isto, a
+      // primeira foto da vitrine só começa a baixar depois de DNS, TCP e TLS
+      // com aquele host — trabalho que dá para adiantar enquanto o HTML ainda
+      // está sendo lido.
+      ...(FOTOS_ORIGIN
+        ? [{ rel: "preconnect", href: FOTOS_ORIGIN, crossOrigin: "anonymous" } as const]
+        : []),
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {

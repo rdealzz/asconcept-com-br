@@ -591,6 +591,17 @@ function Lightbox({
   const [zoom, setZoom] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
 
+  // Enquanto a variante grande não chega, a lupa mostra a que já está em cache.
+  const [nitida, setNitida] = useState(false);
+  useEffect(() => {
+    setNitida(false);
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => setNitida(true);
+    img.src = productImageSrc(images[index], 1600);
+    if (img.complete) setNitida(true);
+  }, [images, index]);
+
   // O laço de ponteiros lê e escreve zoom/posição fora do ciclo do React —
   // um espelho em ref evita depender de estado defasado no meio do gesto.
   const atual = useRef({ zoom, pos });
@@ -810,7 +821,10 @@ function Lightbox({
         style={{ cursor: ampliado ? "grab" : "zoom-in" }}
       >
         <img
-          src={productImageSrc(images[index], 1600)}
+          // A de 1000 acabou de ser exibida na página, então está em cache e
+          // pinta no mesmo quadro em que a lupa abre. A de 1600 entra por cima
+          // quando termina de baixar — abrir o zoom deixa de ser uma espera.
+          src={productImageSrc(images[index], nitida ? 1600 : 1000)}
           alt={`${alt} — foto ${index + 1}`}
           draggable={false}
           className="absolute inset-0 h-full w-full object-contain"

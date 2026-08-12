@@ -7,6 +7,7 @@ import { InstallmentsNote } from "@/components/InstallmentsNote";
 import { GarmentTurntable } from "@/components/GarmentTurntable";
 import { Eyebrow } from "@/components/ui-kit";
 import { productImageSrc, productImageSrcSet } from "@/lib/product-images";
+import { noOcioso } from "@/lib/near-viewport";
 
 /**
  * Vitrine giratória — o palco da coleção.
@@ -57,6 +58,9 @@ const PARTICULAS = [
   { e: 95, t: 13, d: 2.9, s: 7 },
 ];
 
+/** Quantos cartões de vidro cabem ao lado do palco. */
+const PECAS_POR_PAGINA = 2;
+
 export function Showroom({
   products,
   eyebrow,
@@ -88,6 +92,20 @@ export function Showroom({
     if (pecaId) void loadGallery(pecaId);
   }, [pecaId, loadGallery]);
 
+  // As peças dos cartões de vidro também: clicar num deles trocava a peça do
+  // palco e só então ia buscar as fotos dela — a virada acontecia com a peça
+  // ainda vazia. Como os pedidos saem em lote, isto é uma requisição só.
+  const idsVisiveis = products
+    .slice(janela, janela + PECAS_POR_PAGINA)
+    .map((p) => p.id)
+    .join(",");
+  useEffect(() => {
+    if (!idsVisiveis) return;
+    return noOcioso(() => {
+      for (const id of idsVisiveis.split(",")) void loadGallery(id);
+    });
+  }, [idsVisiveis, loadGallery]);
+
   const fotos = useMemo(() => {
     const g = (pecaGaleria ?? []).filter(Boolean);
     return g.length ? g : pecaCapa ? [pecaCapa] : [];
@@ -108,10 +126,9 @@ export function Showroom({
 
   if (!peca || fotos.length === 0) return null;
 
-  const porPagina = 2;
-  const cartoes = products.slice(janela, janela + porPagina);
+  const cartoes = products.slice(janela, janela + PECAS_POR_PAGINA);
   const podeVoltar = janela > 0;
-  const podeAvancar = janela + porPagina < products.length;
+  const podeAvancar = janela + PECAS_POR_PAGINA < products.length;
 
   return (
     <section
@@ -314,10 +331,10 @@ export function Showroom({
               })}
             </div>
 
-            {products.length > porPagina && (
+            {products.length > PECAS_POR_PAGINA && (
               <div className="flex gap-3">
                 <button
-                  onClick={() => setJanela((j) => Math.max(0, j - porPagina))}
+                  onClick={() => setJanela((j) => Math.max(0, j - PECAS_POR_PAGINA))}
                   disabled={!podeVoltar}
                   aria-label="Peças anteriores"
                   className="grid h-9 w-9 place-items-center rounded-full border border-asc-line text-asc-ink transition-colors duration-asc ease-asc hover:border-asc-gold hover:text-asc-gold disabled:opacity-30 disabled:hover:border-asc-line disabled:hover:text-asc-ink"
@@ -326,7 +343,9 @@ export function Showroom({
                 </button>
                 <button
                   onClick={() =>
-                    setJanela((j) => Math.min(products.length - porPagina, j + porPagina))
+                    setJanela((j) =>
+                      Math.min(products.length - PECAS_POR_PAGINA, j + PECAS_POR_PAGINA),
+                    )
                   }
                   disabled={!podeAvancar}
                   aria-label="Próximas peças"
