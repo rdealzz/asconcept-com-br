@@ -125,7 +125,23 @@ function ProductPage() {
   // página abre (uma requisição só, ver `loadGallery`), e a capa de cada uma é
   // baixada em prioridade baixa. Quando o clique vem, já está tudo em cache.
   const album = groupOf(product, groups);
-  const irmas = useMemo(() => album?.members ?? [], [album]);
+
+  /**
+   * As cores irmãs que ainda dá para comprar.
+   *
+   * Cor esgotada sai da fileira de seletores — é a mesma regra da vitrine
+   * (`index.tsx`), e aqui ela faltava: a bolinha continuava na página da peça e
+   * levava a uma tela "Produto Esgotado", caminho para lugar nenhum. O álbum
+   * não some por isso; some a cor. Se todas esgotarem, não sobra seletor —
+   * e nesse caso a própria peça já saiu da vitrine.
+   *
+   * A cor aberta permanece mesmo esgotada: quem chegou aqui por um link antigo
+   * precisa ver onde está, e a página dela já diz "Produto Esgotado".
+   */
+  const irmas = useMemo(
+    () => (album?.members ?? []).filter((m) => m.id === id || totalStock(liveStock[m.id]) > 0),
+    [album, id, liveStock],
+  );
 
   useEffect(() => {
     if (irmas.length < 2) return;
@@ -152,11 +168,14 @@ function ProductPage() {
           (p) =>
             p.id !== product?.id &&
             p.category === product?.category &&
-            (!album || p.variant?.group !== album.id),
+            (!album || p.variant?.group !== album.id) &&
+            // Peça esgotada não entra: o carrossel é convite para comprar, e
+            // levar a uma tela "Produto Esgotado" é o contrário disso.
+            totalStock(liveStock[p.id]) > 0,
         ),
         groups,
       ).slice(0, 10),
-    [products, product?.id, product?.category, album, groups],
+    [products, product?.id, product?.category, album, groups, liveStock],
   );
 
   // `emptyStock()` devolvia um objeto novo a cada render, e ele é dependência

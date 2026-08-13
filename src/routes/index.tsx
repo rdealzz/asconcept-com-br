@@ -2725,7 +2725,9 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
 
 /* ---------- Admin Panel Modal ---------- */
 import { useServerFn } from "@tanstack/react-start";
-import { adminDeleteOrder, adminDeleteCustomer } from "@/lib/admin.functions";
+import { adminDeleteOrder, adminDeleteCustomer, adminReconcileStock } from "@/lib/admin.functions";
+import { AdminNotifications } from "@/components/AdminNotifications";
+import { countUnreadNotifications } from "@/lib/admin-notifications";
 
 function ConfirmDialog({
   open,
@@ -2862,10 +2864,12 @@ type ManualCustomerRow = {
 function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, listCustomers, refreshCustomers } = useAuth();
   const { orders, updateStatus, createOrder, refresh: refreshOrders } = useOrders();
-  const { products, groups } = useCatalog();
-  const [tab, setTab] = useState<"calc" | "pedidos" | "clientes" | "produtos" | "variacoes">(
-    "pedidos",
-  );
+  const { products, groups, refreshStock } = useCatalog();
+  const [tab, setTab] = useState<
+    "calc" | "pedidos" | "clientes" | "produtos" | "variacoes" | "avisos"
+  >("pedidos");
+  const [naoLidos, setNaoLidos] = useState(0);
+  const reconcileFn = useServerFn(adminReconcileStock);
   const [newsletter, setNewsletter] = useState<NewsletterRow[]>([]);
   const [manual, setManual] = useState<ManualCustomerRow[]>([]);
   const [showManualOrder, setShowManualOrder] = useState(false);
@@ -2937,8 +2941,29 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
     if (open && isAdminUser) {
       void loadNewsletter();
       void loadManual();
+      void countUnreadNotifications().then(setNaoLidos);
     }
   }, [open, isAdminUser, loadNewsletter, loadManual]);
+
+  /**
+   * Manda o servidor completar a baixa de pedidos pagos que ficaram para trás e
+   * relê o estoque em seguida — o painel mostra as quantidades do catálogo em
+   * memória, e depois de uma varredura elas mudaram.
+   *
+   * Devolve `null` quando a rotina ainda não existe no banco (migração dos
+   * avisos não rodada), que a aba trata como "sem varredura", não como erro.
+   */
+  const reconciliar = useCallback(async (): Promise<number | null> => {
+    try {
+      const r = await reconcileFn();
+      if (!r?.ok) return null;
+      if (r.reconciled > 0) await refreshStock();
+      return r.reconciled;
+    } catch (e) {
+      console.error("[admin] reconciliação de estoque falhou", e);
+      return null;
+    }
+  }, [reconcileFn, refreshStock]);
 
   if (!open || !isAdminUser) return null;
 
@@ -2952,6 +2977,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
     { id: "clientes" as const, label: `Clientes (${customers.length + manual.length})` },
     { id: "produtos" as const, label: `Produtos (${products.length})` },
     { id: "variacoes" as const, label: `Variações (${groups.size})` },
+    { id: "avisos" as const, label: naoLidos > 0 ? `Avisos (${naoLidos})` : "Avisos" },
   ];
 
   return (
@@ -3096,6 +3122,10 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
 
             {tab === "produtos" && <ProdutosAdmin featuredCount={featuredCount} />}
             {tab === "variacoes" && <VariantsAdmin />}
+
+            {tab === "avisos" && (
+              <AdminNotifications onReconcile={reconciliar} onUnreadChange={setNaoLidos} />
+            )}
 
             {tab === "clientes" && (
               <div className="space-y-10">

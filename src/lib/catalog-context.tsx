@@ -114,6 +114,15 @@ type CatalogCtx = {
   deleteProduct: (id: string) => Promise<void>;
   setStock: (id: string, stock: SizeStock) => Promise<void>;
   refresh: () => Promise<void>;
+  /**
+   * Relê só as quantidades — `id` e `sizes`, nada de fotos.
+   *
+   * O catálogo era buscado uma vez, ao montar o provider, e nunca mais: uma aba
+   * aberta desde a manhã continuava oferecendo o tamanho que esgotou ao meio-dia.
+   * A leitura completa é cara (as fotos antigas viajam como base64 dentro da
+   * linha), então o que se repete é esta, que é a parte que muda sozinha.
+   */
+  refreshStock: () => Promise<void>;
 };
 const CatalogContext = createContext<CatalogCtx | null>(null);
 
@@ -123,6 +132,17 @@ const CatalogContext = createContext<CatalogCtx | null>(null);
  * tamanho de URL que o servidor aceita.
  */
 const MAX_LOTE_GALERIA = 30;
+
+/**
+ * Intervalo mínimo entre duas releituras de estoque, em milissegundos.
+ *
+ * Voltar para a aba e trocar de janela disparam o mesmo evento em sequência; a
+ * trava evita duas requisições coladas pelo mesmo motivo.
+ */
+const INTERVALO_ESTOQUE = 20_000;
+
+/** De quanto em quanto tempo o estoque é relido com a aba à vista. */
+const RELEITURA_ESTOQUE = 90_000;
 
 /**
  * Normaliza o `sizes` do banco: quantidades inteiras e não negativas, uma por
@@ -334,6 +354,55 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     void refresh();
   }, [refresh]);
 
+  /**
+   * Releitura barata do estoque.
+   *
+   * Duas colunas, sem foto e sem descrição: mesmo com o catálogo inteiro isto é
+   * alguns kilobytes, e é o que mantém a vitrine honesta sem recarregar a
+   * página.
+   *
+   * O mapa é trocado inteiro, e não mesclado, de propósito: peça excluída do
+   * banco fica sem estoque conhecido, e sem estoque ela já não aparece na
+   * vitrine — a mesma regra que esconde a esgotada. Tirá-la da lista de
+   * produtos aqui seria arriscar apagar meia loja no dia em que o catálogo
+   * passar do limite de linhas de uma consulta.
+   */
+  const ultimaLeituraEstoque = useRef(0);
+  const refreshStock = useCallback(async () => {
+    ultimaLeituraEstoque.current = Date.now();
+    const { data, error } = await supabase.from("products").select("id,sizes");
+    if (error) {
+      console.error("[catalog] refreshStock failed", error);
+      return;
+    }
+    const linhas = (data ?? []) as unknown as Array<{ id: string; sizes: unknown }>;
+    const proximo: Record<string, SizeStock> = {};
+    for (const r of linhas) proximo[r.id] = coerceSizeStock(r.sizes);
+    setStockMap(proximo);
+  }, []);
+
+  // Quando reler: ao voltar para a aba e, com ela à vista, de tempos em tempos.
+  // Nada roda com a aba escondida — um catálogo em segundo plano não precisa
+  // estar certo, precisa estar certo na hora em que alguém olha.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const talvezReler = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - ultimaLeituraEstoque.current < INTERVALO_ESTOQUE) return;
+      void refreshStock();
+    };
+
+    const relogio = window.setInterval(talvezReler, RELEITURA_ESTOQUE);
+    document.addEventListener("visibilitychange", talvezReler);
+    window.addEventListener("focus", talvezReler);
+    return () => {
+      window.clearInterval(relogio);
+      document.removeEventListener("visibilitychange", talvezReler);
+      window.removeEventListener("focus", talvezReler);
+    };
+  }, [refreshStock]);
+
   const updateProduct: CatalogCtx["updateProduct"] = async (id, patch) => {
     const dbPatch: Record<string, unknown> = {};
     if (patch.name !== undefined) dbPatch.name = patch.name;
@@ -498,6 +567,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         deleteProduct,
         setStock,
         refresh,
+        refreshStock,
       }}
     >
       {children}

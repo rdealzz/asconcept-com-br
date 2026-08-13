@@ -32,6 +32,51 @@ export const adminUpdateOrderStatus = createServerFn({ method: "POST" })
   });
 
 /**
+ * Completa a baixa de estoque de pedidos pagos que ficaram para trás.
+ *
+ * A baixa acontece dentro do tratamento da notificação do Mercado Pago. Quando
+ * aquela chamada falha (banco fora do ar por um instante, deploy no meio do
+ * caminho), o pedido fica pago com `stock_decremented = false` e a peça
+ * continua à venda — o buraco que já apareceu na loja antes e que o log do
+ * servidor era o único a registrar.
+ *
+ * Roda com a chave de serviço porque é ela que executa `consume_order_stock`;
+ * a rotina é idempotente e o painel a dispara ao abrir a aba de avisos.
+ */
+export const adminReconcileStock = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    // Server function é endpoint HTTP: sem esta conferência, qualquer visitante
+    // dispararia uma rotina que roda com a chave de serviço.
+    const { data: roleRow } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!roleRow) throw new Error("Acesso negado.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    try {
+      const { data, error } = (await (
+        supabaseAdmin.rpc as unknown as (
+          n: string,
+        ) => Promise<{ data: unknown; error: { message?: string } | null }>
+      )("reconcile_order_stock")) ?? { data: null, error: null };
+      if (error) {
+        console.error("[admin] reconcile_order_stock recusado", error);
+        // A rotina só existe depois da migração dos avisos. Enquanto ela não
+        // roda, isto não é falha: é uma função que ainda não nasceu.
+        return { ok: false, reconciled: 0, message: error.message ?? "" };
+      }
+      return { ok: true, reconciled: Number(data ?? 0), message: "" };
+    } catch (e) {
+      console.error("[admin] reconcile_order_stock falhou", e);
+      return { ok: false, reconciled: 0, message: e instanceof Error ? e.message : "" };
+    }
+  });
+
+/**
  * Exclui um pedido pelo order_number. Requer que o chamador tenha role 'admin'.
  * RLS já bloqueia, mas validamos duas vezes por defesa em profundidade.
  */

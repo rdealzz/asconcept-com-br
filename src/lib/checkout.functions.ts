@@ -34,18 +34,6 @@ type CheckoutResult = {
  */
 const INITIAL_STATUS = "Aguardando Aprovação";
 
-/** O `sizes` do banco é JSONB: chega como objeto solto e sai daqui inteiro. */
-function normalizarEstoque(v: unknown): Record<string, number> {
-  const out: Record<string, number> = {};
-  if (v && typeof v === "object" && !Array.isArray(v)) {
-    for (const [tamanho, qtd] of Object.entries(v as Record<string, unknown>)) {
-      if (!tamanho) continue;
-      out[tamanho] = Math.max(0, Math.floor(Number(qtd) || 0));
-    }
-  }
-  return out;
-}
-
 function sanitize(v: unknown, max = 200): string {
   const s = typeof v === "string" ? v : "";
   return s
@@ -107,45 +95,20 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
       throw new Error("Um ou mais produtos não foram encontrados.");
     }
 
-    const priceMap = new Map<
-      string,
-      { name: string; price: number; image: string | null; sizes: Record<string, number> }
-    >();
+    const priceMap = new Map<string, { name: string; price: number; image: string | null }>();
     for (const r of rows) {
-      priceMap.set(r.id, {
-        name: r.name,
-        price: Number(r.price),
-        image: r.image,
-        sizes: normalizarEstoque((r as { sizes?: unknown }).sizes),
-      });
+      priceMap.set(r.id, { name: r.name, price: Number(r.price), image: r.image });
     }
 
-    /**
-     * O tamanho pedido existe e tem peça?
-     *
-     * O carrinho vive no navegador: ele pode carregar um tamanho que a peça
-     * deixou de ter (o admin trocou a grade, alguém levou a última) e, até
-     * aqui, o pedido nascia assim mesmo — a recusa só aparecia lá na frente,
-     * quando o pagamento aprovado tentava baixar o estoque e não conseguia. O
-     * cliente pagava por um tamanho que não existe.
-     *
-     * Peça sem nenhum tamanho gravado passa: não há o que conferir, e barrar
-     * seria impedir a venda de um cadastro antigo que ainda funciona.
-     */
-    for (const it of data.items) {
-      const p = priceMap.get(it.id)!;
-      const cadastrados = Object.keys(p.sizes);
-      if (!cadastrados.length) continue;
-      const disponivel = p.sizes[it.size] ?? 0;
-      if (disponivel <= 0) {
-        throw new Error(`${p.name}: o tamanho ${it.size} não está mais disponível.`);
-      }
-      if (disponivel < it.quantity) {
-        throw new Error(
-          `${p.name}: restam ${disponivel} no tamanho ${it.size}, menos do que o pedido.`,
-        );
-      }
-    }
+    // O tamanho pedido existe e tem peça? A conta é a mesma do checkout do
+    // Mercado Pago — mora em `@/lib/stock`, e não duplicada aqui, para que uma
+    // correção na regra valha para os dois caminhos.
+    const { conferirComPecas } = await import("@/lib/stock.server");
+    const semEstoque = conferirComPecas(
+      data.items,
+      rows as unknown as { id: string; name: string; sizes?: unknown }[],
+    );
+    if (semEstoque) throw new Error(semEstoque);
 
     const orderItems = data.items.map((it) => {
       const p = priceMap.get(it.id)!;

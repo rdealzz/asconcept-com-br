@@ -37,6 +37,7 @@ type OrderRow = {
   mp_payment_id: string | null;
   mp_status: string | null;
   coupon_code: string | null;
+  items: unknown;
 };
 
 // Etapas que só existem depois do pagamento confirmado.
@@ -60,7 +61,7 @@ async function loadOwnOrder(
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "order_number, total, status, user_id, customer_email, customer_name, mp_payment_id, mp_status, coupon_code",
+      "order_number, total, status, user_id, customer_email, customer_name, mp_payment_id, mp_status, coupon_code, items",
     )
 
     .eq("order_number", orderNumber)
@@ -69,6 +70,27 @@ async function loadOwnOrder(
   const row = data as OrderRow;
   if (row.user_id !== userId) throw new Error("Pedido não pertence a este usuário.");
   return row;
+}
+
+/**
+ * O pedido ainda pode ser cobrado?
+ *
+ * Entre gravar o pedido pendente e a cobrança sair passa tempo — o cliente
+ * digita o cartão, ou olha o QR do Pix por quinze minutos — e nesse intervalo
+ * outra pessoa pode ter levado a última peça. Cobrar sem reconferir é vender o
+ * que não existe, e depois da aprovação não há como voltar atrás: a baixa
+ * grampeia em zero e o pedido segue de pé.
+ *
+ * Devolve a mensagem pronta para a tela, ou `null` quando dá para cobrar.
+ */
+async function conferirAntesDeCobrar(
+  supabase: AnySupabase,
+  order: OrderRow,
+): Promise<string | null> {
+  const { conferirEstoque, itensDoPedido } = await import("@/lib/stock.server");
+  const itens = itensDoPedido(order.items);
+  if (!itens.length) return null;
+  return conferirEstoque(supabase, itens);
 }
 
 async function notificationUrl(): Promise<string> {
@@ -127,7 +149,12 @@ export async function persistPayment(
       )
       .eq("order_number", orderNumber)
       .maybeSingle();
-    if (row && !(row as { stock_decremented: boolean }).stock_decremented) {
+    // `!row` também entra: quando a leitura acima falha, o que se sabe do
+    // pedido é nada — e o lado seguro de "não sei se já baixou" é chamar a
+    // rotina, que é idempotente pelo próprio `stock_decremented`. Pular a
+    // baixa por causa de uma leitura que não voltou deixaria a peça à venda
+    // depois de vendida, que é o pior dos dois erros.
+    if (!row || !(row as { stock_decremented: boolean }).stock_decremented) {
       // Atenção: .rpc() não lança quando o Postgres recusa — devolve { error }.
       // Ignorar esse retorno foi o que deixou a baixa de estoque falhar em
       // silêncio. O erro não pode derrubar o pagamento (que já foi aprovado),
@@ -189,14 +216,33 @@ export async function createPendingOrderCore(
   data: PendingOrderInput,
 ): Promise<PendingOrderResult> {
   const ids = Array.from(new Set(data.items.map((i) => i.id)));
+  // `sizes` entra no mesmo SELECT que já buscava o preço: a conferência de
+  // estoque não custa uma segunda ida ao banco.
   const { data: rows, error: fetchErr } = await supabase
     .from("products")
-    .select("id, name, price, image")
+    .select("id, name, price, image, sizes")
     .in("id", ids);
   if (fetchErr) return { error: "Falha ao validar preços dos produtos." };
   if (!rows || rows.length !== ids.length) {
     return { error: "Um ou mais produtos não foram encontrados." };
   }
+
+  /**
+   * O tamanho pedido existe e tem peça?
+   *
+   * Esta é a porta de entrada do checkout do site, e até aqui ela não conferia
+   * nada: o carrinho vive no navegador, pode carregar um tamanho que a peça
+   * deixou de ter (o admin trocou a grade, alguém levou a última) e o pedido
+   * nascia assim mesmo. O cliente pagava, e a recusa só aparecia lá na frente,
+   * quando o pagamento aprovado tentava baixar estoque que não existia — em
+   * silêncio, num log de servidor.
+   */
+  const { conferirComPecas } = await import("@/lib/stock.server");
+  const semEstoque = conferirComPecas(
+    data.items.map((i) => ({ id: i.id, size: i.size, quantity: i.quantity })),
+    rows as { id: string; name: string; sizes?: unknown }[],
+  );
+  if (semEstoque) return { error: semEstoque };
 
   const priceMap = new Map<string, { name: string; price: number; image: string | null }>(
     (rows as { id: string; name: string; price: number | string; image: string | null }[]).map(
@@ -316,6 +362,16 @@ export async function payWithCardCore(
     return { orderNumber: order.order_number, status: order.status, approved: true };
   }
 
+  const indisponivel = await conferirAntesDeCobrar(supabase, order);
+  if (indisponivel) {
+    return {
+      orderNumber: order.order_number,
+      status: order.status,
+      approved: false,
+      message: indisponivel,
+    };
+  }
+
   const body: Record<string, unknown> = {
     transaction_amount: Number(order.total),
     token: data.token,
@@ -399,6 +455,11 @@ export async function createPixCore(
   data: { orderNumber: string; cpf: string },
 ): Promise<PixResult> {
   const order = await loadOwnOrder(supabase, data.orderNumber, userId);
+
+  // A cobrança Pix vale quinze minutos: é a janela mais longa do checkout, e a
+  // que mais tem chance de a peça ter ido embora no meio.
+  const indisponivel = await conferirAntesDeCobrar(supabase, order);
+  if (indisponivel) return { error: indisponivel };
 
   const [firstName, ...rest] = (order.customer_name ?? "").split(" ");
   const body: Record<string, unknown> = {

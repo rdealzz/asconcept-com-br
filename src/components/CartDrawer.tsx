@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { X, Minus, Plus } from "lucide-react";
 import { useCart, formatBRL, applyPixDiscount, PIX_ENABLED } from "@/lib/cart-context";
+import { useCatalog } from "@/lib/catalog-context";
+import { faltasDeEstoque, type PecaEmEstoque } from "@/lib/stock";
 import { useAuth } from "@/lib/auth-context";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 import { AVAILABLE_COUPONS, findCoupon, hasUsedCoupon } from "@/lib/coupons";
@@ -18,10 +20,47 @@ import { StitchDivider } from "@/components/StitchDivider";
 export function CartDrawer() {
   const { isOpen, close, items, remove, updateQty, subtotal, count } = useCart();
   const { user, openAuth } = useAuth();
+  const { products, stock } = useCatalog();
   const navigate = useNavigate();
   const [checkoutMsg, setCheckoutMsg] = useState<string | null>(null);
 
+  /**
+   * O que, na sacola, não pode mais ser comprado.
+   *
+   * A sacola vive no navegador e sobrevive a tudo: o cliente guarda a peça
+   * hoje e volta amanhã, quando a última M já foi. O servidor recusa esse
+   * pedido — é ele quem garante que ninguém compra sem estoque —, mas descobrir
+   * isso só na tela de pagamento é frustração desnecessária. Aqui a linha diz
+   * na hora, com o catálogo que o provider mantém atualizado.
+   *
+   * A mesma conta do servidor (`@/lib/stock`), para que as duas telas nunca
+   * discordem sobre o que dá para vender.
+   */
+  const faltando = useMemo(() => {
+    const pecas = new Map<string, PecaEmEstoque>(
+      products.map((p) => [p.id, { id: p.id, name: p.name, sizes: stock[p.id] ?? {} }]),
+    );
+    // Peça que o catálogo ainda não trouxe não vira falta: enquanto ele
+    // carrega, `products` é vazio, e acusar a sacola inteira de esgotada seria
+    // mentira com cara de certeza.
+    const naSacola = items.filter((i) => pecas.has(i.id));
+    const porLinha = new Map<string, number>();
+    for (const f of faltasDeEstoque(
+      naSacola.map((i) => ({ id: i.id, size: i.size, quantity: i.qty })),
+      pecas,
+    )) {
+      porLinha.set(`${f.id}-${f.size}`, f.disponivel);
+    }
+    return porLinha;
+  }, [items, products, stock]);
+
   const onCheckout = () => {
+    if (faltando.size > 0) {
+      setCheckoutMsg(
+        "Uma ou mais peças da sacola esgotaram. Ajuste as quantidades marcadas para continuar.",
+      );
+      return;
+    }
     if (!user) {
       setCheckoutMsg("Você precisa entrar ou criar uma conta para finalizar a compra.");
       close();
@@ -94,62 +133,84 @@ export function CartDrawer() {
                 <FreeShippingHint subtotal={subtotal} />
               </div>
               <ul className="divide-y divide-asc-line">
-                {items.map((i) => (
-                  <li key={`${i.id}-${i.size}`} className="flex gap-4 py-6 first:pt-0">
-                    <img
-                      src={i.image}
-                      alt={i.name}
-                      loading="lazy"
-                      decoding="async"
-                      className="h-24 w-20 shrink-0 bg-asc-bg-raised object-cover"
-                    />
-                    <div className="flex flex-1 flex-col">
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-display text-base leading-snug text-asc-ink">
-                          {i.name}
-                        </h3>
-                        <button
-                          onClick={() => remove(i.id, i.size)}
-                          aria-label="Remover"
-                          className="text-asc-ink-muted transition-colors duration-ascfast ease-asc hover:text-asc-gold"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                      {/* A cor comprada, quando o cadastro a nomeia. O nome da
-                          peça costuma trazê-la, mas não é obrigado: um álbum
-                          pode ter nomes iguais e só a cor separando. */}
-                      <p className="asc-label mt-1 text-[10px] text-asc-ink-muted">
-                        Tamanho {i.size}
-                        {i.colorLabel ? ` · ${i.colorLabel}` : ""}
-                      </p>
-                      <div className="mt-auto flex items-center justify-between pt-4">
-                        <div className="flex items-center border border-asc-line">
+                {items.map((i) => {
+                  const disponivel = faltando.get(`${i.id}-${i.size}`);
+                  const emFalta = disponivel !== undefined;
+                  return (
+                    <li key={`${i.id}-${i.size}`} className="flex gap-4 py-6 first:pt-0">
+                      <img
+                        src={i.image}
+                        alt={i.name}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-24 w-20 shrink-0 bg-asc-bg-raised object-cover"
+                      />
+                      <div className="flex flex-1 flex-col">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-display text-base leading-snug text-asc-ink">
+                            {i.name}
+                          </h3>
                           <button
-                            onClick={() => updateQty(i.id, i.size, -1)}
-                            aria-label="Diminuir"
-                            className="flex h-8 w-8 items-center justify-center transition-colors duration-ascfast ease-asc hover:bg-asc-bg-raised"
+                            onClick={() => remove(i.id, i.size)}
+                            aria-label="Remover"
+                            className="text-asc-ink-muted transition-colors duration-ascfast ease-asc hover:text-asc-gold"
                           >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          <span className="w-8 text-center font-sans text-sm tabular-nums">
-                            {i.qty}
-                          </span>
-                          <button
-                            onClick={() => updateQty(i.id, i.size, 1)}
-                            aria-label="Aumentar"
-                            className="flex h-8 w-8 items-center justify-center transition-colors duration-ascfast ease-asc hover:bg-asc-bg-raised"
-                          >
-                            <Plus className="h-3 w-3" />
+                            <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
-                        <span className="font-sans text-sm tabular-nums text-asc-ink">
-                          {formatBRL(i.price * i.qty)}
-                        </span>
+                        {/* A cor comprada, quando o cadastro a nomeia. O nome da
+                          peça costuma trazê-la, mas não é obrigado: um álbum
+                          pode ter nomes iguais e só a cor separando. */}
+                        <p className="asc-label mt-1 text-[10px] text-asc-ink-muted">
+                          Tamanho {i.size}
+                          {i.colorLabel ? ` · ${i.colorLabel}` : ""}
+                        </p>
+                        {/* A peça esgotou depois de entrar na sacola. Dizer aqui,
+                          e não só na tela de pagamento, é a diferença entre
+                          ajustar em um clique e descobrir com o cartão na mão. */}
+                        {emFalta && (
+                          <p className="asc-label mt-1 text-[10px] text-asc-gold">
+                            {disponivel === 0
+                              ? "Esgotado — remova para continuar"
+                              : `Restam ${disponivel} — ajuste a quantidade`}
+                          </p>
+                        )}
+                        <div className="mt-auto flex items-center justify-between pt-4">
+                          <div
+                            className={`flex items-center border ${
+                              emFalta ? "border-asc-gold" : "border-asc-line"
+                            }`}
+                          >
+                            <button
+                              onClick={() => updateQty(i.id, i.size, -1)}
+                              aria-label="Diminuir"
+                              className="flex h-8 w-8 items-center justify-center transition-colors duration-ascfast ease-asc hover:bg-asc-bg-raised"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="w-8 text-center font-sans text-sm tabular-nums">
+                              {i.qty}
+                            </span>
+                            <button
+                              onClick={() => updateQty(i.id, i.size, 1)}
+                              aria-label="Aumentar"
+                              // Sem estoque para subir: o botão para de crescer a
+                              // sacola em vez de deixar o cliente montar um pedido
+                              // que o servidor vai recusar.
+                              disabled={emFalta}
+                              className="flex h-8 w-8 items-center justify-center transition-colors duration-ascfast ease-asc hover:bg-asc-bg-raised disabled:cursor-not-allowed disabled:opacity-30"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <span className="font-sans text-sm tabular-nums text-asc-ink">
+                            {formatBRL(i.price * i.qty)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
               <div className="mt-8">
                 <ShippingCalculator subtotal={subtotal} />
