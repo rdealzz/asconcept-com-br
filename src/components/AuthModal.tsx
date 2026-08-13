@@ -188,8 +188,17 @@ export function AuthModal() {
   };
 
   if (signedUpEmail) {
-    // A conta já existe neste ponto. O e-mail é enfileirado à parte, então
-    // pode demorar ou se perder — o reenvio evita que a conta fique presa.
+    // Esta tela atende dois casos de propósito: o cadastro que acabou de
+    // nascer e o e-mail que JÁ tinha conta. Ela não diz qual dos dois é —
+    // fosse diferente, o formulário viraria uma consulta de "este e-mail é
+    // cliente da loja?" (ver o comentário em `signUp`, no auth-context).
+    //
+    // Por isso o texto abaixo cobre as duas saídas: quem é novo confirma pelo
+    // link, e quem já tinha conta é mandado para o login sem nunca receber
+    // uma confirmação de que a conta existe.
+    //
+    // O e-mail é enfileirado à parte, então pode demorar ou se perder — o
+    // reenvio evita que a conta fique presa.
     const onResend = async () => {
       setLoading(true);
       setError(null);
@@ -201,13 +210,17 @@ export function AuthModal() {
     };
 
     return (
-      <MolduraModal onClose={closeAuth} rotulo="Conta criada">
-        <p className="asc-label text-[10px] text-asc-gold">Conta criada</p>
+      <MolduraModal onClose={closeAuth} rotulo="Confirme seu e-mail">
+        <p className="asc-label text-[10px] text-asc-gold">Quase lá</p>
         <h2 className="mt-2 font-serif text-3xl text-asc-ink">Confirme seu e-mail</h2>
         <p className="mt-4 text-sm font-light leading-relaxed text-asc-ink-inverse-muted">
           Enviamos um e-mail de confirmação para{" "}
           <span className="text-asc-ink">{signedUpEmail}</span>. Verifique sua caixa de entrada (e o
           spam) e confirme para acessar sua conta.
+        </p>
+        <p className="mt-3 text-sm font-light leading-relaxed text-asc-ink-inverse-muted">
+          Se você já tinha conta com este e-mail, nada mudou:{" "}
+          <span className="text-asc-ink">entre normalmente</span> ou use “Esqueci minha senha”.
         </p>
         {error && (
           <p className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">

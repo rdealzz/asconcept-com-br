@@ -63,10 +63,9 @@ function isH3SwallowedErrorBody(body: string): boolean {
  *    para fora, ou reescrever a base das URLs relativas.
  *  - HSTS: downgrade para HTTP em rede hostil.
  *
- * Não há `default-src` de propósito: uma CSP completa precisa listar Supabase,
- * Mercado Pago, ViaCEP e fontes do Google, e uma lista incompleta quebraria o
- * pagamento em produção sem aviso. As diretivas acima já são as que dispensam
- * inventário de domínios.
+ * O cabeçalho que BLOQUEIA segue com as três diretivas que não dependem de
+ * inventário de domínio. A política completa vai à parte, em modo de relatório
+ * — ver `cspRelatorio()`.
  */
 const CABECALHOS_SEGURANCA: Record<string, string> = {
   "x-content-type-options": "nosniff",
@@ -77,6 +76,63 @@ const CABECALHOS_SEGURANCA: Record<string, string> = {
   "strict-transport-security": "max-age=15552000",
 };
 
+/**
+ * CSP completa, em modo de RELATÓRIO — ela não bloqueia nada.
+ *
+ * Por que não bloquear já: a política precisa listar todo domínio que a loja
+ * usa de verdade, e errar por omissão aqui não dá erro visível — dá cartão que
+ * não processa, foto que não carrega, fonte que não chega. Num ambiente onde
+ * não dá para subir a aplicação e clicar no checkout, publicar isso bloqueando
+ * seria apostar a receita da loja num inventário feito à mão.
+ *
+ * `Report-Only` é o passo que falta antes disso: o navegador aplica a política,
+ * anota tudo que ELA teria bloqueado e não impede nada. A lista abaixo saiu do
+ * código (SDK e API do Mercado Pago, Storage do Supabase, ViaCEP, fontes do
+ * Google), então deve estar completa — e o modo de relatório é o que prova
+ * isso sem custo.
+ *
+ * Como promover para bloqueio, quando quiser: navegue pelo site com o console
+ * do navegador aberto — home, produto, carrinho e um checkout inteiro, com
+ * cartão e com Pix. Cada aviso "[Report Only]" no console é um domínio que
+ * falta. Sem nenhum aviso depois desse passeio, troque a chave
+ * `content-security-policy-report-only` por `content-security-policy` e a
+ * política passa a valer.
+ *
+ * Sobre `'unsafe-inline'` em script-src: é obrigatório aqui, não desleixo. O
+ * script de tema roda inline (é ele que evita a piscada na hidratação) e o
+ * TanStack Start injeta os próprios scripts inline de hidratação. Mesmo assim
+ * a política tem valor: ela barra script de domínio estranho, barra o envio de
+ * dados para fora por `fetch` (connect-src) e barra iframe alheio — que é por
+ * onde um XSS roubaria a sessão ou os dados do cartão.
+ */
+function cspRelatorio(): string {
+  const supabase = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "";
+  let supabaseOrigin = "";
+  try {
+    if (supabase) supabaseOrigin = new URL(supabase).origin;
+  } catch {
+    /* URL malformada: melhor uma diretiva a menos do que um cabeçalho quebrado */
+  }
+
+  const mercadoPago = "https://*.mercadopago.com https://*.mercadolibre.com";
+
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline' https://sdk.mercadopago.com ${mercadoPago}`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    `img-src 'self' data: blob: ${supabaseOrigin} https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev ${mercadoPago}`,
+    `connect-src 'self' ${supabaseOrigin} https://api.mercadopago.com https://viacep.com.br ${mercadoPago}`,
+    `frame-src 'self' ${mercadoPago}`,
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ]
+    .map((d) => d.replace(/\s+/g, " ").trim())
+    .join("; ");
+}
+
 function comSeguranca(response: Response): Response {
   const tipo = response.headers.get("content-type") ?? "";
   // Só documentos: aplicar em cada imagem e chunk de JS é ruído sem ganho.
@@ -85,6 +141,9 @@ function comSeguranca(response: Response): Response {
   const headers = new Headers(response.headers);
   for (const [k, v] of Object.entries(CABECALHOS_SEGURANCA)) {
     if (!headers.has(k)) headers.set(k, v);
+  }
+  if (!headers.has("content-security-policy-report-only")) {
+    headers.set("content-security-policy-report-only", cspRelatorio());
   }
   return new Response(response.body, {
     status: response.status,

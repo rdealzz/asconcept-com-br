@@ -3,6 +3,7 @@ import { render } from '@react-email/render'
 import { createClient } from '@supabase/supabase-js'
 import { createFileRoute } from '@tanstack/react-router'
 import { TEMPLATES } from '@/lib/email-templates/registry'
+import { segredosIguais } from '@/lib/timing-safe'
 
 // Configuration baked in at scaffold time
 const SITE_NAME = "A&S Conccept"
@@ -54,10 +55,12 @@ export const Route = (createFileRoute("/lovable/email/transactional/send") as an
         const token = authHeader?.replace(/^Bearer\s+/i, '').trim()
         const lovableApiKey = process.env.LOVABLE_API_KEY
 
+        // Comparação em tempo constante: `===` sai no primeiro byte diferente
+        // e o tempo da resposta entregaria o segredo caractere a caractere.
         const allowed =
           !!token &&
-          ((!!lovableApiKey && token === lovableApiKey) ||
-            token === supabaseServiceKey)
+          ((!!lovableApiKey && segredosIguais(token, lovableApiKey)) ||
+            segredosIguais(token, supabaseServiceKey))
 
         if (!allowed) {
           return Response.json({ error: 'Unauthorized' }, { status: 401 })

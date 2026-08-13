@@ -56,9 +56,7 @@ export async function mpCreatePayment(
   }
   if (!res.ok) {
     console.error("[mp] create payment failed", res.status, text.slice(0, 500));
-    throw new Error(
-      friendlyError(json as MpError, "Não foi possível processar o pagamento."),
-    );
+    throw new Error(friendlyError(json as MpError, "Não foi possível processar o pagamento."));
   }
   return json as MpPayment;
 }
@@ -121,6 +119,43 @@ export function cardErrorMessage(detail: string | undefined): string {
 }
 
 /**
+ * Idade máxima aceita para o carimbo (`ts`) da notificação.
+ *
+ * Sem esta conferência, uma notificação legítima capturada uma vez vale para
+ * sempre: a assinatura continua batendo daqui a um ano, e quem a tiver pode
+ * reenviá-la quando quiser (CWE-294).
+ *
+ * O tamanho da janela é o ponto delicado, e é largo de propósito. O Mercado
+ * Pago reenvia a notificação a cada 15 minutos quando não recebe 200, e depois
+ * da terceira tentativa espaça ainda mais. Como o `ts` é o carimbo DA
+ * NOTIFICAÇÃO — e a assinatura é calculada em cima dele — uma retentativa
+ * tende a repetir o carimbo original em vez de assinar de novo. Uma janela
+ * curta, então, recusaria justamente a retentativa que existe porque a
+ * primeira entrega falhou: o pagamento ficaria sem confirmar, que é um dano
+ * muito maior do que o replay que se está evitando.
+ *
+ * 24 horas cobre com folga qualquer retentativa real e ainda assim fecha a
+ * porta do "guardo esta notificação e reenvio semana que vem".
+ *
+ * E o replay, aqui, nunca foi grave: `persistPayment` vai buscar o pagamento
+ * na API do Mercado Pago antes de gravar, então reenviar só re-sincroniza a
+ * verdade. Esta janela é defesa em profundidade, não o que segura o portão.
+ */
+const JANELA_ASSINATURA_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * O carimbo do MP vem em segundos numas contas e em milissegundos noutras, e
+ * confundir os dois recusaria 100% das notificações. A separação é segura:
+ * um horário em segundos hoje tem ~10 dígitos (1,8 × 10⁹) e em milissegundos
+ * ~13 (1,8 × 10¹²), então qualquer coisa abaixo de 10¹¹ é segundo.
+ */
+function carimboEmMs(ts: string): number | null {
+  const bruto = Number(ts);
+  if (!Number.isFinite(bruto) || bruto <= 0) return null;
+  return bruto < 1e11 ? bruto * 1000 : bruto;
+}
+
+/**
  * Valida a assinatura do webhook (x-signature) conforme documentação do MP.
  */
 export async function verifyMpWebhook(req: Request, dataId: string): Promise<boolean> {
@@ -142,6 +177,27 @@ export async function verifyMpWebhook(req: Request, dataId: string): Promise<boo
     if (key === "v1") v1 = v?.trim();
   }
   if (!ts || !v1) return false;
+
+  // Antes de gastar o HMAC: o carimbo ainda está dentro da janela?
+  //
+  // A recusa é registrada em voz alta de propósito. Se algum dia o Mercado
+  // Pago mudar o esquema de retentativa e passar a reenviar com carimbo velho,
+  // este log é o que vai explicar por que um pagamento não confirmou — sem
+  // ele, a falha seria silenciosa e indistinguível de assinatura inválida.
+  // Nesse caso, alargar JANELA_ASSINATURA_MS resolve.
+  const carimbo = carimboEmMs(ts);
+  if (carimbo === null) {
+    console.error("[mp] webhook recusado: carimbo (ts) ilegível", ts);
+    return false;
+  }
+  const idade = Math.abs(Date.now() - carimbo);
+  if (idade > JANELA_ASSINATURA_MS) {
+    console.error(
+      `[mp] webhook recusado: carimbo fora da janela (${Math.round(idade / 3600000)}h). ` +
+        `Se o pagamento não confirmar, alargue JANELA_ASSINATURA_MS.`,
+    );
+    return false;
+  }
 
   const manifest = `id:${dataId.toLowerCase()};request-id:${requestId};ts:${ts};`;
   const key = await crypto.subtle.importKey(

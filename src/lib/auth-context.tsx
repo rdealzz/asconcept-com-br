@@ -140,7 +140,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-
   useEffect(() => {
     let mounted = true;
 
@@ -241,8 +240,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: { name: cleanName, full_name: cleanName, phone: cleanPhone },
       },
     });
-    const finishSignUp = () => {
-      if (typeof window !== "undefined") {
+    /**
+     * `contaNova` distingue os dois caminhos que levam à MESMA tela.
+     *
+     * Quando o cadastro é de verdade, marcamos o e-mail de boas-vindas para
+     * sair no primeiro login. Quando a conta já existia, não marcamos: quem já
+     * é cliente receberia um "bem-vindo" fora de hora, e o e-mail é justamente
+     * o que denunciaria que a conta existe.
+     */
+    const finishSignUp = (contaNova = true) => {
+      if (contaNova && typeof window !== "undefined") {
         try {
           window.localStorage.setItem(PENDING_WELCOME_KEY, cleanEmail);
         } catch {
@@ -265,8 +272,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const message = error.message.toLowerCase();
       const code = (error.code ?? "").toLowerCase();
 
-      if (code === "user_already_exists" || message.includes("already"))
-        return { error: "Já existe uma conta com este e-mail." };
+      // Conta já existente NÃO é confirmada para quem perguntou.
+      //
+      // Dizer "já existe uma conta com este e-mail" transforma o formulário de
+      // cadastro em consulta: com uma lista de e-mails vazados, um atacante
+      // descobre em minutos quais deles são clientes da loja — insumo pronto
+      // para phishing dirigido e para credential stuffing.
+      //
+      // O caminho daqui é o mesmo do cadastro bem-sucedido: a tela "confirme
+      // seu e-mail". As duas respostas ficam indistinguíveis de fora, que é o
+      // ponto. Quem realmente esqueceu que já tinha conta não fica preso —
+      // aquela tela diz, em texto, para entrar normalmente ou usar "esqueci
+      // minha senha" (ver AuthModal).
+      if (code === "user_already_exists" || message.includes("already")) return finishSignUp(false);
 
       const isRateLimit =
         error.status === 429 || message.includes("rate limit") || message.includes("rate_limit");
@@ -289,9 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         const probeMsg = (probe.error?.message ?? "").toLowerCase();
         const accountExists =
-          !probe.error ||
-          probeMsg.includes("not confirmed") ||
-          probeMsg.includes("não confirmado");
+          !probe.error || probeMsg.includes("not confirmed") || probeMsg.includes("não confirmado");
         if (accountExists) return finishSignUp();
 
         if (isRateLimit)
@@ -307,7 +323,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Daqui para baixo o servidor recusou o que foi digitado — a mensagem
       // precisa dizer o quê, senão o visitante repete o mesmo erro.
       if (code === "signup_disabled" || message.includes("not allowed"))
-        return { error: "O cadastro está temporariamente indisponível. Tente novamente mais tarde." };
+        return {
+          error: "O cadastro está temporariamente indisponível. Tente novamente mais tarde.",
+        };
       if (code === "weak_password" || message.includes("password"))
         return { error: "Escolha uma senha mais forte, com ao menos 6 caracteres." };
       if (code === "email_address_invalid" || message.includes("email"))
@@ -316,7 +334,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: "Não foi possível concluir o cadastro." };
     }
     return finishSignUp();
-
   };
 
   /** Reenvia o link de confirmação para quem criou a conta e não recebeu. */
@@ -335,7 +352,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
-
   const signOut = async () => {
     await supabase.auth.signOut();
   };
@@ -350,14 +366,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
-
   const updateProfile: AuthCtx["updateProfile"] = async (patch) => {
     if (!user) return;
     const nextName = sanitizeText(patch.name, { maxLength: 80 }) || null;
-    const { error } = await supabase
-      .from("profiles")
-      .update({ name: nextName })
-      .eq("id", user.id);
+    const { error } = await supabase.from("profiles").update({ name: nextName }).eq("id", user.id);
     if (!error) {
       setUser({ ...user, name: nextName ?? undefined });
     }
@@ -370,10 +382,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const saveAddress: AuthCtx["saveAddress"] = async (next) => {
     if (!user) return;
-    const { error } = await supabase
-      .from("profiles")
-      .update({ address: next })
-      .eq("id", user.id);
+    const { error } = await supabase.from("profiles").update({ address: next }).eq("id", user.id);
     if (!error) setAddressState(next);
   };
 
@@ -405,8 +414,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </Ctx.Provider>
   );
 }
-
-
 
 export function useAuth() {
   const c = useContext(Ctx);
