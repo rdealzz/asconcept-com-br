@@ -4032,6 +4032,12 @@ function FinanceChart({ data }: { data: FinancePoint[] }) {
 }
 
 /* ---------- Manual Order Modal ---------- */
+/**
+ * Valor do seletor de cliente que troca a lista pelos campos de digitação.
+ * Não é e-mail de ninguém, e por isso não colide com nenhuma opção real.
+ */
+const CLIENTE_NOVO = "__digitar__";
+
 function ManualOrderModal({
   products,
   customers,
@@ -4047,6 +4053,16 @@ function ManualOrderModal({
 }) {
   const [customerEmail, setCustomerEmail] = useState(customers[0]?.email ?? "");
   const [customerName, setCustomerName] = useState(customers[0]?.name ?? "");
+  /**
+   * Cliente digitado à mão, e não escolhido na lista.
+   *
+   * A venda de balcão é o caso que faltava: quem compra na feira ou pelo
+   * WhatsApp não tem cadastro na loja, e o pedido não podia nem nascer — a
+   * lista era a única entrada possível. Começa ligado quando não há cliente
+   * nenhum cadastrado, que era o único momento em que o formulário já aceitava
+   * digitação.
+   */
+  const [clienteNovo, setClienteNovo] = useState(customers.length === 0);
   const [productId, setProductId] = useState(products[0]?.id ?? "");
   const [size, setSize] = useState<Size>("M");
   const [qty, setQty] = useState<number>(1);
@@ -4064,15 +4080,26 @@ function ManualOrderModal({
 
   const save = async () => {
     setErr(null);
-    if (!customerEmail || !chosen) {
-      setErr("Selecione um cliente e um produto.");
+    if (!chosen) {
+      setErr("Selecione um produto.");
+      return;
+    }
+    // O e-mail continua obrigatório porque a coluna do banco é NOT NULL, e é
+    // por ele que o pedido encontra o cliente depois. O nome é livre: é rótulo
+    // de tela, e um pedido de balcão pode não ter mais do que um primeiro nome.
+    const email = customerEmail.trim().toLowerCase();
+    const nome = customerName.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      setErr(
+        clienteNovo ? "Informe um e-mail válido para o cliente digitado." : "Selecione um cliente.",
+      );
       return;
     }
     setSaving(true);
     try {
       await createOrder({
-        customerEmail,
-        customerName,
+        customerEmail: email,
+        customerName: nome || undefined,
         items: [
           {
             id: chosen.id,
@@ -4120,14 +4147,25 @@ function ManualOrderModal({
           <h3 className="mt-1 font-serif text-2xl">Novo Pedido Manual</h3>
 
           <div className="mt-6 space-y-4">
-            <label className="block">
-              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                Cliente
-              </span>
-              {customers.length > 0 ? (
+            {/* A lista some quando não há ninguém cadastrado: um seletor com uma
+                opção só ("digitar") é degrau sem escada. */}
+            {customers.length > 0 && (
+              <label className="block">
+                <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                  Cliente
+                </span>
                 <select
-                  value={customerEmail}
+                  value={clienteNovo ? CLIENTE_NOVO : customerEmail}
                   onChange={(e) => {
+                    if (e.target.value === CLIENTE_NOVO) {
+                      // Campos em branco: o nome do cliente anterior ficaria
+                      // colado no cadastro novo, e ninguém repara nisso.
+                      setClienteNovo(true);
+                      setCustomerEmail("");
+                      setCustomerName("");
+                      return;
+                    }
+                    setClienteNovo(false);
                     setCustomerEmail(e.target.value);
                     const c = customers.find((x) => x.email === e.target.value);
                     if (c) setCustomerName(c.name);
@@ -4139,8 +4177,33 @@ function ManualOrderModal({
                       {c.name} · {c.email}
                     </option>
                   ))}
+                  <option value={CLIENTE_NOVO}>Outro cliente — digitar nome e e-mail</option>
                 </select>
-              ) : (
+              </label>
+            )}
+
+            {/* O nome fica sempre editável, inclusive para cliente escolhido na
+                lista: o cadastro pode estar como "gui santos" e a nota precisar
+                do nome inteiro. Editar aqui vale só para este pedido — o
+                cadastro do cliente não muda. */}
+            <label className="block">
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Nome do cliente
+              </span>
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Como o nome deve aparecer no pedido"
+                className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+            </label>
+
+            {clienteNovo && (
+              <label className="block">
+                <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                  E-mail do cliente
+                </span>
                 <input
                   type="email"
                   value={customerEmail}
@@ -4148,8 +4211,11 @@ function ManualOrderModal({
                   placeholder="cliente@email.com"
                   className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
                 />
-              )}
-            </label>
+                <span className="mt-1 block text-[10px] leading-relaxed text-muted-foreground">
+                  É por ele que o pedido acha o cliente depois, no painel e no histórico de compras.
+                </span>
+              </label>
+            )}
 
             <label className="block">
               <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
