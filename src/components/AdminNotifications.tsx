@@ -70,8 +70,6 @@ export function AdminNotifications({
   const [semTabela, setSemTabela] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
-  const [sql, setSql] = useState<string | null>(null);
-  const [sqlCopiado, setSqlCopiado] = useState(false);
   const [reconciliados, setReconciliados] = useState<number | null>(null);
 
   const carregar = useCallback(async () => {
@@ -98,23 +96,6 @@ export function AdminNotifications({
     };
   }, [carregar, onReconcile]);
 
-  // O SQL é grande e só interessa a quem ainda não rodou a migração.
-  useEffect(() => {
-    if (!semTabela || sql) return;
-    void import("@/lib/sql-avisos").then((m) => setSql(m.SQL_AVISOS));
-  }, [semTabela, sql]);
-
-  const copiarSql = async () => {
-    if (!sql) return;
-    try {
-      await navigator.clipboard.writeText(sql);
-      setSqlCopiado(true);
-      window.setTimeout(() => setSqlCopiado(false), 2500);
-    } catch {
-      /* área de transferência indisponível — o SQL está à vista mesmo assim */
-    }
-  };
-
   const marcarUm = async (id: string) => {
     const agora = new Date().toISOString();
     setAvisos((prev) => prev.map((a) => (a.id === id ? { ...a, readAt: agora } : a)));
@@ -133,33 +114,30 @@ export function AdminNotifications({
     if (!carregando && !semTabela) onUnreadChange?.(naoLidos);
   }, [naoLidos, carregando, semTabela, onUnreadChange]);
 
+  // Sem a tabela, esta aba não tem o que mostrar. O que ela NÃO faz mais é
+  // despejar uma parede de SQL no painel da loja: quem cuida da loja não tem
+  // por que ler SQL para entender o que está acontecendo. A mensagem diz o que
+  // está inativo, e — o que mais importa — que a loja segue vendendo normal.
   if (semTabela) {
     return (
-      <div className="border border-accent/40 bg-accent/5 px-5 py-4">
-        <p className="text-[11px] tracking-luxe uppercase text-accent">Migração pendente</p>
-        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-          Os avisos de estoque ainda não existem no banco. Rode o SQL abaixo no Supabase (SQL
-          Editor) — ele cria a tabela de avisos, o livro de movimentos do estoque e reescreve a
-          baixa para registrar cada uma. Pode rodar mais de uma vez sem problema.
+      <div className="border border-border bg-muted/20 px-5 py-4">
+        <p className="text-[11px] tracking-luxe uppercase text-muted-foreground">
+          Avisos ainda não ativos
         </p>
-        <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words border border-border bg-muted/40 p-3 text-[10px] leading-relaxed text-muted-foreground">
-          {sql ?? "Carregando o SQL…"}
-        </pre>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => void copiarSql()}
-            disabled={!sql}
-            className="asc-btn-primary px-3 py-1.5 text-[10px] tracking-luxe uppercase disabled:opacity-40"
-          >
-            {sqlCopiado ? "SQL copiado" : "Copiar SQL"}
-          </button>
-          <button
-            onClick={() => void carregar()}
-            className="border border-border px-3 py-1.5 text-[10px] tracking-luxe uppercase text-muted-foreground transition-colors hover:border-accent hover:text-accent"
-          >
-            Já rodei · verificar
-          </button>
-        </div>
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+          O registro de estoque ainda não foi criado no banco, então nada aparece aqui por enquanto.
+        </p>
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+          <span className="text-foreground">A loja não é afetada:</span> vendas, pagamentos e baixa
+          de estoque seguem funcionando como sempre. O que falta é só o histórico do que esgotou e
+          quando.
+        </p>
+        <button
+          onClick={() => void carregar()}
+          className="mt-3 border border-border px-3 py-1.5 text-[10px] tracking-luxe uppercase text-muted-foreground transition-colors hover:border-accent hover:text-accent"
+        >
+          Verificar de novo
+        </button>
       </div>
     );
   }

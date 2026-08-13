@@ -102,10 +102,30 @@ function rowToNotification(r: Row): AdminNotification {
   };
 }
 
-/** Erro do Postgres para tabela que ainda não existe (`undefined_table`). */
+/**
+ * Erro de "esta tabela não existe" — nas duas formas em que ele chega.
+ *
+ * `42P01` é o código do próprio Postgres (`undefined_table`), e era o único
+ * que estava aqui. Só que a leitura não fala com o Postgres direto: fala com o
+ * PostgREST, que responde à sua maneira. Quando a tabela não está no cache de
+ * esquema dele, a resposta é `PGRST205`, com a mensagem "Could not find the
+ * table 'public.admin_notifications' in the schema cache" — que não casa com o
+ * código antigo NEM com o regex de "relation ... does not exist".
+ *
+ * O efeito de não reconhecer isso: a aba caía no ramo de erro genérico e
+ * mostrava um "Não foi possível carregar os avisos" vermelho, em vez do aviso
+ * explicando que a parte do banco ainda não foi criada. Um susto no lugar de
+ * uma informação.
+ */
 export function isMissingTable(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false;
-  return error.code === "42P01" || /relation .* does not exist/i.test(error.message ?? "");
+  if (error.code === "42P01" || error.code === "PGRST205") return true;
+  const message = error.message ?? "";
+  return (
+    /relation .* does not exist/i.test(message) ||
+    /could not find the table/i.test(message) ||
+    /in the schema cache/i.test(message)
+  );
 }
 
 export type ListaDeAvisos = {
