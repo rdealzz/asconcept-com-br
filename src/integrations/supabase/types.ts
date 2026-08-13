@@ -273,6 +273,7 @@ export type Database = {
           sizes: Json
           sort_order: number
           updated_at: string
+          variant: Json | null
         }
         Insert: {
           category?: string
@@ -289,6 +290,7 @@ export type Database = {
           sizes?: Json
           sort_order?: number
           updated_at?: string
+          variant?: Json | null
         }
         Update: {
           category?: string
@@ -305,6 +307,7 @@ export type Database = {
           sizes?: Json
           sort_order?: number
           updated_at?: string
+          variant?: Json | null
         }
         Relationships: []
       }
