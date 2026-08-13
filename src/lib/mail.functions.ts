@@ -1,10 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  orderCreatedTemplate,
-  statusUpdateTemplate,
-  welcomeTemplate,
-} from "./mailTemplates";
+import { orderCreatedTemplate, statusUpdateTemplate, welcomeTemplate } from "./mailTemplates";
 import type { OrderItem, OrderStatus } from "./types";
 
 type MailKind =
@@ -31,22 +27,32 @@ function validate(input: unknown): MailKind {
   if (!d || typeof d !== "object" || typeof d.to !== "string" || !d.to.includes("@")) {
     throw new Error("Destinatário inválido.");
   }
-  if (
-    d.kind !== "welcome" &&
-    d.kind !== "order_created" &&
-    d.kind !== "status_update"
-  ) {
+  if (d.kind !== "welcome" && d.kind !== "order_created" && d.kind !== "status_update") {
     throw new Error("Tipo de e-mail inválido.");
   }
   return d;
 }
 
+/**
+ * Teto de envio por conta.
+ *
+ * Cada chamada põe uma mensagem na fila que sai do domínio verificado da loja
+ * (`notify.asconccept.com.br`). Sem teto, um cliente logado enfileira e-mail em
+ * laço: enche a fila, queima a cota do provedor e — o dano que não se desfaz —
+ * põe a reputação do domínio em risco, que é o que decide se o e-mail de
+ * pedido dos outros clientes cai na caixa de entrada ou no spam.
+ *
+ * Quem envia de verdade dispara um e-mail por evento de pedido; dez em dez
+ * minutos é folga larga sobre isso.
+ */
+const LIMITE_EMAIL = { limite: 10, janelaMs: 10 * 60_000 };
+
 export const sendTransactionalMail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
   .handler(async ({ data, context }) => {
-
-
+    const { exigirLimitePorUsuario } = await import("@/lib/rate-limit.server");
+    exigirLimitePorUsuario("email", context.userId, LIMITE_EMAIL);
 
     // Resolve caller identity server-side. Never trust client-supplied `to`
     // as authorization; it is only used for cross-check with the caller.

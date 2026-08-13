@@ -296,7 +296,6 @@ export async function createPendingOrderCore(
   const total = Math.round((Math.max(0, subtotal - discount) + shippingCost) * 100) / 100;
   if (total < 1) return { error: "Valor do pedido é inválido." };
 
-  const orderNumber = `AS-${Math.floor(100000 + Math.random() * 900000)}`;
   const address = {
     cep: data.customer.cep,
     logradouro: data.customer.logradouro,
@@ -307,39 +306,54 @@ export async function createPendingOrderCore(
     uf: data.customer.uf,
   };
 
-  // Reserva o cupom antes de gravar o pedido (UNIQUE (user_id, code) evita corrida).
+  // Reserva o cupom antes de gravar o pedido (UNIQUE (user_id, code) evita
+  // corrida). O vínculo com o pedido é acertado depois, quando o número final
+  // já é conhecido — ele pode mudar se houver colisão na gravação.
   if (acceptedCoupon) {
     const { claimCouponUse } = await import("@/lib/coupon-uses.server");
-    const claimed = await claimCouponUse(userId, acceptedCoupon, orderNumber);
+    const claimed = await claimCouponUse(userId, acceptedCoupon, null);
     if (!claimed) {
       return { error: "Este cupom já foi utilizado. Remova o cupom para continuar." };
     }
   }
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { error: insertErr } = await supabaseAdmin.from("orders").insert({
-    order_number: orderNumber,
-    user_id: userId,
-    customer_email: data.customer.email.trim().toLowerCase(),
-    customer_name: data.customer.name,
-    customer_phone: data.customer.phone,
-    items: orderItems,
-    address,
-    shipping_cost: shippingCost,
-    subtotal,
-    total,
-    payment_method: data.method === "pix" ? "mp_pix" : "mp_card",
-    status: "Aguardando Pagamento",
-    coupon_code: acceptedCoupon,
-    discount,
-  } as never);
-  if (insertErr) {
-    console.error("[mp] insert pending order failed:", insertErr);
+  const { gravarComNumeroUnico } = await import("@/lib/order-number.server");
+
+  const gravacao = await gravarComNumeroUnico(async (orderNumber) => {
+    const { error } = await supabaseAdmin.from("orders").insert({
+      order_number: orderNumber,
+      user_id: userId,
+      customer_email: data.customer.email.trim().toLowerCase(),
+      customer_name: data.customer.name,
+      customer_phone: data.customer.phone,
+      items: orderItems,
+      address,
+      shipping_cost: shippingCost,
+      subtotal,
+      total,
+      payment_method: data.method === "pix" ? "mp_pix" : "mp_card",
+      status: "Aguardando Pagamento",
+      coupon_code: acceptedCoupon,
+      discount,
+    } as never);
+    return error;
+  });
+
+  if (!gravacao.ok) {
+    console.error("[mp] insert pending order failed:", gravacao.erro);
     if (acceptedCoupon) {
       const { releaseCouponUse } = await import("@/lib/coupon-uses.server");
       await releaseCouponUse(userId, acceptedCoupon);
     }
     return { error: "Não foi possível registrar o pedido." };
+  }
+
+  const { orderNumber } = gravacao;
+
+  if (acceptedCoupon) {
+    const { attachCouponOrder } = await import("@/lib/coupon-uses.server");
+    await attachCouponOrder(userId, acceptedCoupon, orderNumber);
   }
 
   return { orderNumber, total, subtotal, shippingCost, discount };

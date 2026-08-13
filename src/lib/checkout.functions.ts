@@ -70,6 +70,9 @@ function validateInput(raw: unknown): CheckoutInput {
   };
 }
 
+/** Mesmo teto do checkout do site: pedido gravado é linha em `orders`. */
+const LIMITE_PEDIDO = { limite: 20, janelaMs: 10 * 60_000 };
+
 /**
  * Registro de pedido com preços recalculados no servidor.
  *
@@ -83,6 +86,9 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
   .inputValidator(validateInput)
   .handler(async ({ data, context }): Promise<CheckoutResult> => {
     const { supabase, userId } = context;
+
+    const { exigirLimitePorUsuario } = await import("@/lib/rate-limit.server");
+    exigirLimitePorUsuario("pedido-manual", userId, LIMITE_PEDIDO);
 
     const ids = Array.from(new Set(data.items.map((i) => i.id)));
     const { data: rows, error: fetchErr } = await supabase
@@ -152,11 +158,7 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
     const discount = Math.min(subtotal, couponDiscount + pixDiscount);
     const total = Math.max(0, subtotal - discount + shippingCost);
 
-    const rand = Math.floor(100000 + Math.random() * 900000);
-    const orderNumber = `AS-${rand}`;
-
     const insertPayload = {
-      order_number: orderNumber,
       user_id: userId,
       customer_email: data.customerEmail,
       customer_name: data.customerName || null,
@@ -171,32 +173,57 @@ export const placeSecureOrder = createServerFn({ method: "POST" })
       discount,
     };
 
-    // Reserva o cupom antes de gravar o pedido (UNIQUE (user_id, code) evita corrida).
+    // Reserva o cupom antes de gravar o pedido (UNIQUE (user_id, code) evita
+    // corrida). O vínculo com o pedido vem depois: o número final só é
+    // conhecido quando a gravação passa.
     if (acceptedCoupon) {
       const { claimCouponUse } = await import("@/lib/coupon-uses.server");
-      const claimed = await claimCouponUse(userId, acceptedCoupon, orderNumber);
+      const claimed = await claimCouponUse(userId, acceptedCoupon, null);
       if (!claimed) throw new Error("Este cupom já foi utilizado.");
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: inserted, error: insertErr } = await supabaseAdmin
-      .from("orders")
-      .insert(insertPayload as never)
-      .select("order_number, total, subtotal, status")
-      .single();
+    const { gravarComNumeroUnico } = await import("@/lib/order-number.server");
 
-    if (insertErr || !inserted) {
+    let gravado: { total: number | string; subtotal: number | string; status: string } | null =
+      null;
+
+    const gravacao = await gravarComNumeroUnico(async (orderNumber) => {
+      const { data: inserted, error } = await supabaseAdmin
+        .from("orders")
+        .insert({ ...insertPayload, order_number: orderNumber } as never)
+        .select("order_number, total, subtotal, status")
+        .single();
+      if (!error && inserted) {
+        gravado = inserted as unknown as typeof gravado;
+      }
+      return error;
+    });
+
+    if (!gravacao.ok || !gravado) {
       if (acceptedCoupon) {
         const { releaseCouponUse } = await import("@/lib/coupon-uses.server");
         await releaseCouponUse(userId, acceptedCoupon);
       }
-      throw new Error(insertErr?.message ?? "Não foi possível registrar o pedido.");
+      // A mensagem do Postgres não sobe para a tela: ela descreve tabela,
+      // coluna e constraint, que é mapa do banco entregue a quem provocou o
+      // erro. O log do servidor guarda o detalhe para quem precisa dele.
+      if (!gravacao.ok) console.error("[checkout] insert manual order failed:", gravacao.erro);
+      throw new Error("Não foi possível registrar o pedido.");
     }
 
+    const { orderNumber } = gravacao;
+
+    if (acceptedCoupon) {
+      const { attachCouponOrder } = await import("@/lib/coupon-uses.server");
+      await attachCouponOrder(userId, acceptedCoupon, orderNumber);
+    }
+
+    const linha = gravado as { total: number | string; subtotal: number | string; status: string };
     return {
-      orderNumber: (inserted as { order_number: string }).order_number,
-      total: Number((inserted as { total: number | string }).total),
-      subtotal: Number((inserted as { subtotal: number | string }).subtotal),
-      status: (inserted as { status: string }).status,
+      orderNumber,
+      total: Number(linha.total),
+      subtotal: Number(linha.subtotal),
+      status: linha.status,
     };
   });

@@ -22,6 +22,37 @@ const cache = new Map<string, CacheEntry>();
 const TTL_MS = 10 * 60 * 1000;
 
 /**
+ * Teto de valores distintos guardados.
+ *
+ * Este cache é endereçado pelo VALOR do pedido, e quem escolhe o valor é quem
+ * chama — `getInstallments` não exige login. Sem teto, um laço pedindo 1.01,
+ * 1.02, 1.03… cria uma entrada nova a cada chamada e nada nunca saía do
+ * `Map`: o TTL só era conferido na leitura da mesma chave, então valor que
+ * não se repete fica para sempre. Isso é memória crescendo até o processo
+ * morrer, disparada de fora, sem autenticação.
+ *
+ * Mil entradas cobrem com folga os valores reais de uma loja (o carrinho não
+ * assume mil totais diferentes ao mesmo tempo) e o custo de memória é
+ * desprezível.
+ */
+const MAX_ENTRADAS = 1000;
+
+/**
+ * Tira o que expirou e, se ainda estourar o teto, os mais antigos — o `Map`
+ * preserva ordem de inserção, então o primeiro é o mais velho.
+ */
+function podarCache(agora: number): void {
+  for (const [chave, entrada] of cache) {
+    if (agora - entrada.at >= TTL_MS) cache.delete(chave);
+  }
+  while (cache.size >= MAX_ENTRADAS) {
+    const maisVelha = cache.keys().next();
+    if (maisVelha.done) break;
+    cache.delete(maisVelha.value);
+  }
+}
+
+/**
  * Todas as opções de parcelamento (sem e com juros) para o valor informado,
  * exatamente como a conta do Mercado Pago está configurada.
  */
@@ -72,7 +103,9 @@ export async function installmentOptions(amount: number): Promise<InstallmentOpt
     console.error("[mp] installments error", e);
   }
 
-  cache.set(key, { at: Date.now(), value });
+  const agora = Date.now();
+  if (cache.size >= MAX_ENTRADAS) podarCache(agora);
+  cache.set(key, { at: agora, value });
   return value;
 }
 
@@ -84,4 +117,3 @@ export async function bestInterestFreeInstallment(
   const free = options.filter((o) => o.interestFree && o.installments > 1);
   return free.length ? free[free.length - 1]! : null;
 }
-
