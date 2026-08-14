@@ -20,6 +20,18 @@ export type AppUser = {
   email: string;
   name?: string;
   isAdmin: boolean;
+  /**
+   * Sessão de convidado — quem está comprando sem ter criado conta.
+   *
+   * É um usuário anônimo de verdade no Supabase Auth: tem id, tem JWT e o
+   * pedido é amarrado nele pela RLS, como o de qualquer cliente. O que ele não
+   * tem é e-mail, senha e histórico — então a loja não pode tratá-lo como
+   * cliente cadastrado: nada de "Olá, fulano" no menu nem de "minha conta".
+   *
+   * Some sozinho: quando o pagamento é aprovado, o servidor promove esta conta
+   * a conta de verdade com o e-mail digitado no checkout.
+   */
+  isGuest: boolean;
 };
 
 export type CustomerAddress = {
@@ -46,6 +58,16 @@ type AuthCtx = {
   openAuth: () => void;
   closeAuth: () => void;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  /**
+   * Abre uma sessão de convidado para quem quer comprar sem criar conta.
+   *
+   * Devolve a mensagem pronta para a tela quando não dá — e dá para não dar: o
+   * recurso depende de "Anonymous sign-ins" estar ligado nas configurações de
+   * Auth do projeto. Quem chama precisa continuar oferecendo o login normal
+   * como saída, senão um botão desligado no painel do Supabase vira um
+   * checkout sem saída.
+   */
+  entrarComoConvidado: () => Promise<{ error: string | null }>;
   signUp: (
     email: string,
     password: string,
@@ -75,6 +97,19 @@ async function loadProfile(id: string) {
   return data;
 }
 
+/**
+ * A sessão é de convidado?
+ *
+ * `is_anonymous` é o que o Supabase marca no usuário anônimo. A falta de
+ * e-mail entra como segunda leitura porque a versão do Auth que não conhece
+ * essa propriedade ainda assim cria o usuário sem e-mail — e tratar convidado
+ * como cliente cadastrado é pior do que o contrário: a loja diria "Olá" para
+ * quem não tem nome e mostraria um histórico que não existe.
+ */
+function ehConvidado(u: { is_anonymous?: boolean; email?: string | null }): boolean {
+  return u.is_anonymous === true || !u.email;
+}
+
 async function checkIsAdmin(id: string) {
   const { data } = await supabase
     .from("user_roles")
@@ -92,7 +127,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isOpen, setOpen] = useState(false);
 
-  const hydrateSession = useCallback(async (userId: string, email: string) => {
+  const hydrateSession = useCallback(async (userId: string, email: string, isGuest = false) => {
+    // Convidado não tem perfil nem papel para buscar: são duas idas ao banco
+    // que voltariam vazias em toda navegação de quem está no meio da compra.
+    if (isGuest) {
+      setUser({ id: userId, email: "", isAdmin: false, isGuest: true });
+      setAddressState(null);
+      return;
+    }
+
     const forcedAdmin = isMasterAdminEmail(email);
     // Aplica bypass de UI imediatamente para o e-mail mestre, sem esperar a RPC.
     if (forcedAdmin) {
@@ -101,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         name: prev?.name,
         isAdmin: true,
+        isGuest: false,
       }));
     }
     // Nunca deixamos uma falha de leitura derrubar a sessão: o usuário
@@ -122,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       name: profile?.name ?? undefined,
       // Bypass permanente para o e-mail mestre, mesmo se a RPC não retornar admin.
       isAdmin: admin || isMasterAdminEmail(resolvedEmail),
+      isGuest: false,
     });
     setAddressState((profile?.address as CustomerAddress | null) ?? null);
 
@@ -152,7 +197,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!mounted) return;
         const session = data.session;
         if (session?.user) {
-          await hydrateSession(session.user.id, session.user.email ?? "");
+          await hydrateSession(
+            session.user.id,
+            session.user.email ?? "",
+            ehConvidado(session.user),
+          );
         }
       } catch (err) {
         console.error("[auth] bootstrap falhou", err);
@@ -171,9 +220,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
         // Defer to avoid deadlocks
         setTimeout(() => {
-          void hydrateSession(session.user.id, session.user.email ?? "").catch((err) =>
-            console.error("[auth] hidratação falhou", err),
-          );
+          void hydrateSession(
+            session.user.id,
+            session.user.email ?? "",
+            ehConvidado(session.user),
+          ).catch((err) => console.error("[auth] hidratação falhou", err));
         }, 0);
       }
     });
@@ -217,6 +268,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (error) return { error: "E-mail ou senha inválidos." };
     return { error: null };
+  };
+
+  const entrarComoConvidado: AuthCtx["entrarComoConvidado"] = async () => {
+    const { error } = await supabase.auth.signInAnonymously();
+    if (!error) return { error: null };
+
+    // Duas falhas diferentes chegam aqui, e as duas são de configuração, não do
+    // visitante: o recurso desligado nas opções de Auth, e a migração do
+    // convidado ainda não aplicada (aí o gatilho de perfil estoura na criação
+    // do usuário, porque `profiles.email` é NOT NULL). Nenhuma das duas tem
+    // conserto pelo lado de cá, e nenhuma delas o cliente entende — a tela
+    // manda entrar com conta, que continua funcionando.
+    console.error("[auth] sessão de convidado falhou", {
+      status: error.status,
+      code: error.code,
+      message: error.message,
+    });
+    return {
+      error: "Não foi possível continuar sem conta agora. Entre ou crie sua conta para finalizar.",
+    };
   };
 
   const [justSignedUp, setJustSignedUp] = useState(false);
@@ -397,6 +468,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         openAuth: () => setOpen(true),
         closeAuth: () => setOpen(false),
         signIn,
+        entrarComoConvidado,
         signUp,
         signOut,
         resetPassword,

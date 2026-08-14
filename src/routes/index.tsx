@@ -320,6 +320,9 @@ function Nav({
   const { open: openSearch, setTab } = useSearch();
   const isAdmin = useIsAdmin();
   const isDevMaster = !!user?.isAdmin;
+  // Convidado tem sessão, mas não tem conta: para o menu ele é um visitante —
+  // "Minha conta" não teria o que mostrar, e "Olá" não teria a quem saudar.
+  const cadastrado = !!user && !user.isGuest;
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -421,9 +424,9 @@ function Nav({
           </button>
           <ThemeToggle className="hidden md:inline-flex [&>svg]:h-4 [&>svg]:w-4" />
           <button
-            onClick={() => (user ? onOpenAccount() : openAuth())}
-            aria-label={user ? "Minha Conta" : "Entrar"}
-            title={user ? `${user.email}` : "Entrar"}
+            onClick={() => (cadastrado ? onOpenAccount() : openAuth())}
+            aria-label={cadastrado ? "Minha Conta" : "Entrar"}
+            title={cadastrado ? `${user?.email}` : "Entrar"}
             className="hidden transition-colors duration-ascfast ease-asc hover:text-asc-gold md:inline-flex"
           >
             <UserIcon className="h-4 w-4" strokeWidth={1.5} />
@@ -557,12 +560,13 @@ function MobileMenu({
           <button
             onClick={() => {
               onClose();
-              if (user) onOpenAccount();
+              // Mesma regra do menu do topo: convidado não tem "minha conta".
+              if (user && !user.isGuest) onOpenAccount();
               else openAuth();
             }}
             className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
           >
-            {user ? "Minha Conta" : "Entrar / Criar Conta"}
+            {user && !user.isGuest ? "Minha Conta" : "Entrar / Criar Conta"}
           </button>
         </nav>
 

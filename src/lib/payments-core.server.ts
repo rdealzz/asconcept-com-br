@@ -145,7 +145,7 @@ export async function persistPayment(
     const { data: row } = await supabaseAdmin
       .from("orders")
       .select(
-        "stock_decremented, customer_email, customer_name, total, items, mail_sent, preparation_mail_sent",
+        "stock_decremented, customer_email, customer_name, total, items, mail_sent, preparation_mail_sent, user_id",
       )
       .eq("order_number", orderNumber)
       .maybeSingle();
@@ -177,6 +177,22 @@ export async function persistPayment(
       }
     }
 
+    // Comprou sem cadastro? A conta anônima vira conta de verdade agora, com o
+    // e-mail do checkout — e o pedido, que já está amarrado nela, aparece no
+    // histórico assim que a pessoa definir a senha.
+    if (row) {
+      const dono = row as {
+        user_id?: string | null;
+        customer_email?: string;
+        customer_name?: string | null;
+      };
+      await promoverConvidado(supabaseAdmin, {
+        user_id: dono.user_id ?? null,
+        customer_email: dono.customer_email ?? null,
+        customer_name: dono.customer_name ?? null,
+      });
+    }
+
     // Dispara o e-mail de "pedido confirmado" uma única vez por pedido.
     // Evita reenvio caso a webhook do Mercado Pago confirme o mesmo
     // pagamento novamente depois (é comum receber a notificação mais de
@@ -206,6 +222,67 @@ export async function persistPayment(
         console.error("[mail] falha ao enviar e-mail de pedido confirmado", e);
       }
     }
+  }
+}
+
+/**
+ * O convidado vira cliente.
+ *
+ * Quem comprou sem cadastro está numa sessão anônima do Supabase Auth: usuário
+ * de verdade, com id e JWT, mas sem e-mail e sem senha. O pedido já nasceu
+ * amarrado nesse id — então basta pôr o e-mail que a pessoa digitou no checkout
+ * para a conta virar permanente, com o histórico inteiro dentro dela.
+ *
+ * Roda uma vez, no momento em que o pagamento é aprovado, e serve aos dois
+ * caminhos: o cartão (que aprova na hora) e o Pix (que aprova pela notificação
+ * do Mercado Pago, quando o navegador do cliente já pode ter ido embora).
+ *
+ * Nada aqui pode derrubar o pagamento — ele já foi aprovado, e o dinheiro
+ * entrou. Toda falha é registrada e engolida: no pior caso a pessoa fica sem
+ * conta e com o pedido em pé, que é o estado de antes desta funcionalidade.
+ *
+ * A senha não é definida aqui, e isso é de propósito: senha gerada pelo
+ * servidor viaja por e-mail, e e-mail não é lugar de senha. A conta nasce sem
+ * senha e a pessoa define a dela pelo "esqueci minha senha" — o convite para
+ * isso está na tela de pedido concluído.
+ */
+async function promoverConvidado(
+  admin: AnySupabase,
+  pedido: { user_id: string | null; customer_email: string | null; customer_name: string | null },
+): Promise<void> {
+  if (!pedido.user_id || !pedido.customer_email) return;
+
+  try {
+    const { data, error } = await admin.auth.admin.getUserById(pedido.user_id);
+    if (error || !data?.user) return;
+
+    const usuario = data.user as { email?: string | null; is_anonymous?: boolean };
+    // Conta de verdade não se mexe: quem já tinha login comprou logado.
+    if (usuario.is_anonymous !== true && usuario.email) return;
+
+    const nome = pedido.customer_name?.trim() || undefined;
+    const { error: erroPromocao } = await admin.auth.admin.updateUserById(pedido.user_id, {
+      email: pedido.customer_email,
+      // Sem isto o Supabase manda um e-mail de confirmação e só grava o
+      // endereço depois do clique — e a conta ficaria pela metade justamente
+      // para quem não quis se cadastrar.
+      email_confirm: true,
+      ...(nome ? { user_metadata: { name: nome, full_name: nome } } : {}),
+    });
+
+    if (erroPromocao) {
+      // O caso comum não é falha: é o e-mail já pertencer a uma conta. Quem
+      // comprou como convidado usando o e-mail que já tem cadastro continua com
+      // o pedido em pé — ele só não entra no histórico daquela conta, porque
+      // amarrar pedido a uma conta que ninguém provou ser sua seria entregar o
+      // endereço de quem comprou para quem tem o e-mail.
+      console.error(
+        `[auth] não foi possível promover a conta de convidado do pedido — segue sem conta`,
+        erroPromocao,
+      );
+    }
+  } catch (e) {
+    console.error("[auth] promoção de convidado falhou", e);
   }
 }
 

@@ -104,7 +104,7 @@ const telefoneValido = (v: string) => {
 
 function CheckoutPage() {
   const { items, coupon, couponDiscount, subtotal, count, clear, hydrated } = useCart();
-  const { user, loading, openAuth } = useAuth();
+  const { user, loading, openAuth, entrarComoConvidado } = useAuth();
   const navigate = useNavigate();
   const startOrder = useServerFn(createPendingOrder);
   const payCard = useServerFn(payWithCardToken);
@@ -124,8 +124,18 @@ function CheckoutPage() {
   // ao lado do formulário poder espelhá-los.
   const [cardHolder, setCardHolder] = useState("");
   const [cardBrand, setCardBrand] = useState<CardBrandInfo | null>(null);
+  const [entrandoConvidado, setEntrandoConvidado] = useState(false);
+  const [erroConvidado, setErroConvidado] = useState<string | null>(null);
   const prefilledRef = useRef(false);
   const pendingRef = useRef<{ signature: string; orderNumber: string } | null>(null);
+
+  const seguirComoConvidado = async () => {
+    setErroConvidado(null);
+    setEntrandoConvidado(true);
+    const { error } = await entrarComoConvidado();
+    setEntrandoConvidado(false);
+    if (error) setErroConvidado(error);
+  };
 
   // Sem redirecionar: a página mostra o estado certo (entrar / sacola vazia).
   // Redirecionar dentro de efeito quebrava o checkout em acesso direto ou F5,
@@ -408,15 +418,34 @@ function CheckoutPage() {
     );
   }
 
+  // Sem sessão nenhuma: a compra segue sem cadastro, e entrar vira a opção
+  // secundária — para quem já é cliente e quer o endereço preenchido.
   if (!user) {
     return (
       <CheckoutNotice
-        title="Entre para finalizar"
-        text="Faça login ou crie sua conta para concluir o pedido com segurança."
+        title="Finalize sua compra"
+        text="Siga sem cadastro: pedimos apenas o e-mail e o endereço de entrega. Sua conta é criada no fim, para você acompanhar o pedido."
         action={
-          <button onClick={() => openAuth()} className="asc-btn-gold px-8 py-3.5">
-            Entrar
-          </button>
+          <div className="flex w-full flex-col items-center gap-4">
+            <button
+              onClick={() => void seguirComoConvidado()}
+              disabled={entrandoConvidado}
+              className="asc-btn-gold w-full max-w-xs px-8 py-3.5 disabled:opacity-60"
+            >
+              {entrandoConvidado ? "Um instante..." : "Continuar sem cadastro"}
+            </button>
+            <button
+              onClick={() => openAuth()}
+              className="text-[11px] tracking-luxe uppercase text-asc-ink-inverse-muted underline underline-offset-4 transition-colors hover:text-asc-gold"
+            >
+              Já tenho conta — entrar
+            </button>
+            {erroConvidado && (
+              <p role="alert" className="max-w-xs text-xs text-asc-error">
+                {erroConvidado}
+              </p>
+            )}
+          </div>
         }
       />
     );

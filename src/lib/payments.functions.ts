@@ -50,12 +50,46 @@ const LIMITE_PEDIDO = { limite: 15, janelaMs: 5 * 60_000 };
  */
 const LIMITE_STATUS = { limite: 120, janelaMs: 60_000 };
 
+/**
+ * Tetos do convidado, por IP.
+ *
+ * O teto por conta é bom porque trocar de balde custa criar outra conta e
+ * confirmar outro e-mail. Para quem compra sem cadastro esse custo é zero: uma
+ * sessão anônima nova é um balde novo, e o freio some justamente onde ele
+ * importa — pedido gravado e cobrança criada no Mercado Pago.
+ *
+ * Então o convidado leva os dois freios: o dele, por sessão, e mais um por IP,
+ * que é o que sobra de identificável quando não há conta. Os números são
+ * menores que os do cliente logado de propósito — quem tem conta já pagou um
+ * pedágio para chegar aqui.
+ */
+const LIMITE_CONVIDADO_PEDIDO = { limite: 10, janelaMs: 5 * 60_000 };
+const LIMITE_CONVIDADO_PIX = { limite: 6, janelaMs: 5 * 60_000 };
+const LIMITE_CONVIDADO_CARTAO = { limite: 6, janelaMs: 5 * 60_000 };
+
+/**
+ * Aplica o teto por IP quando quem chama é convidado.
+ *
+ * `is_anonymous` vem do próprio JWT, conferido pelo middleware — não é campo
+ * que o cliente escolha. Sessão de cliente cadastrado passa direto.
+ */
+async function freioDeConvidado(
+  claims: Record<string, unknown> | undefined,
+  acao: string,
+  regra: { limite: number; janelaMs: number },
+): Promise<void> {
+  if (claims?.is_anonymous !== true) return;
+  const { exigirLimitePorIp } = await import("@/lib/rate-limit.server");
+  await exigirLimitePorIp(`convidado-${acao}`, regra);
+}
+
 export const createPendingOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validPendingInput)
   .handler(async ({ data, context }): Promise<PendingOrderResult> => {
     const { exigirLimitePorUsuario } = await import("@/lib/rate-limit.server");
     exigirLimitePorUsuario("pedido-pendente", context.userId, LIMITE_PEDIDO);
+    await freioDeConvidado(context.claims, "pedido", LIMITE_CONVIDADO_PEDIDO);
 
     const { createPendingOrderCore } = await import("@/lib/payments-core.server");
     return createPendingOrderCore(context.supabase, context.userId, data);
@@ -67,6 +101,7 @@ export const payWithCardToken = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<CardResult> => {
     const { exigirLimitePorUsuario } = await import("@/lib/rate-limit.server");
     exigirLimitePorUsuario("cartao", context.userId, LIMITE_CARTAO);
+    await freioDeConvidado(context.claims, "cartao", LIMITE_CONVIDADO_CARTAO);
 
     const { payWithCardCore } = await import("@/lib/payments-core.server");
     return payWithCardCore(context.supabase, context.userId, data);
@@ -78,6 +113,7 @@ export const createPixPayment = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<PixResult> => {
     const { exigirLimitePorUsuario } = await import("@/lib/rate-limit.server");
     exigirLimitePorUsuario("pix", context.userId, LIMITE_PIX);
+    await freioDeConvidado(context.claims, "pix", LIMITE_CONVIDADO_PIX);
 
     const { createPixCore } = await import("@/lib/payments-core.server");
     return createPixCore(context.supabase, context.userId, data);

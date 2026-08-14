@@ -5,6 +5,8 @@ import { z } from "zod";
 import { Check, Loader2 } from "lucide-react";
 
 import { getPaymentStatus } from "@/lib/payments.functions";
+import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/lib/cart-context";
 import { ContactStrip } from "@/components/ContactStrip";
 import { Wordmark } from "@/components/Wordmark";
@@ -121,6 +123,7 @@ function SucessoPage() {
             >
               Acompanhar Pedido
             </Link>
+            <ContaDeConvidado />
           </>
         )}
         {state.kind === "pending" && (
@@ -168,5 +171,72 @@ function SucessoPage() {
       </div>
       <ContactStrip />
     </main>
+  );
+}
+
+/**
+ * O convite para assumir a conta que acabou de nascer.
+ *
+ * Quem comprou sem cadastro virou cliente no momento em que o pagamento foi
+ * aprovado: o servidor pôs o e-mail do checkout na conta anônima que já era
+ * dona do pedido (ver `promoverConvidado`). Só falta a senha — e ela não vem
+ * por e-mail nem é inventada aqui: a pessoa define a dela pelo mesmo caminho de
+ * "esqueci minha senha", que já existe e já tem e-mail com a cara da loja.
+ *
+ * Não aparece para quem já estava logado, e não aparece se a promoção não
+ * aconteceu (e-mail já pertencente a outra conta, por exemplo) — nesse caso a
+ * sessão continua anônima depois da atualização, e prometer uma conta que não
+ * existe seria pior do que ficar calado.
+ */
+function ContaDeConvidado() {
+  const { user, resetPassword } = useAuth();
+  const [email, setEmail] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [enviado, setEnviado] = useState(false);
+
+  // A sessão do navegador ainda carrega o token de convidado: a promoção
+  // aconteceu no servidor, depois que este token foi emitido. Recarregá-lo é o
+  // que revela o e-mail — e, de quebra, deixa a pessoa logada de verdade.
+  useEffect(() => {
+    if (!user?.isGuest) return;
+    let vivo = true;
+    void supabase.auth.refreshSession().then(({ data }) => {
+      if (vivo) setEmail(data.session?.user.email ?? null);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [user?.isGuest]);
+
+  if (!email) return null;
+
+  const definirSenha = async () => {
+    setEnviando(true);
+    const { error } = await resetPassword(email);
+    setEnviando(false);
+    if (!error) setEnviado(true);
+  };
+
+  return (
+    <div className="mt-8 border-t border-border pt-6 text-left">
+      <p className="text-[10px] tracking-luxe uppercase text-accent">Sua conta</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Criamos uma conta para <strong className="text-asc-ink">{email}</strong> com este pedido
+        dentro. Defina uma senha para acompanhar a entrega e comprar mais rápido da próxima vez.
+      </p>
+      {enviado ? (
+        <p className="mt-3 text-sm text-accent">
+          Pronto — enviamos o link para criar sua senha. Confira sua caixa de entrada.
+        </p>
+      ) : (
+        <button
+          onClick={() => void definirSenha()}
+          disabled={enviando}
+          className="mt-4 border border-border px-6 py-2.5 text-[11px] tracking-luxe uppercase transition-colors hover:border-accent hover:text-accent disabled:opacity-60"
+        >
+          {enviando ? "Enviando..." : "Definir minha senha"}
+        </button>
+      )}
+    </div>
   );
 }
