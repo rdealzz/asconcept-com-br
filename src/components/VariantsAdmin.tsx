@@ -41,7 +41,6 @@ export function VariantsAdmin() {
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [criando, setCriando] = useState(false);
-  const [sqlCopiado, setSqlCopiado] = useState(false);
   const [dispensadas, setDispensadas] = useState<string[]>([]);
 
   const semColuna = missingColumns.includes("variant");
@@ -76,16 +75,6 @@ export function VariantsAdmin() {
     if (ok) setCriando(false);
   };
 
-  const copiarSql = async () => {
-    try {
-      await navigator.clipboard.writeText(SQL_VARIACOES);
-      setSqlCopiado(true);
-      window.setTimeout(() => setSqlCopiado(false), 2500);
-    } catch {
-      /* área de transferência indisponível — o SQL está à vista mesmo assim */
-    }
-  };
-
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -109,33 +98,28 @@ export function VariantsAdmin() {
         banners.
       </p>
 
-      {/* Migração pendente: o botão de salvar só devolveria 400. Melhor o SQL
-          pronto para colar, como no painel de curadoria. */}
+      {/* Mesma escolha do painel de curadoria: dizer em português o que está
+          fora do ar, em vez de despejar SQL na tela de quem cuida da loja. */}
       {semColuna && (
-        <div className="mb-5 border border-accent/50 bg-accent/[0.07] px-4 py-4">
-          <p className="text-[10px] tracking-luxe uppercase text-accent">Migração pendente</p>
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            A coluna <code className="text-accent">variant</code> ainda não existe no banco, e sem
-            ela não há onde gravar os álbuns. Rode o script abaixo no SQL Editor do Supabase — ele é
-            seguro de rodar mais de uma vez.
+        <div className="mb-5 border border-border bg-muted/20 px-4 py-4">
+          <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+            Álbuns indisponíveis
           </p>
-          <pre className="mt-3 overflow-x-auto border border-border bg-background/60 p-3 text-[10px] leading-relaxed text-muted-foreground">
-            {SQL_VARIACOES}
-          </pre>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => void copiarSql()}
-              className="asc-btn-primary px-3 py-1.5 text-[10px] tracking-luxe uppercase"
-            >
-              {sqlCopiado ? "SQL copiado" : "Copiar SQL"}
-            </button>
-            <button
-              onClick={() => void refresh()}
-              className="border border-border px-3 py-1.5 text-[10px] tracking-luxe uppercase text-muted-foreground transition-colors hover:border-accent hover:text-accent"
-            >
-              Já rodei · verificar
-            </button>
-          </div>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            Agrupar a mesma peça em várias cores ainda não está ativo — falta uma parte do banco de
+            dados.
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            <span className="text-foreground">Nada se perde:</span> cada cor continua existindo como
+            peça própria na vitrine, com preço, estoque e SKU. O que falta é só juntá-las num card
+            único com as bolinhas de cor.
+          </p>
+          <button
+            onClick={() => void refresh()}
+            className="mt-3 border border-border px-3 py-1.5 text-[10px] tracking-luxe uppercase text-muted-foreground transition-colors hover:border-accent hover:text-accent"
+          >
+            Verificar de novo
+          </button>
         </div>
       )}
 
@@ -701,11 +685,3 @@ function nomeSemCor(nome: string): string {
   if (partes.length > 1 && detectarCores(partes.slice(1).join(" ")).color) return partes[0].trim();
   return nome.trim();
 }
-
-/** O mesmo SQL da migração `20260812130000_products_variant.sql`. */
-export const SQL_VARIACOES = `ALTER TABLE public.products
-  ADD COLUMN IF NOT EXISTS variant JSONB;
-
-CREATE INDEX IF NOT EXISTS products_variant_group_idx
-  ON public.products ((variant ->> 'group'))
-  WHERE variant IS NOT NULL;`;

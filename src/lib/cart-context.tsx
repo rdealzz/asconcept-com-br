@@ -1,4 +1,13 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { calcDiscount, type Coupon } from "./coupons";
 import { PIX_DISCOUNT_RATE } from "./payments-validators";
 import type { ProductCategory } from "./categories";
@@ -123,7 +132,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [coupon]);
 
-  const add = (p: Product, size: string = "M") => {
+  /**
+   * Todas as funções abaixo são `useCallback` com lista de dependências vazia,
+   * e isso é possível porque nenhuma delas LÊ o estado — todas atualizam pela
+   * forma funcional (`setItems(prev => …)`). Sem estado lido, não há closure a
+   * envelhecer, e a identidade pode ser fixa para sempre.
+   *
+   * Por que importa: o valor deste contexto era um objeto literal, recriado a
+   * cada render. Como o `CatalogProvider` é filho deste, qualquer mexida no
+   * carrinho descartava e refazia o valor do catálogo também — e a vitrine
+   * inteira re-renderizava ao abrir a sacola, sem nada ter mudado nela.
+   */
+  const add = useCallback((p: Product, size: string = "M") => {
     setItems((prev) => {
       const existing = prev.find((i) => i.id === p.id && i.size === size);
       if (existing)
@@ -142,52 +162,77 @@ export function CartProvider({ children }: { children: ReactNode }) {
       ];
     });
     setOpen(true);
-  };
+  }, []);
 
-  const remove = (id: string, size: string) =>
-    setItems((prev) => prev.filter((i) => !(i.id === id && i.size === size)));
+  const remove = useCallback(
+    (id: string, size: string) =>
+      setItems((prev) => prev.filter((i) => !(i.id === id && i.size === size))),
+    [],
+  );
 
-  const updateQty = (id: string, size: string, delta: number) => {
+  const updateQty = useCallback((id: string, size: string, delta: number) => {
     setItems((prev) =>
       prev
         .map((i) => (i.id === id && i.size === size ? { ...i, qty: i.qty + delta } : i))
         .filter((i) => i.qty > 0),
     );
-  };
+  }, []);
 
-  const count = items.reduce((s, i) => s + i.qty, 0);
-  const subtotal = items.reduce((s, i) => s + i.qty * i.price, 0);
+  const clear = useCallback(() => {
+    setItems([]);
+    setCouponState(null);
+  }, []);
+
+  const open = useCallback(() => setOpen(true), []);
+  const close = useCallback(() => setOpen(false), []);
+  const toggle = useCallback(() => setOpen((o) => !o), []);
+  const setCoupon = useCallback((c: Coupon | null) => setCouponState(c), []);
+
+  const count = useMemo(() => items.reduce((s, i) => s + i.qty, 0), [items]);
+  const subtotal = useMemo(() => items.reduce((s, i) => s + i.qty * i.price, 0), [items]);
   // Recompute the discount dynamically from the current subtotal so cart edits
   // never leave a stale (and potentially over-generous) discount attached.
   const couponDiscount = coupon ? Math.min(subtotal, calcDiscount(coupon, subtotal)) : 0;
 
-  return (
-    <Ctx.Provider
-      value={{
-        items,
-        isOpen,
-        add,
-        remove,
-        updateQty,
-        clear: () => {
-          setItems([]);
-          setCouponState(null);
-        },
-        count,
-        subtotal,
-        open: () => setOpen(true),
-        close: () => setOpen(false),
-        toggle: () => setOpen((o) => !o),
-        coupon,
-        couponCode: coupon?.code ?? null,
-        couponDiscount,
-        setCoupon: (c) => setCouponState(c),
-        hydrated,
-      }}
-    >
-      {children}
-    </Ctx.Provider>
+  const value = useMemo(
+    () => ({
+      items,
+      isOpen,
+      add,
+      remove,
+      updateQty,
+      clear,
+      count,
+      subtotal,
+      open,
+      close,
+      toggle,
+      coupon,
+      couponCode: coupon?.code ?? null,
+      couponDiscount,
+      setCoupon,
+      hydrated,
+    }),
+    [
+      items,
+      isOpen,
+      add,
+      remove,
+      updateQty,
+      clear,
+      count,
+      subtotal,
+      open,
+      close,
+      toggle,
+      coupon,
+      couponDiscount,
+      setCoupon,
+      hydrated,
+    ],
   );
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 export function useCart() {

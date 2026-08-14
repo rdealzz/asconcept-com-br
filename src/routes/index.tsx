@@ -1,6 +1,35 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+
+/**
+ * Painéis do admin, buscados só quando a aba abre.
+ *
+ * Os dois existem apenas para quem administra a loja, mas viviam num `import`
+ * de topo — então TODO visitante baixava, analisava e executava o editor de
+ * álbuns e a aba de avisos junto com a vitrine, para nunca abrir nenhum dos
+ * dois. Em conexão de celular isso é tempo antes da primeira foto aparecer.
+ *
+ * Com `lazy` eles viram um pedaço à parte, buscado no clique da aba: somem do
+ * caminho do cliente e custam um instante ao admin, uma vez só.
+ */
+const VariantsAdmin = lazy(() =>
+  import("@/components/VariantsAdmin").then((m) => ({ default: m.VariantsAdmin })),
+);
+const AdminNotifications = lazy(() =>
+  import("@/components/AdminNotifications").then((m) => ({ default: m.AdminNotifications })),
+);
+
+/** Espera curta enquanto o pedaço do painel chega. */
+function CarregandoPainel() {
+  return (
+    <p className="border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
+      Carregando…
+    </p>
+  );
+}
 import {
+  Suspense,
   createContext,
+  lazy,
   memo,
   useCallback,
   useContext,
@@ -44,7 +73,6 @@ import {
   useCatalog,
   emptyStock,
   totalStock,
-  type OptionalColumn,
   type Size,
   type SizeStock,
 } from "@/lib/catalog-context";
@@ -58,11 +86,11 @@ import {
 } from "@/lib/sizes";
 import { collapseVariants, groupOf, productParam, swatchLabel } from "@/lib/variants";
 import { ColorSwatches } from "@/components/ColorSwatches";
-import { VariantsAdmin, SQL_VARIACOES } from "@/components/VariantsAdmin";
+
 import { supabase } from "@/integrations/supabase/client";
 import { productImageSrc, productImageSrcSet, uploadProductPhoto } from "@/lib/product-images";
 
-import { FavoriteButton, ShareButton } from "@/components/ProductActions";
+import { FavoriteButton } from "@/components/ProductActions";
 import { StitchDivider } from "@/components/StitchDivider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Loader } from "@/components/Loader";
@@ -70,7 +98,7 @@ import { Eyebrow, PillButton } from "@/components/ui-kit";
 import { Showroom } from "@/components/Showroom";
 import { ProductCardMeta } from "@/components/ProductCardMeta";
 import { economizandoDados, noOcioso, temHover, useNearViewport } from "@/lib/near-viewport";
-import { Inview, StackedLines, WordReveal, useScrollProgress } from "@/lib/motion";
+import { StackedLines, WordReveal, useScrollProgress } from "@/lib/motion";
 import { useVisualShell } from "@/lib/visual-shell";
 import { EmptyCategoryState } from "@/components/EmptyCategoryState";
 
@@ -2726,7 +2754,6 @@ function MinhaContaModal({ open, onClose }: { open: boolean; onClose: () => void
 /* ---------- Admin Panel Modal ---------- */
 import { useServerFn } from "@tanstack/react-start";
 import { adminDeleteOrder, adminDeleteCustomer, adminReconcileStock } from "@/lib/admin.functions";
-import { AdminNotifications } from "@/components/AdminNotifications";
 import { countUnreadNotifications } from "@/lib/admin-notifications";
 
 function ConfirmDialog({
@@ -3121,10 +3148,16 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
             )}
 
             {tab === "produtos" && <ProdutosAdmin featuredCount={featuredCount} />}
-            {tab === "variacoes" && <VariantsAdmin />}
+            {tab === "variacoes" && (
+              <Suspense fallback={<CarregandoPainel />}>
+                <VariantsAdmin />
+              </Suspense>
+            )}
 
             {tab === "avisos" && (
-              <AdminNotifications onReconcile={reconciliar} onUnreadChange={setNaoLidos} />
+              <Suspense fallback={<CarregandoPainel />}>
+                <AdminNotifications onReconcile={reconciliar} onUnreadChange={setNaoLidos} />
+              </Suspense>
             )}
 
             {tab === "clientes" && (
@@ -3311,28 +3344,6 @@ function temGradeMista(stock: SizeStock | undefined): boolean {
 }
 
 /**
- * O SQL de cada coluna de curadoria, igual ao da migração correspondente.
- *
- * Duplicado aqui de propósito: o arquivo de migração serve ao deploy, e este
- * texto serve ao admin que abriu o painel e precisa colar o script no SQL
- * Editor agora. Se um mudar, mude o outro.
- */
-const SQL_CURADORIA: Record<OptionalColumn, string> = {
-  is_featured: `ALTER TABLE public.products
-  ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT false;
-
-CREATE INDEX IF NOT EXISTS products_is_featured_idx
-  ON public.products (is_featured)
-  WHERE is_featured;`,
-  force_new: `ALTER TABLE public.products
-  ADD COLUMN IF NOT EXISTS force_new BOOLEAN NOT NULL DEFAULT false;
-
-CREATE INDEX IF NOT EXISTS products_force_new_idx
-  ON public.products (force_new)
-  WHERE force_new;`,
-  variant: SQL_VARIACOES,
-};
-/**
  * Lista de gestão de produtos do painel.
  *
  * O que ela faz de novo é a curadoria: "Destacar na Vitrine" liga o
@@ -3347,7 +3358,6 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
   const isAdmin = useIsAdmin();
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState<string | null>(null);
-  const [sqlCopiado, setSqlCopiado] = useState(false);
 
   if (!isAdmin) return null;
 
@@ -3357,20 +3367,6 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
     const msg = await setFeatured(p.id, p.isFeatured !== true);
     setSalvando(null);
     if (msg) setErro(msg);
-  };
-
-  // Uma coluna faltando ou duas, o que o admin cola no SQL Editor é um script
-  // só — e ele é seguro de rodar de novo.
-  const sqlPendente = missingColumns.map((c) => SQL_CURADORIA[c]).join("\n\n");
-
-  const copiarSql = async () => {
-    try {
-      await navigator.clipboard.writeText(sqlPendente);
-      setSqlCopiado(true);
-      window.setTimeout(() => setSqlCopiado(false), 2500);
-    } catch {
-      /* área de transferência indisponível — o SQL está à vista mesmo assim */
-    }
   };
 
   return (
@@ -3384,40 +3380,28 @@ function ProdutosAdmin({ featuredCount }: { featuredCount: number }) {
         </p>
       </div>
 
-      {/* Migração pendente: em vez de deixar o admin clicar num botão que só
-          devolve 400, a instrução vem com o SQL pronto para copiar. */}
+      {/* Recurso indisponível: o botão de destacar só devolveria 400. A tela
+          diz o que está fora do ar em português — despejar SQL no painel de
+          uma loja é pedir que o dono seja administrador de banco de dados. */}
       {missingColumns.length > 0 ? (
-        <div className="mb-5 border border-accent/50 bg-accent/[0.07] px-4 py-4">
-          <p className="text-[10px] tracking-luxe uppercase text-accent">Migração pendente</p>
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            {missingColumns.length > 1 ? "As colunas " : "A coluna "}
-            {missingColumns.map((c, i) => (
-              <span key={c}>
-                {i > 0 && " e "}
-                <code className="text-accent">{c}</code>
-              </span>
-            ))}
-            {missingColumns.length > 1 ? " ainda não existem" : " ainda não existe"} no banco, e sem
-            {missingColumns.length > 1 ? " elas" : " ela"} não há como gravar a curadoria. Rode o
-            script abaixo no SQL Editor do Supabase — ele é seguro de rodar mais de uma vez.
+        <div className="mb-5 border border-border bg-muted/20 px-4 py-4">
+          <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+            Curadoria indisponível
           </p>
-          <pre className="mt-3 overflow-x-auto border border-border bg-background/60 p-3 text-[10px] leading-relaxed text-muted-foreground">
-            {sqlPendente}
-          </pre>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => void copiarSql()}
-              className="inline-flex items-center gap-1.5 asc-btn-primary px-3 py-1.5 text-[10px] tracking-luxe uppercase"
-            >
-              {sqlCopiado ? "SQL copiado" : "Copiar SQL"}
-            </button>
-            <button
-              onClick={() => void refresh()}
-              className="inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-[10px] tracking-luxe uppercase text-muted-foreground transition-colors hover:border-accent hover:text-accent"
-            >
-              <RotateCcw className="h-3 w-3" strokeWidth={1.5} /> Já rodei · verificar
-            </button>
-          </div>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            Destacar peças na vitrine ainda não está ativo — falta uma parte do banco de dados.
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            <span className="text-foreground">O resto do painel funciona:</span> cadastrar, editar,
+            preço, estoque e fotos seguem normais. Só a marcação de destaque fica de fora, e a home
+            mostra a vitrine padrão enquanto isso.
+          </p>
+          <button
+            onClick={() => void refresh()}
+            className="mt-3 inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-[10px] tracking-luxe uppercase text-muted-foreground transition-colors hover:border-accent hover:text-accent"
+          >
+            <RotateCcw className="h-3 w-3" strokeWidth={1.5} /> Verificar de novo
+          </button>
         </div>
       ) : (
         erro && (
