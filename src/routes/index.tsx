@@ -4022,6 +4022,44 @@ function FinanceChart({ data }: { data: FinancePoint[] }) {
  */
 const CLIENTE_NOVO = "__digitar__";
 
+/**
+ * Uma peça dentro do pedido manual.
+ *
+ * O pedido de balcão raramente é de uma peça só: quem compra pela feira ou
+ * pelo WhatsApp leva a camisa e a bermuda no mesmo acerto, e o formulário só
+ * aceitava uma linha — cada peça virava um pedido separado, com número, envio
+ * e histórico próprios. O `items` do pedido sempre foi lista; o que faltava
+ * era a tela.
+ */
+type LinhaManual = {
+  /** Chave de render: produto e tamanho podem repetir enquanto o admin edita. */
+  key: string;
+  productId: string;
+  size: Size;
+  qty: number;
+  /** Valor negociado da linha inteira — já com a quantidade dentro, não o unitário. */
+  valor: number;
+};
+
+let seqLinhaManual = 0;
+
+/** Linha nova, já preenchida com a peça oferecida por padrão. */
+function novaLinhaManual(p?: Product): LinhaManual {
+  seqLinhaManual += 1;
+  return {
+    key: `linha-${seqLinhaManual}`,
+    productId: p?.id ?? "",
+    // Tamanho em branco cai na primeira posição da grade da peça escolhida —
+    // grade que muda de produto para produto (letras, calça, calçado).
+    size: "",
+    qty: 1,
+    valor: p?.price ?? 0,
+  };
+}
+
+/** Centavos redondos: evita `379.99000000000005` no valor gravado. */
+const emCentavos = (n: number) => Math.round(n * 100) / 100;
+
 function ManualOrderModal({
   products,
   customers,
@@ -4047,25 +4085,51 @@ function ManualOrderModal({
    * digitação.
    */
   const [clienteNovo, setClienteNovo] = useState(customers.length === 0);
-  const [productId, setProductId] = useState(products[0]?.id ?? "");
-  const [size, setSize] = useState<Size>("M");
-  const [qty, setQty] = useState<number>(1);
-  const [total, setTotal] = useState<number>(products[0]?.price ?? 0);
+  const [linhas, setLinhas] = useState<LinhaManual[]>(() => [novaLinhaManual(products[0])]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const chosen = products.find((p) => p.id === productId);
+  const produtoDaLinha = (l: LinhaManual) => products.find((p) => p.id === l.productId);
 
   // A grade segue a peça escolhida: pedido manual de sneaker oferece número,
   // não P/M/G/GG.
-  const tamanhos = sizesForProduct(chosen?.category, chosen?.name ?? "");
+  const tamanhosDaLinha = (l: LinhaManual) => {
+    const p = produtoDaLinha(l);
+    return sizesForProduct(p?.category, p?.name ?? "");
+  };
   // Trocar de peça pode deixar o tamanho selecionado fora da grade nova.
-  const tamanhoAtual = tamanhos.includes(size) ? size : (tamanhos[0] ?? "");
+  const tamanhoDaLinha = (l: LinhaManual) => {
+    const grade = tamanhosDaLinha(l);
+    return grade.includes(l.size) ? l.size : (grade[0] ?? "");
+  };
+
+  const alterarLinha = (key: string, patch: Partial<LinhaManual>) =>
+    setLinhas((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+
+  const removerLinha = (key: string) =>
+    setLinhas((prev) => (prev.length > 1 ? prev.filter((l) => l.key !== key) : prev));
+
+  // O total do pedido é a soma das peças, e não um campo à parte: negociar
+  // desconto é mexer no valor da peça, e assim a nota nunca fecha diferente da
+  // soma dos itens.
+  const total = emCentavos(linhas.reduce((acc, l) => acc + l.valor, 0));
 
   const save = async () => {
     setErr(null);
-    if (!chosen) {
-      setErr("Selecione um produto.");
+    const resolvidas = linhas.map((l) => ({
+      linha: l,
+      produto: produtoDaLinha(l),
+      tamanho: tamanhoDaLinha(l),
+    }));
+    if (resolvidas.some((r) => !r.produto)) {
+      setErr("Selecione um produto em cada peça.");
+      return;
+    }
+    // Mesma peça no mesmo tamanho em duas linhas viraria item repetido no
+    // pedido — quem lê a nota não sabe se são duas peças ou erro de digitação.
+    const chaves = resolvidas.map((r) => `${r.linha.productId}::${r.tamanho}`);
+    if (new Set(chaves).size !== chaves.length) {
+      setErr("A mesma peça no mesmo tamanho está repetida — some na quantidade.");
       return;
     }
     // O e-mail continua obrigatório porque a coluna do banco é NOT NULL, e é
@@ -4084,16 +4148,15 @@ function ManualOrderModal({
       await createOrder({
         customerEmail: email,
         customerName: nome || undefined,
-        items: [
-          {
-            id: chosen.id,
-            name: chosen.name,
-            price: Number(total) / Math.max(1, qty),
-            image: chosen.image,
-            quantity: qty,
-            size: tamanhoAtual,
-          },
-        ],
+        items: resolvidas.map(({ linha, produto, tamanho }) => ({
+          id: produto?.id ?? linha.productId,
+          name: produto?.name ?? "",
+          // A tela negocia o valor da peça inteira; o pedido guarda o unitário.
+          price: emCentavos(linha.valor / Math.max(1, linha.qty)),
+          image: produto?.image ?? "",
+          quantity: linha.qty,
+          size: tamanho,
+        })),
         address: {
           cep: "",
           logradouro: "",
@@ -4201,75 +4264,131 @@ function ManualOrderModal({
               </label>
             )}
 
-            <label className="block">
-              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                Produto
-              </span>
-              <select
-                value={productId}
-                onChange={(e) => {
-                  setProductId(e.target.value);
-                  const p = products.find((x) => x.id === e.target.value);
-                  if (p) setTotal(p.price * qty);
-                }}
-                className="mt-1 w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
-              >
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} — {formatBRL(p.price)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {/* Uma peça por bloco. O pedido de balcão costuma ter mais de uma,
+                e cada uma tem tamanho, quantidade e valor próprios. */}
+            <div className="space-y-3">
+              {linhas.map((linha, i) => {
+                const tamanhos = tamanhosDaLinha(linha);
+                const tamanhoAtual = tamanhoDaLinha(linha);
+                return (
+                  <div key={linha.key} className="border border-border p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                        Peça {i + 1}
+                      </span>
+                      {linhas.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removerLinha(linha.key)}
+                          aria-label={`Remover peça ${i + 1}`}
+                          className="text-[10px] tracking-luxe uppercase text-muted-foreground hover:text-destructive"
+                        >
+                          Remover
+                        </button>
+                      )}
+                    </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                  Tamanho
-                </span>
-                <select
-                  value={tamanhoAtual}
-                  onChange={(e) => setSize(e.target.value)}
-                  className="mt-1 w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
-                >
-                  {tamanhos.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                  Quantidade
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  value={qty}
-                  onChange={(e) => {
-                    const q = Math.max(1, Math.floor(Number(e.target.value) || 1));
-                    setQty(q);
-                    if (chosen) setTotal(chosen.price * q);
-                  }}
-                  className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
-                />
-              </label>
+                    <label className="block">
+                      <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                        Produto
+                      </span>
+                      <select
+                        value={linha.productId}
+                        onChange={(e) => {
+                          const p = products.find((x) => x.id === e.target.value);
+                          alterarLinha(linha.key, {
+                            productId: e.target.value,
+                            valor: p ? emCentavos(p.price * linha.qty) : linha.valor,
+                          });
+                        }}
+                        className="mt-1 w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+                      >
+                        {products.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} — {formatBRL(p.price)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block">
+                        <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                          Tamanho
+                        </span>
+                        <select
+                          value={tamanhoAtual}
+                          onChange={(e) => alterarLinha(linha.key, { size: e.target.value })}
+                          className="mt-1 w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+                        >
+                          {tamanhos.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                          Quantidade
+                        </span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={linha.qty}
+                          onChange={(e) => {
+                            const q = Math.max(1, Math.floor(Number(e.target.value) || 1));
+                            const p = produtoDaLinha(linha);
+                            alterarLinha(linha.key, {
+                              qty: q,
+                              valor: p ? emCentavos(p.price * q) : linha.valor,
+                            });
+                          }}
+                          className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+                        />
+                      </label>
+                    </div>
+
+                    <label className="block">
+                      <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                        Valor negociado desta peça (R$)
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={linha.valor}
+                        onChange={(e) =>
+                          alterarLinha(linha.key, {
+                            valor: Math.max(0, Number(e.target.value) || 0),
+                          })
+                        }
+                        className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
+                      />
+                      <span className="mt-1 block text-[10px] leading-relaxed text-muted-foreground">
+                        Já com a quantidade dentro — é o que o cliente paga por esta peça.
+                      </span>
+                    </label>
+                  </div>
+                );
+              })}
             </div>
 
-            <label className="block">
+            <button
+              type="button"
+              onClick={() => setLinhas((prev) => [...prev, novaLinhaManual(products[0])])}
+              disabled={products.length === 0}
+              className="w-full border border-dashed border-border px-4 py-2 text-[11px] tracking-luxe uppercase hover:bg-secondary disabled:opacity-50"
+            >
+              + Adicionar outra peça
+            </button>
+
+            <div className="flex items-baseline justify-between border-t border-border pt-3">
               <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                Valor Total Negociado (R$)
+                Valor Total Negociado
               </span>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={total}
-                onChange={(e) => setTotal(Math.max(0, Number(e.target.value) || 0))}
-                className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
-              />
-            </label>
+              <span className="font-serif text-lg tabular-nums">{formatBRL(total)}</span>
+            </div>
 
             {err && <p className="text-xs text-destructive">{err}</p>}
           </div>
