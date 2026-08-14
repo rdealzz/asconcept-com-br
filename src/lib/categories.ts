@@ -24,6 +24,31 @@ export const CATEGORY_LABELS: Record<ProductCategory, string> = {
 };
 
 /**
+ * O pedaço da URL de cada categoria.
+ *
+ * Separado da chave do banco de propósito: `clothes` é o valor gravado em
+ * `products.category` desde o primeiro dia, e trocá-lo obrigaria a migrar todas
+ * as linhas. Mas o endereço que o cliente vê — e que o Google indexa — tem de
+ * estar em português, porque é assim que se procura por isso aqui.
+ */
+export const CATEGORY_SLUGS: Record<ProductCategory, string> = {
+  clothes: "roupas",
+  sneakers: "sneakers",
+  acessorios: "acessorios",
+};
+
+export function categorySlug(c: ProductCategory): string {
+  return CATEGORY_SLUGS[c];
+}
+
+/** A categoria de um endereço, ou `null` quando o caminho não é de categoria. */
+export function categoryFromSlug(slug: string): ProductCategory | null {
+  const alvo = slug.trim().toLowerCase();
+  const achada = PRODUCT_CATEGORIES.find((c) => CATEGORY_SLUGS[c] === alvo);
+  return achada ?? null;
+}
+
+/**
  * Texto editorial de cada aba: o que a vitrine e a seção de produtos escrevem.
  * Fica junto do rótulo para que uma categoria nova não nasça sem copy.
  */

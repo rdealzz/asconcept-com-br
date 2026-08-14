@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
+import { Route as SitemapXmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as CategoriaRouteImport } from './routes/$categoria'
 import { Route as TrocasRouteImport } from './routes/trocas'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as SustentabilidadeRouteImport } from './routes/sustentabilidade'
@@ -53,6 +55,16 @@ const TermosRoute = TermosRouteImport.update({
 const SustentabilidadeRoute = SustentabilidadeRouteImport.update({
   id: '/sustentabilidade',
   path: '/sustentabilidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapXmlRoute = SitemapXmlRouteImport.update({
+  id: '/sitemap/xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CategoriaRoute = CategoriaRouteImport.update({
+  id: '/$categoria',
+  path: '/$categoria',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SucessoRoute = SucessoRouteImport.update({
@@ -175,6 +187,8 @@ export interface FileRoutesByFullPath {
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
+  '/$categoria': typeof CategoriaRoute
+  '/sitemap/xml': typeof SitemapXmlRoute
   '/sucesso': typeof SucessoRoute
   '/sustentabilidade': typeof SustentabilidadeRoute
   '/termos': typeof TermosRoute
@@ -202,6 +216,8 @@ export interface FileRoutesByTo {
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
+  '/$categoria': typeof CategoriaRoute
+  '/sitemap.xml': typeof SitemapXmlRoute
   '/sucesso': typeof SucessoRoute
   '/sustentabilidade': typeof SustentabilidadeRoute
   '/termos': typeof TermosRoute
@@ -230,6 +246,8 @@ export interface FileRoutesById {
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sobre': typeof SobreRoute
+  '/$categoria': typeof CategoriaRoute
+  '/sitemap.xml': typeof SitemapXmlRoute
   '/sucesso': typeof SucessoRoute
   '/sustentabilidade': typeof SustentabilidadeRoute
   '/termos': typeof TermosRoute
@@ -341,6 +359,8 @@ export interface RootRouteChildren {
   PrivacidadeRoute: typeof PrivacidadeRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SobreRoute: typeof SobreRoute
+  CategoriaRoute: typeof CategoriaRoute
+  SitemapXmlRoute: typeof SitemapXmlRoute
   SucessoRoute: typeof SucessoRoute
   SustentabilidadeRoute: typeof SustentabilidadeRoute
   TermosRoute: typeof TermosRoute
@@ -361,6 +381,20 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sitemap/xml': {
+      id: '/sitemap/xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapXmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$categoria': {
+      id: '/$categoria'
+      path: '/$categoria'
+      fullPath: '/$categoria'
+      preLoaderRoute: typeof CategoriaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/unsubscribe': {
       id: '/unsubscribe'
       path: '/unsubscribe'
@@ -549,6 +583,8 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacidadeRoute: PrivacidadeRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SobreRoute: SobreRoute,
+  CategoriaRoute: CategoriaRoute,
+  SitemapXmlRoute: SitemapXmlRoute,
   SucessoRoute: SucessoRoute,
   SustentabilidadeRoute: SustentabilidadeRoute,
   TermosRoute: TermosRoute,

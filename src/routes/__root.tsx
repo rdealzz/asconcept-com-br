@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import heroAsset from "../assets/hero-amalfi-men.jpg.asset.json";
+import { SITE_URL } from "../lib/site";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "../lib/auth-context";
 import { CartProvider } from "../lib/cart-context";
@@ -20,16 +21,6 @@ import { WhatsAppFab } from "../components/WhatsAppFab";
 import { CartDrawer } from "../components/CartDrawer";
 import { AuthModal } from "../components/AuthModal";
 import { THEME_INIT_SCRIPT } from "../components/ThemeToggle";
-
-/**
- * O endereço público da loja.
- *
- * `og:image` e `og:url` precisam de URL absoluta: o WhatsApp e o Instagram não
- * resolvem caminho relativo, e sem isso o link compartilhado sai sem prévia. O
- * `head` roda sem conhecer o domínio da requisição, então ele vem daqui — o
- * mesmo endereço que `public/sitemap.xml` e `public/robots.txt` já declaram.
- */
-const SITE_URL = "https://asconccept.com.br";
 
 /**
  * A capa que sai na prévia do link.

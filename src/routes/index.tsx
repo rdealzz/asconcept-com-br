@@ -66,6 +66,7 @@ import {
   CATEGORY_LABELS,
   categoryCopy,
   categoryLabel,
+  categorySlug,
   coerceCategory,
 } from "@/lib/categories";
 import { useAuth } from "@/lib/auth-context";
@@ -120,6 +121,10 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+function Index() {
+  return <Storefront />;
+}
+
 const SNEAKERS_LAUNCH = new Date("2026-09-01T00:00:00-03:00").getTime();
 
 /** Máximo de fotos por produto no formulário do admin. */
@@ -157,10 +162,25 @@ type SearchCtx = {
   filtrosAtivos: number;
 };
 const SearchContext = createContext<SearchCtx | null>(null);
-function SearchProvider({ children }: { children: React.ReactNode }) {
+function SearchProvider({
+  children,
+  categoriaInicial,
+}: {
+  children: React.ReactNode;
+  categoriaInicial?: ProductCategory;
+}) {
   const [query, setQuery] = useState("");
   const [isOpen, setOpen] = useState(false);
-  const [tab, setTab] = useState<ProductCategory>("clothes");
+  const [tab, setTab] = useState<ProductCategory>(categoriaInicial ?? "clothes");
+
+  // A rota manda enquanto a rota mudar: quem entra em /sneakers vê sneakers, e
+  // quem navega de uma categoria para outra pelo menu acompanha. Depois disso
+  // as abas da própria página mandam, sem mexer no endereço — trocar de aba não
+  // é mudar de página, e recarregar a vitrine inteira a cada clique seria pior
+  // do que a URL não acompanhar.
+  useEffect(() => {
+    if (categoriaInicial) setTab(categoriaInicial);
+  }, [categoriaInicial]);
   const [subFilter, setSubFilter] = useState<SubFilter>("todos");
   const [ordem, setOrdem] = useState<Ordenacao>("curadoria");
   const [tamanhos, setTamanhos] = useState<string[]>([]);
@@ -211,7 +231,14 @@ function useSearch() {
   return c;
 }
 
-function Index() {
+/**
+ * A loja inteira — vitrine, seções editoriais, rodapé e os modais.
+ *
+ * Recebe a categoria de quem a montou para que `/sneakers` e `/acessorios`
+ * possam ser páginas de verdade, com endereço próprio, título próprio e lugar
+ * no sitemap, em vez de um estado de memória que só existe depois do clique.
+ */
+export function Storefront({ categoriaInicial }: { categoriaInicial?: ProductCategory }) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
@@ -243,7 +270,7 @@ function Index() {
   }, [navegar]);
 
   return (
-    <SearchProvider>
+    <SearchProvider categoriaInicial={categoriaInicial}>
       <ProductProvider>
         <Loader onReady={() => setPronto(true)} />
         <div className="min-h-screen bg-background text-foreground">
@@ -358,6 +385,7 @@ function Nav({
   const { open, count } = useCart();
   const { user, openAuth } = useAuth();
   const { open: openSearch, setTab } = useSearch();
+  const navegar = useNavigate();
   const isAdmin = useIsAdmin();
   const isDevMaster = !!user?.isAdmin;
   // Convidado tem sessão, mas não tem conta: para o menu ele é um visitante —
@@ -411,6 +439,7 @@ function Nav({
             <button
               onClick={() => {
                 setTab("clothes");
+                void navegar({ to: "/$categoria", params: { categoria: categorySlug("clothes") } });
                 scrollToSection("produtos");
               }}
               className={navLink}
@@ -422,6 +451,10 @@ function Nav({
             <button
               onClick={() => {
                 setTab("acessorios");
+                void navegar({
+                  to: "/$categoria",
+                  params: { categoria: categorySlug("acessorios") },
+                });
                 scrollToSection("produtos");
               }}
               className={navLink}
@@ -524,6 +557,7 @@ function MobileMenu({
 }) {
   const { user, openAuth } = useAuth();
   const { setTab } = useSearch();
+  const navegar = useNavigate();
   const goTo = (id: string) => {
     onClose();
     // Espera o painel fechar antes de rolar, senão a animação atropela.
@@ -561,6 +595,7 @@ function MobileMenu({
               key={c}
               onClick={() => {
                 setTab(c);
+                void navegar({ to: "/$categoria", params: { categoria: categorySlug(c) } });
                 goTo("produtos");
               }}
               className="py-3 text-left font-serif text-2xl leading-tight hover:text-accent"
@@ -2584,6 +2619,7 @@ function FilterSidebar({ open, onClose }: { open: boolean; onClose: () => void }
     filtrosAtivos,
   } = useSearch();
   const { products, stock } = useCatalog();
+  const navegar = useNavigate();
 
   /**
    * Os tamanhos que a categoria aberta realmente tem em estoque.
@@ -2628,9 +2664,15 @@ function FilterSidebar({ open, onClose }: { open: boolean; onClose: () => void }
   // Categoria é a divisão principal do catálogo; o refino por tipo de peça só
   // existe dentro de Roupas — trocar de categoria zera o refino, senão o
   // cliente sairia de "Calça" para Acessórios com um filtro invisível ligado.
+  //
+  // Aqui a troca NAVEGA, e não só muda o estado: esta barra é menu, e menu leva
+  // a uma página. É o que dá endereço compartilhável a cada categoria e faz o
+  // botão voltar desfazer a escolha. As abas grudadas na vitrine seguem sendo
+  // controle de página, sem mexer no endereço.
   const selectCategory = (c: ProductCategory) => {
     setTab(c);
     setSubFilter("todos");
+    void navegar({ to: "/$categoria", params: { categoria: categorySlug(c) } });
     irParaVitrine();
   };
 
