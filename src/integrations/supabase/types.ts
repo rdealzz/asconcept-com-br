@@ -263,6 +263,7 @@ export type Database = {
           created_at: string
           description: string | null
           force_last_item: boolean
+          force_new: boolean
           gallery: Json
           id: string
           image: string | null
@@ -280,6 +281,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           force_last_item?: boolean
+          force_new?: boolean
           gallery?: Json
           id?: string
           image?: string | null
@@ -297,6 +299,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           force_last_item?: boolean
+          force_new?: boolean
           gallery?: Json
           id?: string
           image?: string | null
