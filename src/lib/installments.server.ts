@@ -56,11 +56,46 @@ function podarCache(agora: number): void {
  * Todas as opções de parcelamento (sem e com juros) para o valor informado,
  * exatamente como a conta do Mercado Pago está configurada.
  */
+/**
+ * Teto de consultas que REALMENTE custam — as que não estão em cache.
+ *
+ * A primeira versão disto limitava toda chamada por IP, e estava errado por um
+ * motivo específico deste país: operadora de celular usa CGNAT, então dezenas
+ * de clientes no 4G compartilham um mesmo IP público. A vitrine mostra o
+ * parcelamento em cada cartão de peça, então um punhado de visitantes móveis
+ * estourava o teto junto — e perdia o "12x sem juros" na tela, sem erro
+ * nenhum, só sumindo.
+ *
+ * Limitar apenas o cache miss desfaz isso, porque separa quem custa de quem
+ * não custa. O cliente navega por preços que se repetem (é o catálogo da
+ * loja), o cache é compartilhado por todo mundo no servidor, e a partir do
+ * primeiro visitante essas consultas são de graça — nunca contam. Já o abuso é
+ * feito de valores inventados (1.01, 1.02, 1.03…), onde TODA chamada é miss e
+ * bate no teto quase de imediato.
+ *
+ * 60 por minuto cobre com folga o pior caso honesto: o primeiro visitante
+ * depois de um deploy, com o cache frio, abrindo uma vitrine inteira de preços
+ * distintos.
+ */
+const LIMITE_CONSULTA_NOVA = { limite: 60, janelaMs: 60_000 };
+
 export async function installmentOptions(amount: number): Promise<InstallmentOption[]> {
   if (!Number.isFinite(amount) || amount <= 0) return [];
   const key = amount.toFixed(2);
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
+
+  // Daqui para baixo a consulta custa: três chamadas à API do Mercado Pago e
+  // uma entrada nova no cache. É este trecho que o teto protege.
+  const { consumir, ipDoPedido } = await import("@/lib/rate-limit.server");
+  const ip = await ipDoPedido();
+  if (ip && !consumir(`ip:parcelas-novas:${ip}`, LIMITE_CONSULTA_NOVA).ok) {
+    // Devolve vazio em vez de lançar: a tela apenas não mostra a linha de
+    // parcelamento. Derrubar a página inteira por causa de um detalhe de
+    // apresentação seria trocar um problema pequeno por um grande.
+    console.warn("[mp] consulta de parcelamento barrada por excesso de valores novos");
+    return [];
+  }
 
   const publicKey = process.env["MP_PUBLIC_KEY"];
   if (!publicKey) return [];
@@ -109,11 +144,7 @@ export async function installmentOptions(amount: number): Promise<InstallmentOpt
   return value;
 }
 
-/** Melhor parcelamento SEM JUROS disponível para o valor informado. */
-export async function bestInterestFreeInstallment(
-  amount: number,
-): Promise<InstallmentOption | null> {
-  const options = await installmentOptions(amount);
-  const free = options.filter((o) => o.interestFree && o.installments > 1);
-  return free.length ? free[free.length - 1]! : null;
-}
+// `bestInterestFreeInstallment` morava aqui e não era chamada por ninguém — a
+// escolha do melhor parcelamento sem juros acontece dentro de
+// `getInstallments`, que é quem a tela usa. Removida na auditoria de código
+// morto.

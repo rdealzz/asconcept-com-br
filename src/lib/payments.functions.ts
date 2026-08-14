@@ -19,14 +19,30 @@ import type { CardResult, PendingOrderResult, PixResult } from "@/lib/payments-c
  * nem digita dez cartões seguidos; quem faz isso está sondando.
  */
 
+/**
+ * Sobre o tamanho da janela, que é uma decisão de negócio e não só de segurança.
+ *
+ * A primeira versão usava janelas de 10 minutos. O teto era generoso, mas a
+ * ESPERA não: quem esbarrasse no limite no primeiro minuto ficava trancado por
+ * nove — no meio de um checkout, com o cartão na mão. Isso é o tipo de atrito
+ * que faz cliente desistir da compra, e o dono já apontou, com razão, que numa
+ * boutique isso custa mais caro do que parece.
+ *
+ * A janela ficou menor com o teto quase igual. Para quem ataca não muda nada
+ * relevante: teste de cartão roubado precisa de centenas de tentativas por
+ * hora para valer a pena, e tanto 60 quanto 96 por hora já tornam o alvo ruim.
+ * Para quem está comprando muda bastante — o pior caso de espera cai de nove
+ * minutos para menos de cinco.
+ */
+
 /** Cartão é o mais sensível: é por aqui que se testa cartão roubado. */
-const LIMITE_CARTAO = { limite: 10, janelaMs: 10 * 60_000 };
+const LIMITE_CARTAO = { limite: 8, janelaMs: 5 * 60_000 };
 
 /** Cada Pix é uma cobrança de verdade criada no Mercado Pago. */
-const LIMITE_PIX = { limite: 15, janelaMs: 10 * 60_000 };
+const LIMITE_PIX = { limite: 10, janelaMs: 5 * 60_000 };
 
 /** Cada pendente é uma linha em `orders` — sem teto, a tabela vira depósito. */
-const LIMITE_PEDIDO = { limite: 20, janelaMs: 10 * 60_000 };
+const LIMITE_PEDIDO = { limite: 15, janelaMs: 5 * 60_000 };
 
 /**
  * Consulta de status: a tela do Pix faz polling enquanto o cliente paga, então

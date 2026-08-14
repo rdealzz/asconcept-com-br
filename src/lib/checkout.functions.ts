@@ -71,7 +71,7 @@ function validateInput(raw: unknown): CheckoutInput {
 }
 
 /** Mesmo teto do checkout do site: pedido gravado é linha em `orders`. */
-const LIMITE_PEDIDO = { limite: 20, janelaMs: 10 * 60_000 };
+const LIMITE_PEDIDO = { limite: 15, janelaMs: 5 * 60_000 };
 
 /**
  * Registro de pedido com preços recalculados no servidor.

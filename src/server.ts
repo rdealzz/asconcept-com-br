@@ -127,7 +127,11 @@ function cspRelatorio(): string {
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    "frame-ancestors 'none'",
+    // Sem `frame-ancestors` aqui de propósito: o navegador IGNORA essa
+    // diretiva em política de relatório e ainda imprime um aviso no console a
+    // cada carregamento. Como o console é justamente onde se lê o resultado
+    // deste modo, o aviso viraria ruído parecendo violação. Ele continua
+    // valendo — está no cabeçalho que bloqueia, logo acima.
   ]
     .map((d) => d.replace(/\s+/g, " ").trim())
     .join("; ");
