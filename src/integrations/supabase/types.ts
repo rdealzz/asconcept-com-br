@@ -63,46 +63,15 @@ export type Database = {
           size?: string | null
           sku?: string | null
         }
-        Relationships: []
-      }
-      stock_ledger: {
-        Row: {
-          created_at: string
-          id: string
-          order_number: string | null
-          product_id: string | null
-          product_name: string | null
-          qty_after: number | null
-          qty_before: number | null
-          qty_requested: number
-          reason: string
-          size: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          order_number?: string | null
-          product_id?: string | null
-          product_name?: string | null
-          qty_after?: number | null
-          qty_before?: number | null
-          qty_requested?: number
-          reason: string
-          size?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          order_number?: string | null
-          product_id?: string | null
-          product_name?: string | null
-          qty_after?: number | null
-          qty_before?: number | null
-          qty_requested?: number
-          reason?: string
-          size?: string | null
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "admin_notifications_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       coupon_uses: {
         Row: {
@@ -353,6 +322,7 @@ export type Database = {
           created_at: string
           description: string | null
           force_last_item: boolean
+          force_new: boolean
           gallery: Json
           id: string
           image: string | null
@@ -370,6 +340,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           force_last_item?: boolean
+          force_new?: boolean
           gallery?: Json
           id?: string
           image?: string | null
@@ -387,6 +358,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           force_last_item?: boolean
+          force_new?: boolean
           gallery?: Json
           id?: string
           image?: string | null
@@ -428,6 +400,45 @@ export type Database = {
           name?: string | null
           phone?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      stock_ledger: {
+        Row: {
+          created_at: string
+          id: string
+          order_number: string | null
+          product_id: string | null
+          product_name: string | null
+          qty_after: number | null
+          qty_before: number | null
+          qty_requested: number
+          reason: string
+          size: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_number?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          qty_after?: number | null
+          qty_before?: number | null
+          qty_requested?: number
+          reason: string
+          size?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_number?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          qty_after?: number | null
+          qty_before?: number | null
+          qty_requested?: number
+          reason?: string
+          size?: string | null
         }
         Relationships: []
       }
@@ -515,10 +526,6 @@ export type Database = {
         Args: { _order_number: string }
         Returns: undefined
       }
-      reconcile_order_stock: {
-        Args: never
-        Returns: number
-      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -545,6 +552,7 @@ export type Database = {
           read_ct: number
         }[]
       }
+      reconcile_order_stock: { Args: never; Returns: number }
     }
     Enums: {
       app_role: "admin" | "user"
