@@ -10,6 +10,7 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import heroAsset from "../assets/hero-amalfi-men.jpg.asset.json";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "../lib/auth-context";
 import { CartProvider } from "../lib/cart-context";
@@ -19,6 +20,37 @@ import { WhatsAppFab } from "../components/WhatsAppFab";
 import { CartDrawer } from "../components/CartDrawer";
 import { AuthModal } from "../components/AuthModal";
 import { THEME_INIT_SCRIPT } from "../components/ThemeToggle";
+
+/**
+ * O endereço público da loja.
+ *
+ * `og:image` e `og:url` precisam de URL absoluta: o WhatsApp e o Instagram não
+ * resolvem caminho relativo, e sem isso o link compartilhado sai sem prévia. O
+ * `head` roda sem conhecer o domínio da requisição, então ele vem daqui — o
+ * mesmo endereço que `public/sitemap.xml` e `public/robots.txt` já declaram.
+ */
+const SITE_URL = "https://asconccept.com.br";
+
+/**
+ * A capa que sai na prévia do link.
+ *
+ * Antes era uma captura de tela do preview do Lovable, hospedada num domínio
+ * `r2.dev` que não é da loja e que existe enquanto aquele preview existir. Agora
+ * é a mesma foto de abertura da home, servida pelo domínio da loja.
+ */
+const OG_IMAGE = `${SITE_URL}${heroAsset.url}`;
+
+const TITULO_PADRAO = "A&S Conccept — Alfaiataria de herança para uma nova era";
+
+/**
+ * A frase que aparece embaixo do link no Google e no WhatsApp. Em português,
+ * porque a loja é brasileira, e dizendo o que se vende — a anterior descrevia a
+ * plataforma ("luxury e-commerce platform for affluent young consumers"), que é
+ * texto de apresentação de projeto, não de vitrine.
+ */
+const DESCRICAO_PADRAO =
+  "Peças de alfaiataria e streetwear de luxo, em edição limitada. Envio para todo o Brasil, " +
+  "pagamento em até 12x ou Pix com desconto.";
 
 /** Origem das fotos (o Storage do Supabase), para o `preconnect` do <head>. */
 const FOTOS_ORIGIN = (() => {
@@ -34,17 +66,17 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
+        <p className="text-[11px] tracking-luxe uppercase text-accent">Erro 404</p>
+        <h1 className="mt-3 font-serif text-3xl text-foreground">Esta página não existe</h1>
+        <p className="mt-3 text-sm text-muted-foreground">
+          O endereço pode ter mudado, ou a peça que você procurava saiu da vitrine.
         </p>
-        <div className="mt-6">
+        <div className="mt-8">
           <Link
             to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="asc-btn-primary inline-flex items-center justify-center px-6 py-3 text-[11px] tracking-luxe uppercase"
           >
-            Go home
+            Ver a coleção
           </Link>
         </div>
       </div>
@@ -62,27 +94,27 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+        <p className="text-[11px] tracking-luxe uppercase text-accent">Falha ao carregar</p>
+        <h1 className="mt-3 font-serif text-3xl text-foreground">Esta página não abriu</h1>
+        <p className="mt-3 text-sm text-muted-foreground">
+          O problema foi do nosso lado. Tente de novo — se continuar, fale com a gente pelo
+          WhatsApp.
         </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <div className="mt-8 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="asc-btn-primary inline-flex items-center justify-center px-6 py-3 text-[11px] tracking-luxe uppercase"
           >
-            Try again
+            Tentar de novo
           </button>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="inline-flex items-center justify-center border border-border px-6 py-3 text-[11px] tracking-luxe uppercase text-foreground transition-colors hover:bg-secondary"
           >
-            Go home
+            Ir para a home
           </a>
         </div>
       </div>
@@ -92,44 +124,25 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
+    // Uma descrição só, em português, e escrita para quem vai comprar — não
+    // para investidor. A lista tinha `name="description"` duas vezes, com
+    // textos diferentes: o buscador escolhe um dos dois e ninguém sabe qual.
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "A&S Conccept — The New Era of Heritage" },
-      {
-        name: "description",
-        content:
-          "A&S Conccept — curated luxury apparel for the next generation. Timeless heritage tailoring, reimagined for the modern connoisseur.",
-      },
-      { property: "og:title", content: "A&S Conccept — The New Era of Heritage" },
-      {
-        property: "og:description",
-        content:
-          "A&S Conccept Storefront is a luxury e-commerce platform for affluent young consumers.",
-      },
+      { title: TITULO_PADRAO },
+      { name: "description", content: DESCRICAO_PADRAO },
+      { property: "og:site_name", content: "A&S Conccept" },
+      { property: "og:locale", content: "pt_BR" },
+      { property: "og:url", content: SITE_URL },
+      { property: "og:title", content: TITULO_PADRAO },
+      { property: "og:description", content: DESCRICAO_PADRAO },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: OG_IMAGE },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "A&S Conccept — The New Era of Heritage" },
-      {
-        name: "description",
-        content:
-          "A&S Conccept Storefront is a luxury e-commerce platform for affluent young consumers.",
-      },
-      {
-        name: "twitter:description",
-        content:
-          "A&S Conccept Storefront is a luxury e-commerce platform for affluent young consumers.",
-      },
-      {
-        property: "og:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d116b85a-c6c7-4e6d-856c-fad14c27579f/id-preview-a11de409--4a1b6264-e4f2-4bd0-beae-666af6c1801f.lovable.app-1782999840259.png",
-      },
-      {
-        name: "twitter:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d116b85a-c6c7-4e6d-856c-fad14c27579f/id-preview-a11de409--4a1b6264-e4f2-4bd0-beae-666af6c1801f.lovable.app-1782999840259.png",
-      },
+      { name: "twitter:title", content: TITULO_PADRAO },
+      { name: "twitter:description", content: DESCRICAO_PADRAO },
+      { name: "twitter:image", content: OG_IMAGE },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -162,7 +175,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <head>
         {/* Aplica o tema salvo antes da primeira pintura, para a página não
             piscar do escuro para o claro na hidratação. */}

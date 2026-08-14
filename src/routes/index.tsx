@@ -1440,6 +1440,8 @@ function AdminEditModal() {
     sizeGrid: suggestSizeGrid(creatingCategory ?? tab, "") as SizeGridId,
   });
   const [uploadError, setUploadError] = useState<string | null>(null);
+  /** O que impede de salvar, dito na própria tela (ver o rodapé do formulário). */
+  const [erroForm, setErroForm] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   /**
    * Enquanto ninguém encosta no seletor, a grade acompanha a categoria e o
@@ -1622,10 +1624,11 @@ function AdminEditModal() {
     }));
 
   const onSave = () => {
+    setErroForm(null);
     const name = form.name.trim();
-    if (!name) return alert("Informe o nome do produto.");
+    if (!name) return setErroForm("Informe o nome do produto.");
     const gallery = form.gallery.slice(0, MAX_PRODUCT_IMAGES);
-    if (!gallery.length) return alert("Envie ao menos uma foto do produto.");
+    if (!gallery.length) return setErroForm("Envie ao menos uma foto do produto.");
     const cover = gallery[0];
     // Preço tem de ser maior que zero.
     //
@@ -1636,7 +1639,7 @@ function AdminEditModal() {
     // barrar aqui, onde ainda dá para digitar o número certo.
     const price = Math.max(0, Number(form.price) || 0);
     if (price <= 0)
-      return alert("Informe o preço da peça — ela não pode ir para a vitrine sem preço.");
+      return setErroForm("Informe o preço da peça — ela não pode ir para a vitrine sem preço.");
     // Grava só os tamanhos que estavam na tela: assim uma peça que mudou de
     // grade não fica com "M: 0" perdido no banco para sempre.
     const stockObj: SizeStock = {};
@@ -1900,6 +1903,17 @@ function AdminEditModal() {
               </div>
             </div>
           </div>
+
+          {/* O que falta para salvar aparece junto do botão de salvar, e não
+              numa caixa cinza do navegador por cima de tudo. */}
+          {erroForm && (
+            <p
+              role="alert"
+              className="border-t border-destructive/40 bg-destructive/10 px-6 py-3 text-xs text-destructive"
+            >
+              {erroForm}
+            </p>
+          )}
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4">
             {!isCreate && product ? (
@@ -2763,6 +2777,7 @@ function ConfirmDialog({
   onConfirm,
   onCancel,
   busy,
+  erro,
 }: {
   open: boolean;
   title: string;
@@ -2770,6 +2785,8 @@ function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
   busy?: boolean;
+  /** Falha da última tentativa. A caixa fica aberta para tentar de novo. */
+  erro?: string | null;
 }) {
   if (!open) return null;
   return (
@@ -2782,6 +2799,14 @@ function ConfirmDialog({
           </p>
           <h3 className="mt-2 font-serif text-2xl">{title}</h3>
           <p className="mt-4 text-sm text-muted-foreground">{message}</p>
+          {erro && (
+            <p
+              role="alert"
+              className="mt-4 border border-destructive/40 bg-destructive/10 px-4 py-3 text-xs text-destructive"
+            >
+              {erro}
+            </p>
+          )}
           <div className="mt-8 flex justify-end gap-3">
             <button
               onClick={onCancel}
@@ -2908,6 +2933,8 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
     name: string;
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  /** Falha da última exclusão, mostrada dentro da própria caixa de confirmação. */
+  const [erroExclusao, setErroExclusao] = useState<string | null>(null);
   const deleteOrderFn = useServerFn(adminDeleteOrder);
   const deleteCustomerFn = useServerFn(adminDeleteCustomer);
 
@@ -2916,13 +2943,16 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
   const handleDeleteOrder = async () => {
     if (!confirmOrder || !isAdminUser) return;
     setDeleting(true);
+    setErroExclusao(null);
     try {
       await deleteOrderFn({ data: { orderNumber: confirmOrder } });
       await refreshOrders();
       setConfirmOrder(null);
     } catch (e) {
       console.error("[admin] delete order failed", e);
-      alert("Não foi possível excluir o pedido.");
+      // A caixa continua aberta com o aviso dentro: fechar e mostrar um
+      // `alert()` do navegador dava a impressão de que o pedido tinha sumido.
+      setErroExclusao("Não foi possível excluir o pedido. Tente de novo em instantes.");
     } finally {
       setDeleting(false);
     }
@@ -2931,6 +2961,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
   const handleDeleteCustomer = async () => {
     if (!confirmCustomer || !isAdminUser) return;
     setDeleting(true);
+    setErroExclusao(null);
     try {
       await deleteCustomerFn({
         data: { email: confirmCustomer.email, kind: confirmCustomer.kind },
@@ -2943,7 +2974,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
       setConfirmCustomer(null);
     } catch (e) {
       console.error("[admin] delete customer failed", e);
-      alert("Não foi possível excluir o cliente.");
+      setErroExclusao("Não foi possível excluir o cliente. Tente de novo em instantes.");
     } finally {
       setDeleting(false);
     }
@@ -3312,16 +3343,26 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
         title="Excluir pedido"
         message={`Tem certeza que deseja remover o pedido ${confirmOrder ?? ""} permanentemente? Esta ação não pode ser desfeita.`}
         onConfirm={handleDeleteOrder}
-        onCancel={() => !deleting && setConfirmOrder(null)}
+        onCancel={() => {
+          if (deleting) return;
+          setConfirmOrder(null);
+          setErroExclusao(null);
+        }}
         busy={deleting}
+        erro={erroExclusao}
       />
       <ConfirmDialog
         open={!!confirmCustomer}
         title="Excluir cliente"
         message={`Esta ação excluirá o cadastro de ${confirmCustomer?.name ?? ""} e todos os dados associados. Deseja prosseguir?`}
         onConfirm={handleDeleteCustomer}
-        onCancel={() => !deleting && setConfirmCustomer(null)}
+        onCancel={() => {
+          if (deleting) return;
+          setConfirmCustomer(null);
+          setErroExclusao(null);
+        }}
         busy={deleting}
+        erro={erroExclusao}
       />
     </>
   );
