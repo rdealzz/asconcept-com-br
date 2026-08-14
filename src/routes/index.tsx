@@ -80,11 +80,13 @@ import {
   SIZE_GRIDS,
   SIZE_GRID_LABELS,
   gridOfSizes,
+  ordenarTamanhos,
   sizesForProduct,
   suggestSizeGrid,
   type SizeGridId,
 } from "@/lib/sizes";
 import { collapseVariants, groupOf, productParam, swatchLabel } from "@/lib/variants";
+import { ORDENACOES, combinaBusca, ordenarProdutos, type Ordenacao } from "@/lib/busca";
 import { ColorSwatches } from "@/components/ColorSwatches";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -140,6 +142,19 @@ type SearchCtx = {
   setTab: (t: ProductCategory) => void;
   subFilter: SubFilter;
   setSubFilter: (s: SubFilter) => void;
+  /** Como a vitrine está ordenada (ver `@/lib/busca`). */
+  ordem: Ordenacao;
+  setOrdem: (o: Ordenacao) => void;
+  /** Tamanhos escolhidos no filtro. Vazio = todos. */
+  tamanhos: string[];
+  alternarTamanho: (t: string) => void;
+  /** Teto de preço, em reais. `null` = sem teto. */
+  precoMax: number | null;
+  setPrecoMax: (v: number | null) => void;
+  /** Zera tudo que refina a vitrine, menos a categoria. */
+  limparFiltros: () => void;
+  /** Quantos refinos estão ligados — o número que o botão de filtro exibe. */
+  filtrosAtivos: number;
 };
 const SearchContext = createContext<SearchCtx | null>(null);
 function SearchProvider({ children }: { children: React.ReactNode }) {
@@ -147,6 +162,23 @@ function SearchProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setOpen] = useState(false);
   const [tab, setTab] = useState<ProductCategory>("clothes");
   const [subFilter, setSubFilter] = useState<SubFilter>("todos");
+  const [ordem, setOrdem] = useState<Ordenacao>("curadoria");
+  const [tamanhos, setTamanhos] = useState<string[]>([]);
+  const [precoMax, setPrecoMax] = useState<number | null>(null);
+
+  const alternarTamanho = (t: string) =>
+    setTamanhos((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+
+  const limparFiltros = () => {
+    setSubFilter("todos");
+    setTamanhos([]);
+    setPrecoMax(null);
+    setOrdem("curadoria");
+  };
+
+  const filtrosAtivos =
+    (subFilter !== "todos" ? 1 : 0) + tamanhos.length + (precoMax !== null ? 1 : 0);
+
   return (
     <SearchContext.Provider
       value={{
@@ -159,6 +191,14 @@ function SearchProvider({ children }: { children: React.ReactNode }) {
         setTab,
         subFilter,
         setSubFilter,
+        ordem,
+        setOrdem,
+        tamanhos,
+        alternarTamanho,
+        precoMax,
+        setPrecoMax,
+        limparFiltros,
+        filtrosAtivos,
       }}
     >
       {children}
@@ -835,8 +875,38 @@ function matchesSub(name: string, description: string, sub: SubFilter) {
   return tipoDaPeca(name, description) === sub;
 }
 
+/** Uma ficha de filtro ligado, com o X que a desfaz. */
+function FichaDeFiltro({ rotulo, onRemover }: { rotulo: string; onRemover: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-2 border border-accent/50 bg-accent/5 px-3 py-1.5 text-xs">
+      <span className="font-serif italic">{rotulo}</span>
+      <button
+        onClick={onRemover}
+        aria-label={`Remover filtro ${rotulo}`}
+        className="text-muted-foreground transition-colors hover:text-accent"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </span>
+  );
+}
+
 function Products() {
-  const { query, setQuery, tab, subFilter, setSubFilter } = useSearch();
+  const {
+    query,
+    setQuery,
+    tab,
+    subFilter,
+    setSubFilter,
+    ordem,
+    setOrdem,
+    tamanhos,
+    alternarTamanho: alternar,
+    precoMax,
+    setPrecoMax,
+    limparFiltros,
+    filtrosAtivos,
+  } = useSearch();
   const { products, stock, groups, loading: catalogLoading, refresh: resetCatalog } = useCatalog();
   const { openCreate } = useProduct();
   const isAdmin = useIsAdmin();
@@ -844,7 +914,7 @@ function Products() {
   const copy = categoryCopy(tab);
 
   const base = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = query.trim();
     let inTab = products.filter((p) => coerceCategory(p.category) === tab);
     // Produtos sem estoque em nenhum tamanho somem da vitrine pública,
     // mas continuam visíveis para o admin (para repor estoque ou excluir).
@@ -854,14 +924,26 @@ function Products() {
     if (tab === "clothes" && subFilter !== "todos") {
       inTab = inTab.filter((p) => matchesSub(p.name, p.description, subFilter));
     }
+    // Filtro por tamanho: vale o que a peça TEM EM ESTOQUE naquele tamanho.
+    // Mostrar a peça porque a grade dela prevê "M" e deixar o cliente descobrir
+    // no clique que a M acabou é o pior dos dois mundos.
+    if (tamanhos.length) {
+      inTab = inTab.filter((p) => {
+        const grade = stock[p.id] ?? {};
+        return tamanhos.some((t) => (grade[t] ?? 0) > 0);
+      });
+    }
+    if (precoMax !== null) {
+      inTab = inTab.filter((p) => p.price <= precoMax);
+    }
     if (!q) return inTab;
     return inTab.filter(
       (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        (p.longDescription ?? "").toLowerCase().includes(q),
+        combinaBusca(p.name, q) ||
+        combinaBusca(p.description, q) ||
+        combinaBusca(p.longDescription ?? "", q),
     );
-  }, [query, products, tab, subFilter, isAdmin, stock]);
+  }, [query, products, tab, subFilter, isAdmin, stock, tamanhos, precoMax]);
 
   /**
    * A vitrine mostra um card por álbum, não um por cor.
@@ -873,10 +955,16 @@ function Products() {
    */
   const filtered = useMemo(() => {
     const buscando = query.trim().length > 0;
-    if (!buscando) return collapseVariants(base, groups);
-    const visiveis = new Set(base.map((p) => p.id));
-    return collapseVariants(base, groups, (g) => g.members.find((m) => visiveis.has(m.id)));
-  }, [base, groups, query]);
+    const cards = buscando
+      ? collapseVariants(base, groups, (g) => {
+          const visiveis = new Set(base.map((p) => p.id));
+          return g.members.find((m) => visiveis.has(m.id));
+        })
+      : collapseVariants(base, groups);
+    // A ordenação vem depois do agrupamento por cor: ordenar antes ordenaria
+    // as cores, e o que a vitrine mostra é um card por álbum.
+    return ordenarProdutos(cards, ordem);
+  }, [base, groups, query, ordem]);
 
   const showSneakersComingSoon = tab === "sneakers" && !isAdmin && base.length === 0;
 
@@ -911,19 +999,55 @@ function Products() {
             </div>
           )}
 
-          {subFilter !== "todos" && tab === "clothes" && (
-            <div className="mt-4 flex items-center gap-3 border border-accent/50 bg-accent/5 px-4 py-2 text-xs">
-              <span className="text-muted-foreground">Filtro:</span>
-              <span className="font-serif italic capitalize">
-                {SUB_OPTIONS.find((o) => o.id === subFilter)?.label ?? subFilter}
-              </span>
-              <button
-                onClick={() => setSubFilter("todos")}
-                className="ml-2 text-muted-foreground hover:text-accent"
-                aria-label="Limpar filtro"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+          {/* O que está ligado agora, em fichas que se desfazem uma a uma —
+              filtro que o cliente não vê é filtro que ele acha que é catálogo
+              vazio. */}
+          {filtrosAtivos > 0 && (
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              {subFilter !== "todos" && tab === "clothes" && (
+                <FichaDeFiltro
+                  rotulo={SUB_OPTIONS.find((o) => o.id === subFilter)?.label ?? subFilter}
+                  onRemover={() => setSubFilter("todos")}
+                />
+              )}
+              {tamanhos.map((t) => (
+                <FichaDeFiltro key={t} rotulo={`Tamanho ${t}`} onRemover={() => alternar(t)} />
+              ))}
+              {precoMax !== null && (
+                <FichaDeFiltro
+                  rotulo={`Até ${formatBRL(precoMax)}`}
+                  onRemover={() => setPrecoMax(null)}
+                />
+              )}
+              {filtrosAtivos > 1 && (
+                <button
+                  onClick={limparFiltros}
+                  className="px-2 text-[10px] tracking-luxe uppercase text-muted-foreground underline underline-offset-4 hover:text-accent"
+                >
+                  Limpar tudo
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Ordenação: some quando não há o que ordenar. */}
+          {filtered.length > 1 && (
+            <div className="mt-8 flex items-center gap-2 text-[10px] tracking-luxe uppercase">
+              <span className="text-muted-foreground">Ordenar</span>
+              {ORDENACOES.map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() => setOrdem(o.id)}
+                  aria-pressed={ordem === o.id}
+                  className={`border px-3 py-1.5 transition-colors ${
+                    ordem === o.id
+                      ? "border-accent text-accent"
+                      : "border-border text-muted-foreground hover:border-accent/50 hover:text-foreground"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
             </div>
           )}
 
@@ -2447,7 +2571,54 @@ const SUB_OPTIONS: { id: SubFilter; label: string }[] = [
 ];
 
 function FilterSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { subFilter, setSubFilter, tab, setTab } = useSearch();
+  const {
+    subFilter,
+    setSubFilter,
+    tab,
+    setTab,
+    tamanhos,
+    alternarTamanho,
+    precoMax,
+    setPrecoMax,
+    limparFiltros,
+    filtrosAtivos,
+  } = useSearch();
+  const { products, stock } = useCatalog();
+
+  /**
+   * Os tamanhos que a categoria aberta realmente tem em estoque.
+   *
+   * Lista fixa não serve: a grade muda com a espécie da peça (letras em roupa,
+   * número em calça e em sneaker, "Único" em acessório), e oferecer um tamanho
+   * que ninguém tem é mandar o cliente para uma vitrine vazia.
+   */
+  const tamanhosDisponiveis = useMemo(() => {
+    const encontrados = new Set<string>();
+    for (const p of products) {
+      if (coerceCategory(p.category) !== tab) continue;
+      for (const [tamanho, qtd] of Object.entries(stock[p.id] ?? {})) {
+        if (Number(qtd) > 0) encontrados.add(tamanho);
+      }
+    }
+    return ordenarTamanhos([...encontrados]);
+  }, [products, stock, tab]);
+
+  /**
+   * As faixas de preço, tiradas do próprio catálogo.
+   *
+   * Valores fixos ("até R$ 200") envelhecem junto com a tabela de preços e
+   * viram filtro que não devolve nada. Estes três degraus acompanham a peça
+   * mais cara da categoria, arredondados para uma dezena legível.
+   */
+  const faixasDePreco = useMemo(() => {
+    const precos = products
+      .filter((p) => coerceCategory(p.category) === tab && totalStock(stock[p.id]) > 0)
+      .map((p) => p.price);
+    if (precos.length < 2) return [];
+    const teto = Math.max(...precos);
+    const degrau = (fracao: number) => Math.ceil((teto * fracao) / 50) * 50;
+    return [...new Set([degrau(0.34), degrau(0.67), degrau(1)])].filter((v) => v > 0);
+  }, [products, stock, tab]);
 
   const irParaVitrine = () => {
     onClose();
@@ -2527,10 +2698,77 @@ function FilterSidebar({ open, onClose }: { open: boolean; onClose: () => void }
               </button>
             );
           })}
+
+          <p className="mt-6 px-4 pb-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
+            Tamanho
+          </p>
+          {/* Só os tamanhos que existem na categoria aberta, e só os que têm
+              peça: oferecer um filtro que devolve vitrine vazia é armadilha. */}
+          <div className="flex flex-wrap gap-2 px-4">
+            {tamanhosDisponiveis.length === 0 ? (
+              <span className="text-xs text-muted-foreground">
+                Nenhum tamanho disponível nesta categoria.
+              </span>
+            ) : (
+              tamanhosDisponiveis.map((t) => {
+                const ativo = tamanhos.includes(t);
+                return (
+                  <button
+                    key={t}
+                    onClick={() => alternarTamanho(t)}
+                    aria-pressed={ativo}
+                    className={`min-w-11 border px-3 py-2 text-xs transition-colors ${
+                      ativo
+                        ? "border-accent bg-accent/10 text-accent"
+                        : "border-border text-muted-foreground hover:border-accent/50 hover:text-foreground"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          <p className="mt-6 px-4 pb-2 text-[10px] tracking-luxe uppercase text-muted-foreground">
+            Até quanto
+          </p>
+          <div className="flex flex-wrap gap-2 px-4">
+            {faixasDePreco.map((v) => {
+              const ativo = precoMax === v;
+              return (
+                <button
+                  key={v}
+                  onClick={() => setPrecoMax(ativo ? null : v)}
+                  aria-pressed={ativo}
+                  className={`border px-3 py-2 text-xs transition-colors ${
+                    ativo
+                      ? "border-accent bg-accent/10 text-accent"
+                      : "border-border text-muted-foreground hover:border-accent/50 hover:text-foreground"
+                  }`}
+                >
+                  {formatBRL(v)}
+                </button>
+              );
+            })}
+          </div>
         </nav>
-        <p className="border-t border-border px-6 py-4 text-[10px] leading-relaxed text-muted-foreground">
-          Escolha uma categoria do catálogo ou refine a vitrine de Roupas por tipo de peça.
-        </p>
+
+        <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-4">
+          <p className="text-[10px] leading-relaxed text-muted-foreground">
+            {filtrosAtivos === 0
+              ? "Escolha uma categoria ou refine a vitrine."
+              : `${filtrosAtivos} ${filtrosAtivos === 1 ? "refino ligado" : "refinos ligados"}.`}
+          </p>
+          {filtrosAtivos > 0 && (
+            <button
+              onClick={limparFiltros}
+              className="whitespace-nowrap text-[10px] tracking-luxe uppercase text-accent underline underline-offset-4"
+            >
+              Limpar
+            </button>
+          )}
+        </div>
       </aside>
     </>
   );

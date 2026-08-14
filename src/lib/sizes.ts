@@ -79,7 +79,7 @@ const ORDEM_LETRAS = ["PP", "P", "M", "G", "GG", "XGG", "XXGG"];
  * sentido para quem compra. Letras saem na ordem de sempre, números em ordem
  * crescente e qualquer rótulo estranho fica no fim, sem sumir.
  */
-function ordenarTamanhos(lista: readonly string[]): string[] {
+export function ordenarTamanhos(lista: readonly string[]): string[] {
   const peso = (s: string): [number, number, string] => {
     const letra = ORDEM_LETRAS.indexOf(s.toUpperCase());
     if (letra >= 0) return [0, letra, s];
