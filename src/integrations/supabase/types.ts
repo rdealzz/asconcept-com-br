@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_notifications: {
+        Row: {
+          color_label: string | null
+          created_at: string
+          id: string
+          kind: string
+          message: string
+          order_number: string | null
+          payload: Json
+          previous_qty: number | null
+          product_id: string | null
+          product_name: string
+          read_at: string | null
+          requested_qty: number | null
+          size: string | null
+          sku: string | null
+        }
+        Insert: {
+          color_label?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          message: string
+          order_number?: string | null
+          payload?: Json
+          previous_qty?: number | null
+          product_id?: string | null
+          product_name?: string
+          read_at?: string | null
+          requested_qty?: number | null
+          size?: string | null
+          sku?: string | null
+        }
+        Update: {
+          color_label?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          message?: string
+          order_number?: string | null
+          payload?: Json
+          previous_qty?: number | null
+          product_id?: string | null
+          product_name?: string
+          read_at?: string | null
+          requested_qty?: number | null
+          size?: string | null
+          sku?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_notifications_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coupon_uses: {
         Row: {
           code: string
@@ -344,6 +403,45 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_ledger: {
+        Row: {
+          created_at: string
+          id: string
+          order_number: string | null
+          product_id: string | null
+          product_name: string | null
+          qty_after: number | null
+          qty_before: number | null
+          qty_requested: number
+          reason: string
+          size: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_number?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          qty_after?: number | null
+          qty_before?: number | null
+          qty_requested?: number
+          reason: string
+          size?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_number?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          qty_after?: number | null
+          qty_before?: number | null
+          qty_requested?: number
+          reason?: string
+          size?: string | null
+        }
+        Relationships: []
+      }
       suppressed_emails: {
         Row: {
           created_at: string
@@ -454,6 +552,7 @@ export type Database = {
           read_ct: number
         }[]
       }
+      reconcile_order_stock: { Args: never; Returns: number }
     }
     Enums: {
       app_role: "admin" | "user"
