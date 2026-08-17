@@ -10,13 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
-import { Route as SitemapXmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as CategoriaRouteImport } from './routes/$categoria'
 import { Route as TrocasRouteImport } from './routes/trocas'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as SustentabilidadeRouteImport } from './routes/sustentabilidade'
 import { Route as SucessoRouteImport } from './routes/sucesso'
 import { Route as SobreRouteImport } from './routes/sobre'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as FaqRouteImport } from './routes/faq'
@@ -24,6 +23,7 @@ import { Route as EnvioRouteImport } from './routes/envio'
 import { Route as CraftsmanshipRouteImport } from './routes/craftsmanship'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as AjustesRouteImport } from './routes/ajustes'
+import { Route as CategoriaRouteImport } from './routes/$categoria'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PedidosIndexRouteImport } from './routes/pedidos.index'
 import { Route as ProdutoIdRouteImport } from './routes/produto.$id'
@@ -57,16 +57,6 @@ const SustentabilidadeRoute = SustentabilidadeRouteImport.update({
   path: '/sustentabilidade',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SitemapXmlRoute = SitemapXmlRouteImport.update({
-  id: '/sitemap/xml',
-  path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CategoriaRoute = CategoriaRouteImport.update({
-  id: '/$categoria',
-  path: '/$categoria',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SucessoRoute = SucessoRouteImport.update({
   id: '/sucesso',
   path: '/sucesso',
@@ -75,6 +65,11 @@ const SucessoRoute = SucessoRouteImport.update({
 const SobreRoute = SobreRouteImport.update({
   id: '/sobre',
   path: '/sobre',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -110,6 +105,11 @@ const CheckoutRoute = CheckoutRouteImport.update({
 const AjustesRoute = AjustesRouteImport.update({
   id: '/ajustes',
   path: '/ajustes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CategoriaRoute = CategoriaRouteImport.update({
+  id: '/$categoria',
+  path: '/$categoria',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -179,6 +179,7 @@ const ApiPublicPaymentsMercadopagoRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$categoria': typeof CategoriaRoute
   '/ajustes': typeof AjustesRoute
   '/checkout': typeof CheckoutRoute
   '/craftsmanship': typeof CraftsmanshipRoute
@@ -186,9 +187,8 @@ export interface FileRoutesByFullPath {
   '/faq': typeof FaqRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sobre': typeof SobreRoute
-  '/$categoria': typeof CategoriaRoute
-  '/sitemap/xml': typeof SitemapXmlRoute
   '/sucesso': typeof SucessoRoute
   '/sustentabilidade': typeof SustentabilidadeRoute
   '/termos': typeof TermosRoute
@@ -208,6 +208,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$categoria': typeof CategoriaRoute
   '/ajustes': typeof AjustesRoute
   '/checkout': typeof CheckoutRoute
   '/craftsmanship': typeof CraftsmanshipRoute
@@ -215,9 +216,8 @@ export interface FileRoutesByTo {
   '/faq': typeof FaqRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sobre': typeof SobreRoute
-  '/$categoria': typeof CategoriaRoute
-  '/sitemap.xml': typeof SitemapXmlRoute
   '/sucesso': typeof SucessoRoute
   '/sustentabilidade': typeof SustentabilidadeRoute
   '/termos': typeof TermosRoute
@@ -238,6 +238,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/$categoria': typeof CategoriaRoute
   '/ajustes': typeof AjustesRoute
   '/checkout': typeof CheckoutRoute
   '/craftsmanship': typeof CraftsmanshipRoute
@@ -245,9 +246,8 @@ export interface FileRoutesById {
   '/faq': typeof FaqRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sobre': typeof SobreRoute
-  '/$categoria': typeof CategoriaRoute
-  '/sitemap.xml': typeof SitemapXmlRoute
   '/sucesso': typeof SucessoRoute
   '/sustentabilidade': typeof SustentabilidadeRoute
   '/termos': typeof TermosRoute
@@ -269,6 +269,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/$categoria'
     | '/ajustes'
     | '/checkout'
     | '/craftsmanship'
@@ -276,6 +277,7 @@ export interface FileRouteTypes {
     | '/faq'
     | '/privacidade'
     | '/reset-password'
+    | '/sitemap.xml'
     | '/sobre'
     | '/sucesso'
     | '/sustentabilidade'
@@ -296,6 +298,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/$categoria'
     | '/ajustes'
     | '/checkout'
     | '/craftsmanship'
@@ -303,6 +306,7 @@ export interface FileRouteTypes {
     | '/faq'
     | '/privacidade'
     | '/reset-password'
+    | '/sitemap.xml'
     | '/sobre'
     | '/sucesso'
     | '/sustentabilidade'
@@ -323,6 +327,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/$categoria'
     | '/ajustes'
     | '/checkout'
     | '/craftsmanship'
@@ -330,6 +335,7 @@ export interface FileRouteTypes {
     | '/faq'
     | '/privacidade'
     | '/reset-password'
+    | '/sitemap.xml'
     | '/sobre'
     | '/sucesso'
     | '/sustentabilidade'
@@ -351,6 +357,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CategoriaRoute: typeof CategoriaRoute
   AjustesRoute: typeof AjustesRoute
   CheckoutRoute: typeof CheckoutRoute
   CraftsmanshipRoute: typeof CraftsmanshipRoute
@@ -358,9 +365,8 @@ export interface RootRouteChildren {
   FaqRoute: typeof FaqRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SobreRoute: typeof SobreRoute
-  CategoriaRoute: typeof CategoriaRoute
-  SitemapXmlRoute: typeof SitemapXmlRoute
   SucessoRoute: typeof SucessoRoute
   SustentabilidadeRoute: typeof SustentabilidadeRoute
   TermosRoute: typeof TermosRoute
@@ -381,20 +387,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sitemap/xml': {
-      id: '/sitemap/xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapXmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/$categoria': {
-      id: '/$categoria'
-      path: '/$categoria'
-      fullPath: '/$categoria'
-      preLoaderRoute: typeof CategoriaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/unsubscribe': {
       id: '/unsubscribe'
       path: '/unsubscribe'
@@ -435,6 +427,13 @@ declare module '@tanstack/react-router' {
       path: '/sobre'
       fullPath: '/sobre'
       preLoaderRoute: typeof SobreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -484,6 +483,13 @@ declare module '@tanstack/react-router' {
       path: '/ajustes'
       fullPath: '/ajustes'
       preLoaderRoute: typeof AjustesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$categoria': {
+      id: '/$categoria'
+      path: '/$categoria'
+      fullPath: '/$categoria'
+      preLoaderRoute: typeof CategoriaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -575,6 +581,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CategoriaRoute: CategoriaRoute,
   AjustesRoute: AjustesRoute,
   CheckoutRoute: CheckoutRoute,
   CraftsmanshipRoute: CraftsmanshipRoute,
@@ -582,9 +589,8 @@ const rootRouteChildren: RootRouteChildren = {
   FaqRoute: FaqRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   SobreRoute: SobreRoute,
-  CategoriaRoute: CategoriaRoute,
-  SitemapXmlRoute: SitemapXmlRoute,
   SucessoRoute: SucessoRoute,
   SustentabilidadeRoute: SustentabilidadeRoute,
   TermosRoute: TermosRoute,
