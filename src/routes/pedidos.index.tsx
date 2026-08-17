@@ -20,7 +20,14 @@ import { useAuth, isMasterAdminEmail } from "@/lib/auth-context";
 import { useOrders } from "@/lib/orders-context";
 import { formatBRL } from "@/lib/cart-context";
 import { supabase } from "@/integrations/supabase/client";
-import { FLOW_STATUSES, isPrePaymentStatus, type Order, type OrderStatus } from "@/lib/types";
+import {
+  FLOW_STATUSES,
+  MANUAL_SALE_STATUS,
+  isManualSaleStatus,
+  isPrePaymentStatus,
+  type Order,
+  type OrderStatus,
+} from "@/lib/types";
 import { ContactStrip } from "@/components/ContactStrip";
 
 export const Route = createFileRoute("/pedidos/")({
@@ -75,6 +82,13 @@ const STATUS_META: Record<OrderStatus, { label: string; icon: string; className:
   },
   Entregue: {
     label: "Entregue",
+    icon: "✅",
+    className: "border-transparent bg-asc-gold text-asc-bg",
+  },
+  // Venda de balcão: entrou já concluída, com o estoque baixado. Divide o
+  // acabamento do "Entregue" porque é o mesmo fim de linha, por outro caminho.
+  Finalizado: {
+    label: "Finalizado",
     icon: "✅",
     className: "border-transparent bg-asc-gold text-asc-bg",
   },
@@ -559,6 +573,18 @@ function AdminOrdersList({ orders }: { orders: Order[] }) {
       icon: STATUS_META[s].icon,
       count: orders.filter((o) => o.status === s).length,
     }));
+    // Venda de balcão não é etapa do ateliê e não tem cartão fixo: só aparece
+    // quando existe alguma, para não sobrar um "0" no painel de quem vende
+    // apenas pelo site.
+    const finalizados = orders.filter((o) => isManualSaleStatus(o.status)).length;
+    if (finalizados > 0) {
+      cartoes.push({
+        key: MANUAL_SALE_STATUS,
+        label: STATUS_META[MANUAL_SALE_STATUS].label,
+        icon: STATUS_META[MANUAL_SALE_STATUS].icon,
+        count: finalizados,
+      });
+    }
     const naoPagos = orders.filter((o) => isPrePaymentStatus(o.status)).length;
     if (naoPagos > 0) {
       cartoes.push({ key: "nao-pagos", label: "Sem pagamento", icon: "◌", count: naoPagos });
@@ -664,6 +690,8 @@ function AdminOrderCard({ order }: { order: Order }) {
   const showTracking = order.status === "Em trânsito" || !!order.trackingCode;
 
   const naoPago = isPrePaymentStatus(order.status);
+  /** Venda registrada à mão: fechada de nascença, sem etapa antes nem depois. */
+  const vendaManual = isManualSaleStatus(order.status);
   const currentIndex = ALL_STATUSES.indexOf(order.status);
   const proximo = currentIndex >= 0 ? ALL_STATUSES[currentIndex + 1] : undefined;
 
@@ -867,6 +895,13 @@ function AdminOrderCard({ order }: { order: Order }) {
               <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
                 Use apenas se recebeu o valor por fora (Pix manual, transferência). O pedido entra
                 na fila de aprovação e o cliente recebe a confirmação por e-mail.
+              </p>
+            </div>
+          ) : vendaManual ? (
+            <div className="mt-2 rounded-md border border-[color:var(--gold)]/40 bg-[color:var(--gold)]/5 p-3">
+              <p className="text-xs leading-relaxed text-asc-ink">
+                Venda registrada manualmente e já concluída. O estoque foi baixado no cadastro — não
+                há etapa a avançar.
               </p>
             </div>
           ) : (

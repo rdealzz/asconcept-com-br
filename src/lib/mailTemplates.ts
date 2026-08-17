@@ -156,6 +156,10 @@ export function statusUpdateTemplate(
     "Preparando pedido": "Nosso ateliê está preparando cuidadosamente cada peça do seu pedido.",
     "Em trânsito": "Suas peças partiram do ateliê e estão a caminho do endereço informado.",
     Entregue: "Seu pedido foi entregue. Que seja vestido com prazer.",
+    // Venda de balcão. Nenhum e-mail é disparado para ela — o pedido nasce
+    // fechado e não muda de status —, mas a frase existe para o dia em que o
+    // ateliê quiser mandar um comprovante da compra presencial.
+    Finalizado: "Sua compra foi registrada e concluída. Que seja vestida com prazer.",
   };
   const trackBlock = trackingCode
     ? `<div style="margin:24px 0;padding:16px;border:1px dashed ${BRAND.gold};background:${BRAND.ivory};">

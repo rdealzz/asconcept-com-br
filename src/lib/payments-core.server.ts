@@ -13,6 +13,7 @@ import {
   type CardInput,
   type PendingOrderInput,
 } from "@/lib/payments-validators";
+import { MANUAL_SALE_STATUS } from "@/lib/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -40,13 +41,16 @@ type OrderRow = {
   items: unknown;
 };
 
-// Etapas que só existem depois do pagamento confirmado.
-const PAID_STATUSES = new Set(["Preparando pedido", "Em trânsito", "Entregue"]);
+// Etapas que só existem depois do pagamento confirmado. "Finalizado" entra
+// aqui porque a venda de balcão é registrada depois de o dinheiro ter entrado:
+// oferecer cobrança para ela seria cobrar duas vezes pela mesma peça.
+const PAID_STATUSES = new Set(["Preparando pedido", "Em trânsito", "Entregue", MANUAL_SALE_STATUS]);
 
 /**
- * Um pedido está pago quando já avançou no fluxo do ateliê ou quando está em
- * "Aguardando Aprovação" com um pagamento aprovado registrado no Mercado Pago
- * (pedidos manuais nascem nesse status sem pagamento e não contam).
+ * Um pedido está pago quando já avançou no fluxo do ateliê, quando é venda de
+ * balcão já registrada, ou quando está em "Aguardando Aprovação" com um
+ * pagamento aprovado no Mercado Pago (só o "Aguardando Aprovação" seco, sem
+ * pagamento, não conta).
  */
 function isOrderPaid(order: { status: string; mp_status: string | null }): boolean {
   if (PAID_STATUSES.has(order.status)) return true;
@@ -126,7 +130,10 @@ export async function persistPayment(
   const jaNoAtelie =
     statusAtual === "Preparando pedido" ||
     statusAtual === "Em trânsito" ||
-    statusAtual === "Entregue";
+    statusAtual === "Entregue" ||
+    // Venda de balcão: fechada de nascença, e nenhuma notificação de pagamento
+    // tem o direito de reabri-la.
+    statusAtual === MANUAL_SALE_STATUS;
 
   const patch: Record<string, unknown> = {
     mp_payment_id: String(payment.id),

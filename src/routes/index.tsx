@@ -3128,6 +3128,7 @@ const ROTULO_STATUS: Record<string, string> = {
   "Preparando pedido": "Preparando Pedido",
   "Em trânsito": "Em Trânsito",
   Entregue: "Entregue",
+  Finalizado: "Finalizado",
 };
 
 /**
@@ -3137,6 +3138,9 @@ const ROTULO_STATUS: Record<string, string> = {
  * e um `<select>` com as quatro etapas convidava o admin a escolher algo que
  * seria rejeitado. Pedido sem pagamento confirmado só tem um caminho —
  * confirmar o pagamento — e é isso que aparece.
+ *
+ * Venda de balcão ("Finalizado") não tem caminho nenhum: nasceu concluída, com
+ * o estoque já baixado, e o seletor fica travado nela.
  */
 function StatusSelect({
   order,
@@ -3199,8 +3203,8 @@ type ManualCustomerRow = {
 
 function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, listCustomers, refreshCustomers } = useAuth();
-  const { orders, updateStatus, createOrder, refresh: refreshOrders } = useOrders();
-  const { products, groups, refreshStock } = useCatalog();
+  const { orders, updateStatus, createManualOrder, refresh: refreshOrders } = useOrders();
+  const { products, stock, groups, refreshStock } = useCatalog();
   const [tab, setTab] = useState<
     "calc" | "pedidos" | "clientes" | "produtos" | "variacoes" | "avisos"
   >("pedidos");
@@ -3209,6 +3213,8 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
   const [newsletter, setNewsletter] = useState<NewsletterRow[]>([]);
   const [manual, setManual] = useState<ManualCustomerRow[]>([]);
   const [showManualOrder, setShowManualOrder] = useState(false);
+  /** Confirmação da última venda de balcão registrada. */
+  const [avisoPedido, setAvisoPedido] = useState<string | null>(null);
   const [showManualCustomer, setShowManualCustomer] = useState(false);
   const [confirmOrder, setConfirmOrder] = useState<string | null>(null);
   const [confirmCustomer, setConfirmCustomer] = useState<{
@@ -3381,6 +3387,18 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                     <Plus className="h-3 w-3" /> Adicionar Novo Pedido Manualmente
                   </button>
                 </div>
+                {avisoPedido && (
+                  <div className="mb-5 flex items-start justify-between gap-3 border border-accent/40 bg-accent/5 px-4 py-3">
+                    <p className="text-xs leading-relaxed text-asc-ink">{avisoPedido}</p>
+                    <button
+                      onClick={() => setAvisoPedido(null)}
+                      aria-label="Dispensar aviso"
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" strokeWidth={1.5} />
+                    </button>
+                  </div>
+                )}
                 {orders.length === 0 ? (
                   <p className="border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
                     Nenhum pedido registrado no momento.
@@ -3604,13 +3622,22 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
       {showManualOrder && (
         <ManualOrderModal
           products={products}
+          stock={stock}
           customers={customers.map((c) => ({
             email: c.email,
             name: c.name ?? c.email.split("@")[0],
           }))}
           onClose={() => setShowManualOrder(false)}
-          onSaved={() => setShowManualOrder(false)}
-          createOrder={createOrder}
+          onSaved={async (orderNumber) => {
+            setShowManualOrder(false);
+            // O estoque acabou de cair no banco; sem reler, a vitrine e o
+            // próprio formulário continuariam mostrando a peça que saiu.
+            await refreshStock();
+            setAvisoPedido(
+              `Pedido ${orderNumber} registrado como venda concluída — estoque atualizado.`,
+            );
+          }}
+          createManualOrder={createManualOrder}
         />
       )}
       {showManualCustomer && (
@@ -4387,16 +4414,19 @@ const emCentavos = (n: number) => Math.round(n * 100) / 100;
 
 function ManualOrderModal({
   products,
+  stock,
   customers,
   onClose,
   onSaved,
-  createOrder,
+  createManualOrder,
 }: {
   products: Product[];
+  /** Grade de cada peça, por id — o que ainda há para vender no balcão. */
+  stock: Record<string, SizeStock>;
   customers: { email: string; name: string }[];
   onClose: () => void;
-  onSaved: () => void;
-  createOrder: ReturnType<typeof useOrders>["createOrder"];
+  onSaved: (orderNumber: string) => void | Promise<void>;
+  createManualOrder: ReturnType<typeof useOrders>["createManualOrder"];
 }) {
   const [customerEmail, setCustomerEmail] = useState(customers[0]?.email ?? "");
   const [customerName, setCustomerName] = useState(customers[0]?.name ?? "");
@@ -4428,6 +4458,17 @@ function ManualOrderModal({
     return grade.includes(l.size) ? l.size : (grade[0] ?? "");
   };
 
+  /**
+   * Quanto resta da peça no tamanho escolhido, ou `null` quando a peça não tem
+   * grade cadastrada — aí não há o que conferir, e dizer "esgotado" seria
+   * mentira sobre um cadastro antigo que ainda vende.
+   */
+  const disponivelNaLinha = (l: LinhaManual): number | null => {
+    const grade = stock[l.productId];
+    if (!grade || Object.keys(grade).length === 0) return null;
+    return Math.max(0, grade[tamanhoDaLinha(l)] ?? 0);
+  };
+
   const alterarLinha = (key: string, patch: Partial<LinhaManual>) =>
     setLinhas((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
@@ -4457,6 +4498,21 @@ function ManualOrderModal({
       setErr("A mesma peça no mesmo tamanho está repetida — some na quantidade.");
       return;
     }
+    // A venda de balcão baixa o estoque na hora de gravar, então o que não cabe
+    // no estoque não vira pedido. A conferência de verdade é do servidor, com o
+    // estoque lido no momento da gravação; esta aqui é só para o admin não
+    // descobrir o problema depois de preencher a nota inteira.
+    const semEstoque = linhas
+      .map((l) => ({ l, resta: disponivelNaLinha(l) }))
+      .filter(({ l, resta }) => resta !== null && l.qty > resta)
+      .map(({ l, resta }) => {
+        const nome = produtoDaLinha(l)?.name ?? "peça";
+        return `${nome} (${tamanhoDaLinha(l)}): ${resta} em estoque, pedido ${l.qty}`;
+      });
+    if (semEstoque.length) {
+      setErr(`Estoque insuficiente — ${semEstoque.join("; ")}.`);
+      return;
+    }
     // O e-mail continua obrigatório porque a coluna do banco é NOT NULL, e é
     // por ele que o pedido encontra o cliente depois. O nome é livre: é rótulo
     // de tela, e um pedido de balcão pode não ter mais do que um primeiro nome.
@@ -4470,32 +4526,19 @@ function ManualOrderModal({
     }
     setSaving(true);
     try {
-      await createOrder({
+      const { orderNumber } = await createManualOrder({
         customerEmail: email,
         customerName: nome || undefined,
-        items: resolvidas.map(({ linha, produto, tamanho }) => ({
-          id: produto?.id ?? linha.productId,
-          name: produto?.name ?? "",
-          // A tela negocia o valor da peça inteira; o pedido guarda o unitário.
-          price: emCentavos(linha.valor / Math.max(1, linha.qty)),
-          image: produto?.image ?? "",
-          quantity: linha.qty,
+        items: resolvidas.map(({ linha, tamanho }) => ({
+          id: linha.productId,
           size: tamanho,
+          quantity: linha.qty,
+          // O servidor divide pelo número de peças para gravar o unitário —
+          // aqui vai o que foi negociado pela linha inteira.
+          valor: emCentavos(linha.valor),
         })),
-        address: {
-          cep: "",
-          logradouro: "",
-          numero: "",
-          bairro: "",
-          cidade: "",
-          uf: "",
-        },
-        shippingCost: 0,
-        subtotal: Number(total),
-        total: Number(total),
-        paymentMethod: "pix",
       });
-      onSaved();
+      await onSaved(orderNumber);
     } catch (e) {
       setErr((e as Error).message ?? "Falha ao salvar pedido.");
     } finally {
@@ -4517,6 +4560,12 @@ function ManualOrderModal({
           </button>
           <p className="text-[11px] tracking-luxe uppercase text-accent">Registrar venda</p>
           <h3 className="mt-1 font-serif text-2xl">Novo Pedido Manual</h3>
+          {/* O que este formulário faz, dito antes de o admin preencher: é
+              registro de venda concluída, não abertura de pedido. */}
+          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+            Venda já concluída (balcão, feira, WhatsApp). O pedido é gravado como{" "}
+            <span className="text-asc-ink">Finalizado</span> e as peças saem do estoque na hora.
+          </p>
 
           <div className="mt-6 space-y-4">
             {/* A lista some quando não há ninguém cadastrado: um seletor com uma
@@ -4595,6 +4644,8 @@ function ManualOrderModal({
               {linhas.map((linha, i) => {
                 const tamanhos = tamanhosDaLinha(linha);
                 const tamanhoAtual = tamanhoDaLinha(linha);
+                const resta = disponivelNaLinha(linha);
+                const grade = stock[linha.productId];
                 return (
                   <div key={linha.key} className="border border-border p-3 space-y-3">
                     <div className="flex items-center justify-between">
@@ -4646,11 +4697,17 @@ function ManualOrderModal({
                           onChange={(e) => alterarLinha(linha.key, { size: e.target.value })}
                           className="mt-1 w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
                         >
-                          {tamanhos.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
+                          {tamanhos.map((s) => {
+                            // Quanto há de cada tamanho, na própria lista: no
+                            // balcão a pergunta "tem no M?" vem antes de tudo.
+                            const q = grade && Object.keys(grade).length ? (grade[s] ?? 0) : null;
+                            return (
+                              <option key={s} value={s}>
+                                {s}
+                                {q === null ? "" : q > 0 ? ` · ${q} em estoque` : " · esgotado"}
+                              </option>
+                            );
+                          })}
                         </select>
                       </label>
                       <label className="block">
@@ -4671,6 +4728,17 @@ function ManualOrderModal({
                           }}
                           className="mt-1 w-full border border-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent"
                         />
+                        {resta !== null && (
+                          <span
+                            className={`mt-1 block text-[10px] leading-relaxed ${
+                              linha.qty > resta ? "text-destructive" : "text-muted-foreground"
+                            }`}
+                          >
+                            {resta > 0
+                              ? `${resta} em estoque no tamanho ${tamanhoAtual}`
+                              : `Sem estoque no tamanho ${tamanhoAtual}`}
+                          </span>
+                        )}
                       </label>
                     </div>
 

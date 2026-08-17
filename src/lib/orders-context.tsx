@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./auth-context";
-import { adminUpdateOrderStatus } from "./admin.functions";
+import { adminCreateManualOrder, adminUpdateOrderStatus } from "./admin.functions";
 import {
   isFlowStatus,
+  isManualSaleStatus,
   isPrePaymentStatus,
   type CheckoutAddress,
   type Order,
@@ -12,21 +13,28 @@ import {
   type PaymentMethod,
 } from "./types";
 
+/** Uma peça da venda de balcão, com o valor já negociado. */
+export type ItemManual = {
+  id: string;
+  size: string;
+  quantity: number;
+  /** Valor da linha inteira — com a quantidade dentro, não o unitário. */
+  valor: number;
+};
+
 type OrdersCtx = {
   orders: Order[];
   loading: boolean;
-  createOrder: (input: {
+  /**
+   * Registra uma venda feita fora da loja. O pedido nasce "Finalizado" e o
+   * estoque cai na hora — quem faz as duas coisas é o servidor, porque a baixa
+   * exige a chave de serviço e as duas precisam acontecer juntas ou nenhuma.
+   */
+  createManualOrder: (input: {
     customerEmail: string;
     customerName?: string;
-    items: OrderItem[];
-    address: CheckoutAddress;
-    shippingCost: number;
-    subtotal: number;
-    total: number;
-    paymentMethod: PaymentMethod;
-    couponCode?: string | null;
-    discount?: number;
-  }) => Promise<Order>;
+    items: ItemManual[];
+  }) => Promise<{ orderNumber: string }>;
   updateStatus: (id: string, status: OrderStatus, trackingCode?: string) => Promise<void>;
   setTrackingCode: (id: string, trackingCode: string) => Promise<void>;
   byUser: (email: string) => Order[];
@@ -71,7 +79,7 @@ function rowToOrder(r: Row): Order {
 }
 
 function normalizeStatus(s: string): OrderStatus {
-  if (isFlowStatus(s) || isPrePaymentStatus(s)) return s;
+  if (isFlowStatus(s) || isPrePaymentStatus(s) || isManualSaleStatus(s)) return s;
   // Status desconhecido vindo do banco: trata como anterior ao pagamento, que é
   // o lado seguro — nunca como "pronto para aprovar".
   return "Aguardando Pagamento";
@@ -104,38 +112,14 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const createOrder: OrdersCtx["createOrder"] = async (o) => {
+  const createManualOrder: OrdersCtx["createManualOrder"] = async (o) => {
     if (!user) throw new Error("Não autenticado.");
-    const rand = Math.floor(100000 + Math.random() * 900000);
-    const orderNumber = `AS-${rand}`;
-    const payload = {
-      order_number: orderNumber,
-      user_id: user.id,
-      customer_email: o.customerEmail,
-      customer_name: o.customerName ?? null,
-      items: o.items as unknown,
-      address: o.address as unknown,
-      shipping_cost: o.shippingCost,
-      subtotal: o.subtotal,
-      total: o.total,
-      payment_method: o.paymentMethod,
-      // Todo pedido nasce aguardando aprovação — inclusive o que o admin cria à
-      // mão. Quem tira o pedido daqui é o botão de avançar etapa no painel, que
-      // é também o ponto onde o estoque baixa. Antes o cadastro manual entrava
-      // já em "Preparando pedido", pulando a aprovação e a baixa.
-      status: "Aguardando Aprovação" satisfies OrderStatus,
-      coupon_code: o.couponCode ?? null,
-      discount: o.discount ?? 0,
-    };
-    const { data, error } = await supabase
-      .from("orders")
-      .insert(payload as never)
-      .select("*")
-      .single();
-    if (error || !data) throw error ?? new Error("Falha ao criar pedido.");
-    const order = rowToOrder(data as Row);
-    setOrders((prev) => [order, ...prev]);
-    return order;
+    const { orderNumber } = await adminCreateManualOrder({ data: o });
+    // A lista vem do banco em vez de ser remendada aqui: a venda de balcão
+    // mexe em estoque e em pedido na mesma ida, e o que o servidor gravou é a
+    // única versão que interessa.
+    await refresh();
+    return { orderNumber };
   };
 
   const updateStatus: OrdersCtx["updateStatus"] = async (id, status, trackingCode) => {
@@ -171,7 +155,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
       value={{
         orders,
         loading,
-        createOrder,
+        createManualOrder,
         updateStatus,
         setTrackingCode,
         byUser,

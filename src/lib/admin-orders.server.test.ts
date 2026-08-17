@@ -126,6 +126,22 @@ describe("avanço de status do pedido", () => {
     ).rejects.toThrow(/retroceder/i);
   });
 
+  test("venda de balcão não avança nem volta — e não baixa estoque de novo", async () => {
+    const { client, chamadas } = fakeSupabase({
+      ...base,
+      status: "Finalizado",
+      stock_decremented: true,
+    });
+    await expect(
+      updateAdminOrderStatusCore(client as never, {
+        orderNumber: "AS-100001",
+        status: "Aguardando Aprovação",
+      }),
+    ).rejects.toThrow(/venda concluída/i);
+    expect(chamadas.rpc).toEqual([]);
+    expect(chamadas.updates).toEqual([]);
+  });
+
   test("pagamento recusado também só volta pela confirmação manual", async () => {
     const { client } = fakeSupabase({ ...base, status: "Pagamento recusado" });
     await expect(

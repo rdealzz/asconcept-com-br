@@ -49,9 +49,24 @@ export const FLOW_STATUSES = [
   "Entregue",
 ] as const;
 
+/**
+ * Venda fechada fora da loja — balcão, feira, WhatsApp.
+ *
+ * Fica de fora de `FLOW_STATUSES` de propósito: não é uma quinta etapa do
+ * ateliê, é a ausência de etapas. O pedido manual nasce aqui porque a peça já
+ * trocou de mãos e o dinheiro já entrou; passá-lo por "Aguardando Aprovação →
+ * Preparando pedido → Em trânsito → Entregue" seria pedir ao admin que
+ * encenasse quatro cliques para uma venda que acabou antes de ser cadastrada.
+ *
+ * Como está fora do fluxo, o painel não oferece próximo passo e o servidor
+ * recusa qualquer mudança de status: pedido finalizado é ponto final.
+ */
+export const MANUAL_SALE_STATUS = "Finalizado" as const;
+
 export type PrePaymentStatus = (typeof PRE_PAYMENT_STATUSES)[number];
 export type FlowStatus = (typeof FLOW_STATUSES)[number];
-export type OrderStatus = PrePaymentStatus | FlowStatus;
+export type ManualSaleStatus = typeof MANUAL_SALE_STATUS;
+export type OrderStatus = PrePaymentStatus | FlowStatus | ManualSaleStatus;
 
 export function isPrePaymentStatus(s: string): s is PrePaymentStatus {
   return (PRE_PAYMENT_STATUSES as readonly string[]).includes(s);
@@ -59,6 +74,11 @@ export function isPrePaymentStatus(s: string): s is PrePaymentStatus {
 
 export function isFlowStatus(s: string): s is FlowStatus {
   return (FLOW_STATUSES as readonly string[]).includes(s);
+}
+
+/** Venda de balcão já concluída — não avança, não retrocede. */
+export function isManualSaleStatus(s: string): s is ManualSaleStatus {
+  return s === MANUAL_SALE_STATUS;
 }
 
 export interface Order {
