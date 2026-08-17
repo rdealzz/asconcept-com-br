@@ -3381,7 +3381,14 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                     {orders.length} pedidos registrados
                   </p>
                   <button
-                    onClick={() => setShowManualOrder(true)}
+                    onClick={() => {
+                      setAvisoPedido(null);
+                      setShowManualOrder(true);
+                      // O formulário recusa o que não cabe no estoque, então ele
+                      // precisa abrir com o número de agora — e não com o que
+                      // este navegador leu na última vez que olhou a vitrine.
+                      void refreshStock();
+                    }}
                     className="inline-flex items-center gap-1.5 asc-btn-primary px-3 py-1.5 text-[10px] tracking-luxe uppercase"
                   >
                     <Plus className="h-3 w-3" /> Adicionar Novo Pedido Manualmente

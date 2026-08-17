@@ -68,10 +68,16 @@ const emCentavos = (n: number) => Math.round(n * 100) / 100;
  */
 function funcaoInexistente(erro: unknown): boolean {
   const e = erro as { code?: string; message?: string } | null;
+  const msg = e?.message ?? "";
   return (
+    // PostgREST não achou a rotina no cache do schema; Postgres não achou a
+    // função. O texto só entra como reserva, e amarrado ao nome da função:
+    // um "does not exist" solto casaria também com "relation ... does not
+    // exist", e aí um banco quebrado viraria baixa pela função frouxa.
     e?.code === "PGRST202" ||
     e?.code === "42883" ||
-    /could not find the function|does not exist/i.test(e?.message ?? "")
+    /could not find the function/i.test(msg) ||
+    /consume_order_stock_strict[^\n]*does not exist/i.test(msg)
   );
 }
 
@@ -229,9 +235,27 @@ export async function createManualOrderCore(
       return concluir(orderNumber, orderItems.length, total);
     }
 
-    await supabaseAdmin.from("orders").delete().eq("order_number", orderNumber);
+    const { error: erroAoApagar } = await supabaseAdmin
+      .from("orders")
+      .delete()
+      .eq("order_number", orderNumber);
+
     const recusa = mensagemDoBanco(error);
     if (!recusa) console.error(`[admin] baixa de estoque recusada no pedido ${orderNumber}`, error);
+
+    // Recusa que não pôde ser desfeita: o pedido ficou gravado sem baixa. Dizer
+    // "não foi registrado" aqui seria mentira — e uma mentira que esconde uma
+    // linha de venda no painel.
+    if (erroAoApagar) {
+      console.error(
+        `[admin] pedido ${orderNumber} ficou gravado sem baixa de estoque — precisa ser excluído à mão`,
+        erroAoApagar,
+      );
+      throw new Error(
+        `${recusa ?? "O estoque não pôde ser baixado."} O pedido ${orderNumber} ficou gravado sem baixa — exclua-o na lista antes de tentar de novo.`,
+      );
+    }
+
     throw new Error(
       recusa ?? "O estoque não pôde ser baixado, então o pedido não foi registrado. Tente de novo.",
     );

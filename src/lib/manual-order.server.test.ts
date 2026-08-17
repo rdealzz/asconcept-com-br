@@ -14,6 +14,8 @@ type Cenario = {
   rpc?: (nome: string) => { code?: string; message?: string } | null;
   /** O que a releitura do pedido devolve depois de uma baixa que falhou. */
   baixouMesmoAssim?: boolean;
+  /** O DELETE de desfazer também falha. */
+  falhaAoApagar?: boolean;
   perfil?: { id: string } | null;
 };
 
@@ -54,7 +56,7 @@ function fakeSupabase(c: Cenario) {
           return {
             eq: async (_coluna: string, valor: string) => {
               chamadas.deleted.push(valor);
-              return { error: null };
+              return { error: c.falhaAoApagar ? { message: "conexão caiu" } : null };
             },
           };
         },
@@ -176,6 +178,41 @@ describe("cadastro manual de pedido", () => {
     ).rejects.toThrow(/Estoque insuficiente/);
 
     expect(chamadas.inserted).toHaveLength(1);
+    expect(chamadas.deleted).toHaveLength(1);
+  });
+
+  test("recusa que não pôde ser desfeita avisa que o pedido ficou de pé", async () => {
+    const { client, chamadas } = fakeSupabase({
+      produtos: [bone],
+      rpc: () => ({ message: "Estoque insuficiente: sem peça." }),
+      falhaAoApagar: true,
+    });
+    await expect(
+      createManualOrderCore(client as never, {
+        ...cliente,
+        items: [{ id: bone.id, size: "Único", quantity: 1, valor: 219.9 }],
+      }),
+      // Dizer "não foi registrado" com a linha ainda na tabela esconderia uma
+      // venda no painel.
+    ).rejects.toThrow(/ficou gravado sem baixa/i);
+    expect(chamadas.deleted).toHaveLength(1);
+  });
+
+  test("erro de banco que não é função ausente NÃO cai na baixa frouxa", async () => {
+    const { client, chamadas } = fakeSupabase({
+      produtos: [camisa],
+      // "does not exist" aparece em erro de tabela também; só o nome da função
+      // (ou o código do PostgREST) autoriza a segunda tentativa.
+      rpc: () => ({ code: "42P01", message: 'relation "public.stock_ledger" does not exist' }),
+    });
+    await expect(
+      createManualOrderCore(client as never, {
+        ...cliente,
+        items: [{ id: camisa.id, size: "M", quantity: 1, valor: 399 }],
+      }),
+    ).rejects.toThrow(/não pôde ser baixado/i);
+
+    expect(chamadas.rpc).toEqual(["consume_order_stock_strict"]);
     expect(chamadas.deleted).toHaveLength(1);
   });
 
