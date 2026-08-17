@@ -126,7 +126,7 @@ describe("avanço de status do pedido", () => {
     ).rejects.toThrow(/retroceder/i);
   });
 
-  test("venda de balcão não avança nem volta — e não baixa estoque de novo", async () => {
+  test("pedido finalizado não avança nem volta — e não baixa estoque de novo", async () => {
     const { client, chamadas } = fakeSupabase({
       ...base,
       status: "Finalizado",
@@ -137,9 +137,26 @@ describe("avanço de status do pedido", () => {
         orderNumber: "AS-100001",
         status: "Aguardando Aprovação",
       }),
-    ).rejects.toThrow(/venda concluída/i);
+    ).rejects.toThrow(/já está finalizado/i);
     expect(chamadas.rpc).toEqual([]);
     expect(chamadas.updates).toEqual([]);
+  });
+
+  test("pedido do site fecha em Finalizado depois de entregue, sem e-mail novo", async () => {
+    const { client, chamadas } = fakeSupabase({
+      ...base,
+      status: "Entregue",
+      stock_decremented: true,
+      delivered_mail_sent: true,
+    });
+    await updateAdminOrderStatusCore(client as never, {
+      orderNumber: "AS-100001",
+      status: "Finalizado",
+    });
+    expect(chamadas.updates[0]!.status).toBe("Finalizado");
+    // Fechar a pasta não é notícia para o cliente: ele já recebeu o "entregue".
+    expect(emails).toEqual([]);
+    expect(chamadas.rpc).toEqual([]);
   });
 
   test("pagamento recusado também só volta pela confirmação manual", async () => {

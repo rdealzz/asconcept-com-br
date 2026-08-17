@@ -4,9 +4,10 @@ import { useAuth } from "./auth-context";
 import { adminCreateManualOrder, adminUpdateOrderStatus } from "./admin.functions";
 import {
   isFlowStatus,
-  isManualSaleStatus,
   isPrePaymentStatus,
+  orderOrigin,
   type CheckoutAddress,
+  type FlowStatus,
   type Order,
   type OrderItem,
   type OrderStatus,
@@ -26,15 +27,19 @@ type OrdersCtx = {
   orders: Order[];
   loading: boolean;
   /**
-   * Registra uma venda feita fora da loja. O pedido nasce "Finalizado" e o
-   * estoque cai na hora — quem faz as duas coisas é o servidor, porque a baixa
-   * exige a chave de serviço e as duas precisam acontecer juntas ou nenhuma.
+   * Registra uma venda feita fora da loja.
+   *
+   * O status inicial é escolha de quem cadastra — "Finalizado" no caso comum,
+   * em que a peça já saiu com o cliente. Quem grava é o servidor: a baixa de
+   * estoque exige a chave de serviço, e ela e a gravação precisam acontecer
+   * juntas ou nenhuma.
    */
   createManualOrder: (input: {
     customerEmail: string;
     customerName?: string;
     items: ItemManual[];
-  }) => Promise<{ orderNumber: string }>;
+    status?: FlowStatus;
+  }) => Promise<{ orderNumber: string; status: FlowStatus; stockConsumed: boolean }>;
   updateStatus: (id: string, status: OrderStatus, trackingCode?: string) => Promise<void>;
   setTrackingCode: (id: string, trackingCode: string) => Promise<void>;
   byUser: (email: string) => Order[];
@@ -59,6 +64,10 @@ type Row = {
   status: string;
   tracking_code: string | null;
   created_at: string;
+  /** Colunas do Mercado Pago e a origem: ausentes em banco mais antigo. */
+  mp_payment_id?: string | null;
+  mp_status?: string | null;
+  origin?: string | null;
 };
 
 function rowToOrder(r: Row): Order {
@@ -73,13 +82,16 @@ function rowToOrder(r: Row): Order {
     total: Number(r.total),
     paymentMethod: r.payment_method as PaymentMethod,
     status: normalizeStatus(r.status),
+    // A leitura é `select("*")`, então a coluna nova entra sozinha assim que a
+    // migração roda; até lá, `orderOrigin` deduz pelo pagamento e pelo endereço.
+    origin: orderOrigin(r),
     trackingCode: r.tracking_code ?? undefined,
     createdAt: r.created_at,
   };
 }
 
 function normalizeStatus(s: string): OrderStatus {
-  if (isFlowStatus(s) || isPrePaymentStatus(s) || isManualSaleStatus(s)) return s;
+  if (isFlowStatus(s) || isPrePaymentStatus(s)) return s;
   // Status desconhecido vindo do banco: trata como anterior ao pagamento, que é
   // o lado seguro — nunca como "pronto para aprovar".
   return "Aguardando Pagamento";
@@ -114,12 +126,12 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
 
   const createManualOrder: OrdersCtx["createManualOrder"] = async (o) => {
     if (!user) throw new Error("Não autenticado.");
-    const { orderNumber } = await adminCreateManualOrder({ data: o });
+    const { orderNumber, status, stockConsumed } = await adminCreateManualOrder({ data: o });
     // A lista vem do banco em vez de ser remendada aqui: a venda de balcão
     // mexe em estoque e em pedido na mesma ida, e o que o servidor gravou é a
     // única versão que interessa.
     await refresh();
-    return { orderNumber };
+    return { orderNumber, status, stockConsumed };
   };
 
   const updateStatus: OrdersCtx["updateStatus"] = async (id, status, trackingCode) => {

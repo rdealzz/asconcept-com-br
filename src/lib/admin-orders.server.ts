@@ -1,11 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { enqueueOrderEmail, type OrderEmailKind } from "@/lib/order-email.server";
-import {
-  FLOW_STATUSES,
-  isManualSaleStatus,
-  isPrePaymentStatus,
-  type OrderStatus,
-} from "@/lib/types";
+import { FLOW_STATUSES, isFinalStatus, isPrePaymentStatus, type OrderStatus } from "@/lib/types";
 
 type AdminStatusInput = {
   orderNumber: string;
@@ -86,11 +81,11 @@ export async function updateAdminOrderStatusCore(
   const nextIndex = STATUS_FLOW.indexOf(input.status);
   if (nextIndex === -1) throw new Error("Status inválido.");
 
-  // Venda de balcão: nasceu fechada, com o estoque já baixado. Não há etapa
-  // seguinte nem anterior — e deixá-la voltar para "Aguardando Aprovação"
-  // abriria caminho para uma segunda baixa do mesmo pedido.
-  if (isManualSaleStatus(order.status)) {
-    throw new Error("Este pedido foi registrado como venda concluída e não avança no fluxo.");
+  // Ponto final, venha do site ou do balcão: não há etapa seguinte, e deixá-lo
+  // voltar para "Aguardando Aprovação" abriria caminho para uma segunda baixa
+  // do mesmo pedido.
+  if (isFinalStatus(order.status)) {
+    throw new Error("Este pedido já está finalizado — não há etapa seguinte nem volta atrás.");
   }
 
   // Pedido ainda não pago (checkout abandonado, cartão recusado): a única saída

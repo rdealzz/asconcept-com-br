@@ -13,7 +13,7 @@ import {
   type CardInput,
   type PendingOrderInput,
 } from "@/lib/payments-validators";
-import { MANUAL_SALE_STATUS } from "@/lib/types";
+import { FINAL_STATUS } from "@/lib/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = any;
@@ -44,7 +44,7 @@ type OrderRow = {
 // Etapas que só existem depois do pagamento confirmado. "Finalizado" entra
 // aqui porque a venda de balcão é registrada depois de o dinheiro ter entrado:
 // oferecer cobrança para ela seria cobrar duas vezes pela mesma peça.
-const PAID_STATUSES = new Set(["Preparando pedido", "Em trânsito", "Entregue", MANUAL_SALE_STATUS]);
+const PAID_STATUSES = new Set(["Preparando pedido", "Em trânsito", "Entregue", FINAL_STATUS]);
 
 /**
  * Um pedido está pago quando já avançou no fluxo do ateliê, quando é venda de
@@ -133,7 +133,7 @@ export async function persistPayment(
     statusAtual === "Entregue" ||
     // Venda de balcão: fechada de nascença, e nenhuma notificação de pagamento
     // tem o direito de reabri-la.
-    statusAtual === MANUAL_SALE_STATUS;
+    statusAtual === FINAL_STATUS;
 
   const patch: Record<string, unknown> = {
     mp_payment_id: String(payment.id),

@@ -2,21 +2,27 @@
  * Cadastro manual de pedido — a venda que já aconteceu.
  *
  * Feira, WhatsApp, balcão: o cliente levou a peça e pagou antes de alguém abrir
- * o painel. O formulário não está criando uma venda, está registrando uma. Duas
- * consequências, e elas são a razão deste módulo existir:
+ * o painel. Na maior parte das vezes o formulário não está criando uma venda,
+ * está registrando uma — e é por isso que ele nasce em "Finalizado":
  *
- *   1. **o pedido nasce "Finalizado"** — não há pagamento a confirmar, separação
- *      a fazer nem envio a rastrear. Fazer a venda de balcão desfilar pelas
- *      quatro etapas do ateliê era encenação: quatro cliques para chegar onde
- *      ela já estava quando foi cadastrada;
+ *   1. **não há etapa a cumprir** — nem pagamento a confirmar, nem separação,
+ *      nem envio a rastrear. Fazer a venda de balcão desfilar pelo fluxo do
+ *      ateliê era encenação: quatro cliques para chegar onde ela já estava
+ *      quando foi cadastrada;
  *   2. **o estoque cai na hora** — a peça saiu da prateleira de verdade. Enquanto
  *      a baixa dependia da aprovação no painel, a loja continuava oferecendo o
  *      que já tinha sido vendido até alguém lembrar de avançar o status.
  *
- * E, porque o estoque cai junto com a gravação, a conferência vira barreira:
- * pedido que não cabe no estoque não é gravado, e o admin lê o porquê. No
- * checkout do site a regra é outra de propósito — lá o cliente já pagou, e a
- * baixa grampeia em zero com aviso em vez de recusar.
+ * O status inicial, porém, é escolha de quem cadastra. Encomenda combinada por
+ * WhatsApp que ainda vai ser preparada e enviada nasce em "Aguardando
+ * Aprovação" e percorre o mesmo fluxo de um pedido do site — inclusive o ponto
+ * da baixa, que continua sendo a aprovação. Quem decide não é este módulo: é o
+ * status escolhido (ver `consumesStockOnCreate`).
+ *
+ * Quando a baixa acontece aqui, a conferência vira barreira: pedido que não
+ * cabe no estoque não é gravado, e o admin lê o porquê. No checkout do site a
+ * regra é outra de propósito — lá o cliente já pagou, e a baixa grampeia em
+ * zero com aviso em vez de recusar.
  *
  * Nada disto alcança pedido manual antigo: eles ficam com o status que têm e o
  * estoque não é recalculado para trás.
@@ -24,7 +30,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { gravarComNumeroUnico } from "@/lib/order-number.server";
 import { conferirComPecas } from "@/lib/stock.server";
-import { MANUAL_SALE_STATUS } from "@/lib/types";
+import { consumesStockOnCreate, FINAL_STATUS, type FlowStatus } from "@/lib/types";
 
 /** Uma peça do pedido, como o formulário do painel a entrega. */
 export type ItemManual = {
@@ -40,12 +46,20 @@ export type PedidoManualInput = {
   customerEmail: string;
   customerName?: string;
   items: ItemManual[];
+  /**
+   * Onde a venda começa. "Finalizado" é o caso comum — a peça já saiu com o
+   * cliente. Nascendo em "Aguardando Aprovação", o pedido entra no fluxo do
+   * ateliê como um pedido do site e o estoque espera a aprovação.
+   */
+  status?: FlowStatus;
 };
 
 export type PedidoManualResult = {
   ok: true;
   orderNumber: string;
-  status: typeof MANUAL_SALE_STATUS;
+  status: FlowStatus;
+  /** O estoque saiu agora, na gravação? */
+  stockConsumed: boolean;
   total: number;
 };
 
@@ -101,14 +115,28 @@ async function chamarRpc(supabaseAdmin: SupabaseClient, nome: string, orderNumbe
  *
  * O rastro detalhado é do banco — `stock_ledger` guarda item a item, e
  * `admin_notifications` avisa o que esgotou. Esta linha é a que amarra as duas
- * pontas para quem lê o log depois: pedido tal, tantas peças, nascido fechado e
- * com o estoque já baixado.
+ * pontas para quem lê o log depois: pedido tal, tantas peças, com que status
+ * nasceu e se o estoque saiu junto.
  */
-function concluir(orderNumber: string, pecas: number, total: number): PedidoManualResult {
+function concluir(
+  orderNumber: string,
+  pecas: number,
+  total: number,
+  status: FlowStatus,
+  stockConsumed: boolean,
+): PedidoManualResult {
   console.info(
-    `[admin] venda manual ${orderNumber} registrada: ${pecas} peça(s), status ${MANUAL_SALE_STATUS}, estoque baixado`,
+    `[admin] venda manual ${orderNumber} registrada: ${pecas} peça(s), status ${status}, estoque ${
+      stockConsumed ? "baixado na gravação" : "pendente da aprovação"
+    }`,
   );
-  return { ok: true, orderNumber, status: MANUAL_SALE_STATUS, total };
+  return { ok: true, orderNumber, status, stockConsumed, total };
+}
+
+/** Erro de coluna que ainda não existe no banco (`undefined_column`). */
+function colunaInexistente(erro: unknown): boolean {
+  const e = erro as { code?: string; message?: string } | null;
+  return e?.code === "42703" || e?.code === "PGRST204" || /'origin' column/i.test(e?.message ?? "");
 }
 
 /**
@@ -186,6 +214,9 @@ export async function createManualOrderCore(
     .eq("email", email)
     .maybeSingle();
 
+  const status: FlowStatus = input.status ?? FINAL_STATUS;
+  const baixaAgora = consumesStockOnCreate(status);
+
   const payload = {
     user_id: (perfil as { id?: string } | null)?.id ?? null,
     customer_email: email,
@@ -196,14 +227,30 @@ export async function createManualOrderCore(
     subtotal: total,
     total,
     payment_method: "pix",
-    status: MANUAL_SALE_STATUS,
+    status,
     discount: 0,
   };
 
+  // A origem é gravada quando a coluna existe; sem ela o app deduz pela leitura
+  // (ver `orderOrigin`). O laço não é capricho: mandar uma coluna que o banco
+  // não tem derruba o INSERT inteiro, e a venda de balcão pararia de funcionar
+  // só porque a migração ainda não rodou.
+  let comOrigem = true;
   const gravacao = await gravarComNumeroUnico(async (orderNumber) => {
-    const { error } = await supabaseAdmin
-      .from("orders")
-      .insert({ ...payload, order_number: orderNumber } as never);
+    const linha = {
+      ...payload,
+      order_number: orderNumber,
+      ...(comOrigem ? { origin: "manual" } : {}),
+    };
+    const { error } = await supabaseAdmin.from("orders").insert(linha as never);
+    if (error && comOrigem && colunaInexistente(error)) {
+      console.warn("[admin] coluna orders.origin ausente — rode a migração de origem do pedido");
+      comOrigem = false;
+      const { error: erroSemOrigem } = await supabaseAdmin
+        .from("orders")
+        .insert({ ...payload, order_number: orderNumber } as never);
+      return erroSemOrigem as { code?: string; message?: string } | null;
+    }
     return error as { code?: string; message?: string } | null;
   });
   if (!gravacao.ok) {
@@ -213,6 +260,11 @@ export async function createManualOrderCore(
     throw new Error("Não foi possível registrar o pedido.");
   }
   const { orderNumber } = gravacao;
+
+  // Nascendo antes da aprovação, o pedido segue o fluxo do site: o estoque
+  // espera o admin avançar para "Preparando pedido", que é onde a baixa mora
+  // para todo mundo. A conferência acima já garantiu que a peça existe hoje.
+  if (!baixaAgora) return concluir(orderNumber, orderItems.length, total, status, false);
 
   let { error } = await chamarRpc(supabaseAdmin, "consume_order_stock_strict", orderNumber);
   if (error && funcaoInexistente(error)) {
@@ -232,7 +284,7 @@ export async function createManualOrderCore(
       .eq("order_number", orderNumber)
       .maybeSingle();
     if ((gravado as { stock_decremented?: boolean } | null)?.stock_decremented === true) {
-      return concluir(orderNumber, orderItems.length, total);
+      return concluir(orderNumber, orderItems.length, total, status, true);
     }
 
     const { error: erroAoApagar } = await supabaseAdmin
@@ -261,5 +313,5 @@ export async function createManualOrderCore(
     );
   }
 
-  return concluir(orderNumber, orderItems.length, total);
+  return concluir(orderNumber, orderItems.length, total, status, true);
 }

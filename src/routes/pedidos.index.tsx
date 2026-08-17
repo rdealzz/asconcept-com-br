@@ -22,12 +22,14 @@ import { formatBRL } from "@/lib/cart-context";
 import { supabase } from "@/integrations/supabase/client";
 import {
   FLOW_STATUSES,
-  MANUAL_SALE_STATUS,
-  isManualSaleStatus,
+  ORDER_ORIGIN_LABELS,
+  isFinalStatus,
   isPrePaymentStatus,
   type Order,
+  type OrderOrigin,
   type OrderStatus,
 } from "@/lib/types";
+import { OrigemBadge } from "@/components/OrigemBadge";
 import { ContactStrip } from "@/components/ContactStrip";
 
 export const Route = createFileRoute("/pedidos/")({
@@ -85,8 +87,9 @@ const STATUS_META: Record<OrderStatus, { label: string; icon: string; className:
     icon: "✅",
     className: "border-transparent bg-asc-gold text-asc-bg",
   },
-  // Venda de balcão: entrou já concluída, com o estoque baixado. Divide o
-  // acabamento do "Entregue" porque é o mesmo fim de linha, por outro caminho.
+  // Ponto final. Divide o acabamento do "Entregue" porque é o mesmo fim de
+  // linha: o pedido do site chega nele depois da entrega, e o de balcão pode
+  // nascer nele.
   Finalizado: {
     label: "Finalizado",
     icon: "✅",
@@ -94,7 +97,7 @@ const STATUS_META: Record<OrderStatus, { label: string; icon: string; className:
   },
 };
 
-/** As quatro etapas do ateliê, na ordem em que avançam. */
+/** As etapas do ateliê, na ordem em que avançam. */
 const ALL_STATUSES: OrderStatus[] = [...FLOW_STATUSES];
 
 function OrdersPage() {
@@ -542,10 +545,21 @@ function ResultCell({ label, value, accent }: { label: string; value: string; ac
 
 function AdminOrdersList({ orders }: { orders: Order[] }) {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "todos" | "nao-pagos">("todos");
+  /** Loja ou balcão: os dois fluxos dividem a lista e raramente se procuram juntos. */
+  const [origemFiltro, setOrigemFiltro] = useState<OrderOrigin | "todos">("todos");
   const [term, setTerm] = useState("");
+
+  const totaisPorOrigem = useMemo(
+    () => ({
+      online: orders.filter((o) => o.origin === "online").length,
+      manual: orders.filter((o) => o.origin === "manual").length,
+    }),
+    [orders],
+  );
 
   const filtered = useMemo(() => {
     return orders.filter((o) => {
+      if (origemFiltro !== "todos" && o.origin !== origemFiltro) return false;
       if (statusFilter === "nao-pagos" && !isPrePaymentStatus(o.status)) return false;
       if (statusFilter !== "todos" && statusFilter !== "nao-pagos" && o.status !== statusFilter)
         return false;
@@ -557,7 +571,7 @@ function AdminOrdersList({ orders }: { orders: Order[] }) {
         (o.customerName ?? "").toLowerCase().includes(q)
       );
     });
-  }, [orders, statusFilter, term]);
+  }, [orders, origemFiltro, statusFilter, term]);
 
   // Um cartão por etapa do ateliê, mais um para o que ainda não foi pago —
   // esse é o balde que antes se disfarçava de "Aguardando Aprovação".
@@ -573,18 +587,6 @@ function AdminOrdersList({ orders }: { orders: Order[] }) {
       icon: STATUS_META[s].icon,
       count: orders.filter((o) => o.status === s).length,
     }));
-    // Venda de balcão não é etapa do ateliê e não tem cartão fixo: só aparece
-    // quando existe alguma, para não sobrar um "0" no painel de quem vende
-    // apenas pelo site.
-    const finalizados = orders.filter((o) => isManualSaleStatus(o.status)).length;
-    if (finalizados > 0) {
-      cartoes.push({
-        key: MANUAL_SALE_STATUS,
-        label: STATUS_META[MANUAL_SALE_STATUS].label,
-        icon: STATUS_META[MANUAL_SALE_STATUS].icon,
-        count: finalizados,
-      });
-    }
     const naoPagos = orders.filter((o) => isPrePaymentStatus(o.status)).length;
     if (naoPagos > 0) {
       cartoes.push({ key: "nao-pagos", label: "Sem pagamento", icon: "◌", count: naoPagos });
@@ -643,6 +645,36 @@ function AdminOrdersList({ orders }: { orders: Order[] }) {
       </section>
 
       <div className="flex flex-wrap items-center gap-3 border-b border-border pb-4">
+        {/* Loja ou balcão. Fica ao lado da busca, e não entre os cartões de
+            etapa, porque é outra pergunta: os cartões filtram "em que ponto
+            está", este filtra "de onde veio". */}
+        <div className="flex items-center gap-1">
+          {(
+            [
+              ["todos", "Todos"],
+              ["online", ORDER_ORIGIN_LABELS.online],
+              ["manual", ORDER_ORIGIN_LABELS.manual],
+            ] as const
+          ).map(([chave, rotulo]) => {
+            const ativo = origemFiltro === chave;
+            const contagem =
+              chave === "todos" ? orders.length : totaisPorOrigem[chave as OrderOrigin];
+            return (
+              <button
+                key={chave}
+                onClick={() => setOrigemFiltro(chave)}
+                aria-pressed={ativo}
+                className={`rounded-md border px-3 py-2 text-[11px] tracking-luxe uppercase transition-colors duration-ascfast ease-asc ${
+                  ativo
+                    ? "border-asc-gold bg-asc-bg-raised text-asc-gold"
+                    : "border-border text-muted-foreground hover:border-asc-gold/50 hover:text-asc-ink"
+                }`}
+              >
+                {rotulo} <span className="tabular-nums opacity-70">{contagem}</span>
+              </button>
+            );
+          })}
+        </div>
         <div className="relative flex-1 min-w-[240px]">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -652,7 +684,7 @@ function AdminOrdersList({ orders }: { orders: Order[] }) {
             className="w-full rounded-md border border-border bg-background px-9 py-2 text-sm outline-none transition-colors duration-ascfast ease-asc focus:border-asc-gold"
           />
         </div>
-        {(statusFilter !== "todos" || term) && (
+        {(statusFilter !== "todos" || origemFiltro !== "todos" || term) && (
           <span className="text-[11px] text-muted-foreground">
             {filtered.length} {filtered.length === 1 ? "pedido" : "pedidos"}
           </span>
@@ -660,6 +692,7 @@ function AdminOrdersList({ orders }: { orders: Order[] }) {
         <button
           onClick={() => {
             setStatusFilter("todos");
+            setOrigemFiltro("todos");
             setTerm("");
           }}
           className="rounded-md border border-border px-4 py-2 text-[11px] tracking-luxe uppercase text-muted-foreground transition-colors duration-ascfast ease-asc hover:border-asc-gold hover:text-asc-gold"
@@ -690,8 +723,14 @@ function AdminOrderCard({ order }: { order: Order }) {
   const showTracking = order.status === "Em trânsito" || !!order.trackingCode;
 
   const naoPago = isPrePaymentStatus(order.status);
-  /** Venda registrada à mão: fechada de nascença, sem etapa antes nem depois. */
-  const vendaManual = isManualSaleStatus(order.status);
+  /**
+   * Venda de balcão que já nasceu fechada: não tem etapa antes nem depois, e a
+   * escada do ateliê seria uma encenação — as quatro etapas apareceriam como
+   * "cumpridas" sem nunca terem existido. Pedido manual que nasceu no fluxo
+   * (encomenda a preparar) não entra aqui: ele percorre a escada como qualquer
+   * outro.
+   */
+  const vendaManualFechada = order.origin === "manual" && isFinalStatus(order.status);
   const currentIndex = ALL_STATUSES.indexOf(order.status);
   const proximo = currentIndex >= 0 ? ALL_STATUSES[currentIndex + 1] : undefined;
 
@@ -744,7 +783,12 @@ function AdminOrderCard({ order }: { order: Order }) {
           </Link>
           <p className="mt-1 text-[11px] text-muted-foreground">{created}</p>
         </div>
-        <StatusBadge status={order.status} />
+        {/* De onde veio, e em que ponto está — nessa ordem: a origem diz qual
+            fluxo esperar do pedido, e o status, onde ele parou. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <OrigemBadge origin={order.origin} />
+          <StatusBadge status={order.status} />
+        </div>
       </header>
 
       <div className="grid gap-6 px-6 py-5 md:grid-cols-[1.1fr_1.4fr_1fr]">
@@ -897,7 +941,7 @@ function AdminOrderCard({ order }: { order: Order }) {
                 na fila de aprovação e o cliente recebe a confirmação por e-mail.
               </p>
             </div>
-          ) : vendaManual ? (
+          ) : vendaManualFechada ? (
             <div className="mt-2 rounded-md border border-[color:var(--gold)]/40 bg-[color:var(--gold)]/5 p-3">
               <p className="text-xs leading-relaxed text-asc-ink">
                 Venda registrada manualmente e já concluída. O estoque foi baixado no cadastro — não

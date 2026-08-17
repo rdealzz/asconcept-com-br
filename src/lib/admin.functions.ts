@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { FLOW_STATUSES, type OrderStatus } from "@/lib/types";
+import { FLOW_STATUSES, isFlowStatus, type OrderStatus } from "@/lib/types";
 
 export const adminUpdateOrderStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -54,11 +54,20 @@ export const adminCreateManualOrder = createServerFn({ method: "POST" })
       customerEmail: string;
       customerName?: string;
       items: { id: string; size: string; quantity: number; valor: number }[];
+      status?: OrderStatus;
     }) => {
       const items = Array.isArray(input?.items) ? input.items : [];
       if (!items.length) throw new Error("O pedido precisa de ao menos uma peça.");
       if (items.length > 40) throw new Error("Pedido com peças demais.");
+      // Só as etapas do ateliê: a venda de balcão pode nascer em qualquer uma
+      // delas, mas nunca num estado anterior ao pagamento — quem cadastra à mão
+      // está registrando dinheiro que entrou.
+      const status = input?.status;
+      if (status !== undefined && !isFlowStatus(status)) {
+        throw new Error("Status inicial inválido.");
+      }
       return {
+        status,
         customerEmail: String(input?.customerEmail ?? "")
           .trim()
           .toLowerCase()

@@ -59,7 +59,17 @@ import {
   Star,
 } from "lucide-react";
 import { useOrders } from "@/lib/orders-context";
-import { isPrePaymentStatus, type Order, type OrderStatus } from "@/lib/types";
+import { OrigemBadge } from "@/components/OrigemBadge";
+import {
+  FINAL_STATUS,
+  FLOW_STATUSES,
+  isPrePaymentStatus,
+  ORDER_ORIGIN_LABELS,
+  type FlowStatus,
+  type Order,
+  type OrderOrigin,
+  type OrderStatus,
+} from "@/lib/types";
 import { useCart, formatBRL, type Product, type ProductCategory } from "@/lib/cart-context";
 import {
   PRODUCT_CATEGORIES,
@@ -3113,12 +3123,14 @@ function ConfirmDialog({
   );
 }
 
-const ADMIN_STATUSES: OrderStatus[] = [
-  "Aguardando Aprovação",
-  "Preparando pedido",
-  "Em trânsito",
-  "Entregue",
-];
+/**
+ * As etapas na ordem em que o painel as oferece.
+ *
+ * Vem de `FLOW_STATUSES` em vez de repetir a lista: quando "Finalizado" entrou
+ * como último degrau, a cópia local teria deixado o painel sem o passo de
+ * fechar o pedido — e ninguém perceberia até tentar usar.
+ */
+const ADMIN_STATUSES: OrderStatus[] = [...FLOW_STATUSES];
 
 const ROTULO_STATUS: Record<string, string> = {
   "Aguardando Pagamento": "Aguardando Pagamento",
@@ -3215,6 +3227,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
   const [showManualOrder, setShowManualOrder] = useState(false);
   /** Confirmação da última venda de balcão registrada. */
   const [avisoPedido, setAvisoPedido] = useState<string | null>(null);
+  const [filtroOrigem, setFiltroOrigem] = useState<OrderOrigin | "todos">("todos");
   const [showManualCustomer, setShowManualCustomer] = useState(false);
   const [confirmOrder, setConfirmOrder] = useState<string | null>(null);
   const [confirmCustomer, setConfirmCustomer] = useState<{
@@ -3229,6 +3242,18 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
   const deleteCustomerFn = useServerFn(adminDeleteCustomer);
 
   const isAdminUser = !!user?.isAdmin;
+
+  const totaisPorOrigem = useMemo(
+    () => ({
+      online: orders.filter((o) => o.origin === "online").length,
+      manual: orders.filter((o) => o.origin === "manual").length,
+    }),
+    [orders],
+  );
+  const pedidosVisiveis = useMemo(
+    () => (filtroOrigem === "todos" ? orders : orders.filter((o) => o.origin === filtroOrigem)),
+    [orders, filtroOrigem],
+  );
 
   const handleDeleteOrder = async () => {
     if (!confirmOrder || !isAdminUser) return;
@@ -3376,10 +3401,32 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
 
             {tab === "pedidos" && (
               <>
-                <div className="mb-5 flex items-center justify-between gap-3">
-                  <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
-                    {orders.length} pedidos registrados
-                  </p>
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                  {/* Filtro por origem: as duas vendas dividem a tabela, e quem
+                      procura a venda de balcão de ontem não quer varrer os
+                      pedidos do site para achá-la. */}
+                  <div className="flex items-center gap-1">
+                    {(
+                      [
+                        ["todos", `Todos (${orders.length})`],
+                        ["online", `${ORDER_ORIGIN_LABELS.online}s (${totaisPorOrigem.online})`],
+                        ["manual", `${ORDER_ORIGIN_LABELS.manual}s (${totaisPorOrigem.manual})`],
+                      ] as const
+                    ).map(([chave, rotulo]) => (
+                      <button
+                        key={chave}
+                        onClick={() => setFiltroOrigem(chave)}
+                        aria-pressed={filtroOrigem === chave}
+                        className={`border px-2.5 py-1 text-[10px] tracking-luxe uppercase transition-colors ${
+                          filtroOrigem === chave
+                            ? "border-accent bg-accent/10 text-accent"
+                            : "border-border text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {rotulo}
+                      </button>
+                    ))}
+                  </div>
                   <button
                     onClick={() => {
                       setAvisoPedido(null);
@@ -3406,9 +3453,11 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                     </button>
                   </div>
                 )}
-                {orders.length === 0 ? (
+                {pedidosVisiveis.length === 0 ? (
                   <p className="border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
-                    Nenhum pedido registrado no momento.
+                    {orders.length === 0
+                      ? "Nenhum pedido registrado no momento."
+                      : `Nenhum ${ORDER_ORIGIN_LABELS[filtroOrigem as OrderOrigin]?.toLowerCase() ?? "pedido"} por aqui.`}
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
@@ -3426,7 +3475,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                         </tr>
                       </thead>
                       <tbody>
-                        {orders.map((o) =>
+                        {pedidosVisiveis.map((o) =>
                           o.items.map((i, ix) => (
                             <tr
                               key={`${o.id}-${i.id}-${i.size}-${ix}`}
@@ -3434,6 +3483,12 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
                             >
                               <td className="py-3 pr-3 font-serif">
                                 {o.customerName ?? o.customerEmail.split("@")[0]}
+                                {/* O selo aparece uma vez por pedido, e não por
+                                    peça: repeti-lo em cada linha do mesmo
+                                    pedido seria ruído. */}
+                                {ix === 0 && (
+                                  <OrigemBadge origin={o.origin} className="mt-1 flex w-fit" />
+                                )}
                               </td>
                               <td className="py-3 pr-3 text-[11px] text-muted-foreground">
                                 {o.customerEmail}
@@ -3635,13 +3690,15 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
             name: c.name ?? c.email.split("@")[0],
           }))}
           onClose={() => setShowManualOrder(false)}
-          onSaved={async (orderNumber) => {
+          onSaved={async ({ orderNumber, status, stockConsumed }) => {
             setShowManualOrder(false);
-            // O estoque acabou de cair no banco; sem reler, a vitrine e o
-            // próprio formulário continuariam mostrando a peça que saiu.
-            await refreshStock();
+            // Quando o estoque cai no banco, reler é obrigatório: sem isso a
+            // vitrine e o próprio formulário seguiriam mostrando a peça que saiu.
+            if (stockConsumed) await refreshStock();
             setAvisoPedido(
-              `Pedido ${orderNumber} registrado como venda concluída — estoque atualizado.`,
+              stockConsumed
+                ? `Pedido Manual ${orderNumber} registrado como ${ROTULO_STATUS[status] ?? status} — estoque atualizado.`
+                : `Pedido Manual ${orderNumber} registrado em ${ROTULO_STATUS[status] ?? status} — o estoque baixa quando você aprovar.`,
             );
           }}
           createManualOrder={createManualOrder}
@@ -4432,11 +4489,24 @@ function ManualOrderModal({
   stock: Record<string, SizeStock>;
   customers: { email: string; name: string }[];
   onClose: () => void;
-  onSaved: (orderNumber: string) => void | Promise<void>;
+  onSaved: (resultado: {
+    orderNumber: string;
+    status: FlowStatus;
+    stockConsumed: boolean;
+  }) => void | Promise<void>;
   createManualOrder: ReturnType<typeof useOrders>["createManualOrder"];
 }) {
   const [customerEmail, setCustomerEmail] = useState(customers[0]?.email ?? "");
   const [customerName, setCustomerName] = useState(customers[0]?.name ?? "");
+  /**
+   * Em que etapa a venda começa.
+   *
+   * "Finalizado" é o padrão porque é o caso comum: a peça saiu com o cliente
+   * antes de alguém abrir este formulário. As outras etapas existem para a
+   * encomenda combinada por fora que ainda vai ser preparada e enviada — essa
+   * entra no mesmo fluxo de um pedido do site.
+   */
+  const [status, setStatus] = useState<FlowStatus>(FINAL_STATUS);
   /**
    * Cliente digitado à mão, e não escolhido na lista.
    *
@@ -4505,10 +4575,10 @@ function ManualOrderModal({
       setErr("A mesma peça no mesmo tamanho está repetida — some na quantidade.");
       return;
     }
-    // A venda de balcão baixa o estoque na hora de gravar, então o que não cabe
-    // no estoque não vira pedido. A conferência de verdade é do servidor, com o
-    // estoque lido no momento da gravação; esta aqui é só para o admin não
-    // descobrir o problema depois de preencher a nota inteira.
+    // Peça que não existe não vira venda, nasça o pedido fechado ou no fluxo: o
+    // servidor confere nos dois casos, contra o estoque do momento da gravação.
+    // Esta conferência aqui é só para o admin não descobrir o problema depois
+    // de preencher a nota inteira.
     const semEstoque = linhas
       .map((l) => ({ l, resta: disponivelNaLinha(l) }))
       .filter(({ l, resta }) => resta !== null && l.qty > resta)
@@ -4533,9 +4603,10 @@ function ManualOrderModal({
     }
     setSaving(true);
     try {
-      const { orderNumber } = await createManualOrder({
+      const resultado = await createManualOrder({
         customerEmail: email,
         customerName: nome || undefined,
+        status,
         items: resolvidas.map(({ linha, tamanho }) => ({
           id: linha.productId,
           size: tamanho,
@@ -4545,7 +4616,7 @@ function ManualOrderModal({
           valor: emCentavos(linha.valor),
         })),
       });
-      await onSaved(orderNumber);
+      await onSaved(resultado);
     } catch (e) {
       setErr((e as Error).message ?? "Falha ao salvar pedido.");
     } finally {
@@ -4568,13 +4639,51 @@ function ManualOrderModal({
           <p className="text-[11px] tracking-luxe uppercase text-accent">Registrar venda</p>
           <h3 className="mt-1 font-serif text-2xl">Novo Pedido Manual</h3>
           {/* O que este formulário faz, dito antes de o admin preencher: é
-              registro de venda concluída, não abertura de pedido. */}
+              registro de venda feita fora da loja. */}
           <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-            Venda já concluída (balcão, feira, WhatsApp). O pedido é gravado como{" "}
-            <span className="text-asc-ink">Finalizado</span> e as peças saem do estoque na hora.
+            Venda fora da loja (balcão, feira, WhatsApp). Fica marcada como{" "}
+            <span className="text-asc-ink">Pedido Manual</span> na lista.
           </p>
 
           <div className="mt-6 space-y-4">
+            {/* A etapa em que a venda entra. Vem primeiro porque muda o que o
+                resto do formulário significa: fechada agora, ou na fila. */}
+            <label className="block">
+              <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+                Situação da venda
+              </span>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as FlowStatus)}
+                className="mt-1 w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+              >
+                <option value={FINAL_STATUS}>Finalizado — já entregue ao cliente</option>
+                {FLOW_STATUSES.filter((s) => s !== FINAL_STATUS).map((s) => (
+                  <option key={s} value={s}>
+                    {ROTULO_STATUS[s] ?? s}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-[10px] leading-relaxed text-muted-foreground">
+                {status === FINAL_STATUS ? (
+                  <>
+                    Venda encerrada: não passa por preparação, envio ou entrega, e as peças saem do
+                    estoque na hora.
+                  </>
+                ) : status === "Aguardando Aprovação" ? (
+                  <>
+                    Entra no fluxo do ateliê como um pedido do site. O estoque só baixa quando você
+                    avançar para “Preparando Pedido”.
+                  </>
+                ) : (
+                  <>
+                    Entra no fluxo do ateliê já nesta etapa, e as peças saem do estoque na hora —
+                    como acontece em qualquer pedido daqui para a frente.
+                  </>
+                )}
+              </span>
+            </label>
+
             {/* A lista some quando não há ninguém cadastrado: um seletor com uma
                 opção só ("digitar") é degrau sem escada. */}
             {customers.length > 0 && (

@@ -16,6 +16,8 @@ type Cenario = {
   baixouMesmoAssim?: boolean;
   /** O DELETE de desfazer também falha. */
   falhaAoApagar?: boolean;
+  /** O banco ainda não tem a coluna `orders.origin`. */
+  semColunaOrigem?: boolean;
   perfil?: { id: string } | null;
 };
 
@@ -50,7 +52,12 @@ function fakeSupabase(c: Cenario) {
         },
         insert(payload: Record<string, unknown>) {
           chamadas.inserted.push(payload);
-          return Promise.resolve({ error: null });
+          const recusaOrigem = c.semColunaOrigem && payload.origin !== undefined;
+          return Promise.resolve({
+            error: recusaOrigem
+              ? { code: "PGRST204", message: "Could not find the 'origin' column of 'orders'" }
+              : null,
+          });
         },
         delete() {
           return {
@@ -101,6 +108,68 @@ describe("cadastro manual de pedido", () => {
     expect(chamadas.inserted[0]!.status).toBe("Finalizado");
     expect(chamadas.rpc).toEqual(["consume_order_stock_strict"]);
     expect(chamadas.deleted).toEqual([]);
+  });
+
+  test("nasce Finalizado por padrão e grava a origem manual", async () => {
+    const { client, chamadas } = fakeSupabase({ produtos: [camisa] });
+    await createManualOrderCore(client as never, {
+      ...cliente,
+      items: [{ id: camisa.id, size: "M", quantity: 1, valor: 399 }],
+    });
+    expect(chamadas.inserted[0]!.origin).toBe("manual");
+  });
+
+  test("nascendo em Aguardando Aprovação, o estoque espera a aprovação", async () => {
+    const { client, chamadas } = fakeSupabase({ produtos: [camisa] });
+    const r = await createManualOrderCore(client as never, {
+      ...cliente,
+      status: "Aguardando Aprovação",
+      items: [{ id: camisa.id, size: "M", quantity: 1, valor: 399 }],
+    });
+
+    expect(r.status).toBe("Aguardando Aprovação");
+    expect(r.stockConsumed).toBe(false);
+    // A baixa é do painel, no avanço para "Preparando pedido" — como em
+    // qualquer pedido do site.
+    expect(chamadas.rpc).toEqual([]);
+    expect(chamadas.inserted[0]!.status).toBe("Aguardando Aprovação");
+  });
+
+  test("nascendo já em preparação, o estoque sai na gravação", async () => {
+    const { client, chamadas } = fakeSupabase({ produtos: [camisa] });
+    const r = await createManualOrderCore(client as never, {
+      ...cliente,
+      status: "Preparando pedido",
+      items: [{ id: camisa.id, size: "M", quantity: 1, valor: 399 }],
+    });
+
+    expect(r.stockConsumed).toBe(true);
+    expect(chamadas.rpc).toEqual(["consume_order_stock_strict"]);
+  });
+
+  test("mesmo esperando a aprovação, peça que não existe não vira pedido", async () => {
+    const { client, chamadas } = fakeSupabase({ produtos: [camisa] });
+    await expect(
+      createManualOrderCore(client as never, {
+        ...cliente,
+        status: "Aguardando Aprovação",
+        items: [{ id: camisa.id, size: "P", quantity: 5, valor: 900 }],
+      }),
+    ).rejects.toThrow(/menos do que o pedido/i);
+    expect(chamadas.inserted).toEqual([]);
+  });
+
+  test("banco sem a coluna origin ainda grava a venda", async () => {
+    const { client, chamadas } = fakeSupabase({ produtos: [camisa], semColunaOrigem: true });
+    const r = await createManualOrderCore(client as never, {
+      ...cliente,
+      items: [{ id: camisa.id, size: "M", quantity: 1, valor: 399 }],
+    });
+
+    expect(r.status).toBe("Finalizado");
+    // Duas tentativas: com origem e, depois da recusa, sem.
+    expect(chamadas.inserted).toHaveLength(2);
+    expect(chamadas.inserted[1]!.origin).toBeUndefined();
   });
 
   test("o valor negociado da linha vira preço unitário no pedido", async () => {
