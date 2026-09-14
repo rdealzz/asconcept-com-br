@@ -110,6 +110,12 @@ type CatalogCtx = {
    * saber disso na hora de salvar, não num console.
    */
   saveGroup: (entries: Array<{ id: string; meta: VariantMeta | null }>) => Promise<string | null>;
+  /**
+   * Grava o preço de várias peças de uma vez. É o que deixa o painel baixar (ou
+   * subir) um álbum inteiro sem abrir cor por cor. Devolve `null` em caso de
+   * sucesso ou a mensagem pronta para a tela.
+   */
+  setPrices: (entries: Array<{ id: string; price: number }>) => Promise<string | null>;
   addProduct: (p: ProductInput, stock: SizeStock) => Promise<string | null>;
   deleteProduct: (id: string) => Promise<void>;
   setStock: (id: string, stock: SizeStock) => Promise<void>;
@@ -475,6 +481,43 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     return null;
   };
 
+  /**
+   * Muda o preço de um punhado de peças.
+   *
+   * Uma linha por vez, pelo mesmo motivo de `saveGroup`: o que muda é diferente
+   * em cada peça, e um `upsert` em lote mandaria a linha inteira de volta,
+   * sobrescrevendo o que outra tela tivesse acabado de gravar. São poucas cores
+   * por álbum, e isto só roda no painel.
+   *
+   * O estado local muda antes para a prévia e a vitrine acompanharem na hora;
+   * se o banco recusar, relê tudo e conta o que houve — meio álbum com preço
+   * novo e meio com o velho é pior do que não ter mexido.
+   */
+  const setPrices: CatalogCtx["setPrices"] = async (entries) => {
+    if (!entries.length) return null;
+
+    const porId = new Map(entries.map((e) => [e.id, e.price]));
+    setProducts((prev) =>
+      prev.map((p) => {
+        const novo = porId.get(p.id);
+        return novo === undefined ? p : { ...p, price: novo };
+      }),
+    );
+
+    for (const { id, price } of entries) {
+      const { error } = await supabase
+        .from("products")
+        .update({ price } as never)
+        .eq("id", id);
+      if (!error) continue;
+
+      console.error("[catalog] setPrices failed", error);
+      await refresh();
+      return "Não foi possível salvar os preços. Tente novamente.";
+    }
+    return null;
+  };
+
   const setFeatured: CatalogCtx["setFeatured"] = async (id, featured) => {
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, isFeatured: featured } : p)));
     const { error } = await supabase
@@ -563,6 +606,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         updateProduct,
         setFeatured,
         saveGroup,
+        setPrices,
         addProduct,
         deleteProduct,
         setStock,

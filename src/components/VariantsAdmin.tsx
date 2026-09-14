@@ -1,17 +1,32 @@
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Check, Plus, Search, Sparkles, Star, Trash2, X } from "lucide-react";
-import type { Product } from "@/lib/cart-context";
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  Plus,
+  Search,
+  Sparkles,
+  Star,
+  Tag,
+  Trash2,
+  X,
+} from "lucide-react";
+import { formatBRL, type Product } from "@/lib/cart-context";
 import { useCatalog } from "@/lib/catalog-context";
 import { categoryLabel } from "@/lib/categories";
 import { productImageSrc } from "@/lib/product-images";
 import {
   detectarCores,
   normalizar,
+  PRECO_MINIMO,
+  parsePreco,
   planGroup,
+  planPrices,
   slugify,
   suggestGroups,
   swatchBackground,
   swatchLabel,
+  type AjustePreco,
   type SugestaoAlbum,
   type VariantGroup,
   type VariantMeta,
@@ -37,7 +52,7 @@ function hexSeguro(v: string | undefined): string {
 }
 
 export function VariantsAdmin() {
-  const { products, groups, saveGroup, missingColumns, refresh } = useCatalog();
+  const { products, groups, saveGroup, setPrices, missingColumns, refresh } = useCatalog();
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [criando, setCriando] = useState(false);
@@ -64,6 +79,15 @@ export function VariantsAdmin() {
     setErro(null);
     setSalvando(true);
     const msg = await saveGroup(entries);
+    setSalvando(false);
+    if (msg) setErro(msg);
+    return !msg;
+  };
+
+  const gravarPrecos = async (entries: Array<{ id: string; price: number }>) => {
+    setErro(null);
+    setSalvando(true);
+    const msg = await setPrices(entries);
     setSalvando(false);
     if (msg) setErro(msg);
     return !msg;
@@ -151,6 +175,7 @@ export function VariantsAdmin() {
               candidatos={soltas}
               ocupado={salvando}
               onSalvar={gravar}
+              onPrecos={gravarPrecos}
             />
           ))}
         </div>
@@ -350,11 +375,13 @@ function AlbumEditor({
   candidatos,
   ocupado,
   onSalvar,
+  onPrecos,
 }: {
   album: VariantGroup;
   candidatos: Product[];
   ocupado: boolean;
   onSalvar: (entries: Array<{ id: string; meta: VariantMeta | null }>) => Promise<boolean>;
+  onPrecos: (entries: Array<{ id: string; price: number }>) => Promise<boolean>;
 }) {
   const [aberto, setAberto] = useState(false);
   const [adicionando, setAdicionando] = useState<string[]>([]);
@@ -461,6 +488,7 @@ function AlbumEditor({
               <tr className="border-b border-border text-left text-[10px] tracking-luxe uppercase text-muted-foreground">
                 <th className="py-2 pr-3">Ordem</th>
                 <th className="py-2 pr-3">Peça</th>
+                <th className="py-2 pr-3 text-right">Preço</th>
                 <th className="py-2 pr-3">Peça · Logo</th>
                 <th className="py-2 pr-3">Nome da cor</th>
                 <th className="py-2 pr-3 text-right">Principal</th>
@@ -511,6 +539,18 @@ function AlbumEditor({
                           {m.name}
                         </span>
                       </div>
+                    </td>
+                    <td className="py-2 pr-3 text-right font-serif text-xs tabular-nums">
+                      {Number(m.price) > 0 ? (
+                        formatBRL(m.price)
+                      ) : (
+                        <span
+                          className="text-destructive"
+                          title="Peça sem preço: aparece como R$ 0,00 na vitrine e o pagamento é recusado."
+                        >
+                          Sem preço
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 pr-3">
                       <div className="flex items-center gap-2">
@@ -605,6 +645,8 @@ function AlbumEditor({
             )}
           </div>
 
+          <PrecoDoAlbum membros={membros} ocupado={ocupado} onAplicar={onPrecos} />
+
           <div className="mt-6 border-t border-border pt-4">
             <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
               Adicionar cor ao álbum
@@ -625,6 +667,192 @@ function AlbumEditor({
             </button>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- preço do álbum ---------- */
+
+const MODOS: ReadonlyArray<{ id: AjustePreco["modo"]; rotulo: string; ajuda: string }> = [
+  {
+    id: "igualar",
+    rotulo: "Mesmo preço",
+    ajuda: "Todas as cores passam a custar o valor digitado.",
+  },
+  {
+    id: "percentual",
+    rotulo: "Porcentagem",
+    ajuda: "Cada cor muda na mesma proporção — a que custava mais continua custando mais.",
+  },
+  {
+    id: "reais",
+    rotulo: "Valor em R$",
+    ajuda: "Cada cor muda no mesmo número de reais.",
+  },
+];
+
+/**
+ * O preço do álbum inteiro, numa conta só.
+ *
+ * Cada cor é uma peça própria no catálogo — é isso que faz carrinho, checkout e
+ * estoque saírem certos —, e o preço mora nela. O efeito colateral é que baixar
+ * uma linha de sete cores significava abrir sete peças, com a chance de a
+ * sétima ficar pelo preço velho na vitrine. Aqui o admin escolhe o quanto, vê
+ * como cada cor fica e grava as sete de uma vez.
+ *
+ * Nada vai para o banco antes da prévia: o valor digitado só vira gravação no
+ * botão, e a lista abaixo mostra de quanto para quanto cada cor vai.
+ */
+function PrecoDoAlbum({
+  membros,
+  ocupado,
+  onAplicar,
+}: {
+  membros: Product[];
+  ocupado: boolean;
+  onAplicar: (entries: Array<{ id: string; price: number }>) => Promise<boolean>;
+}) {
+  const [modo, setModo] = useState<AjustePreco["modo"]>("igualar");
+  const [direcao, setDirecao] = useState<"baixar" | "subir">("baixar");
+  const [texto, setTexto] = useState("");
+
+  const digitado = parsePreco(texto);
+  // Sinal só existe em porcentagem e em reais: "mesmo preço" é um destino, não
+  // um movimento. Zero e negativo digitado não valem — o sinal vem do botão.
+  const ajuste: AjustePreco | null =
+    digitado === null || digitado <= 0
+      ? null
+      : modo === "igualar"
+        ? { modo: "igualar", valor: digitado }
+        : { modo, valor: direcao === "baixar" ? -digitado : digitado };
+
+  const plano = ajuste ? planPrices(membros, ajuste) : [];
+  const novos = new Map(plano.map((e) => [e.id, e.price]));
+  const noPiso = plano.some((e) => e.price === PRECO_MINIMO);
+
+  const aplicar = async () => {
+    if (!plano.length) return;
+    const ok = await onAplicar(plano);
+    if (ok) setTexto("");
+  };
+
+  return (
+    <div className="mt-6 border-t border-border pt-4">
+      <div className="flex items-center gap-2">
+        <Tag className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
+        <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+          Preço de todas as cores
+        </p>
+      </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+        Muda de uma vez o preço das {membros.length} cores deste álbum — sem abrir peça por peça.
+        Confira a prévia antes de gravar.
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {MODOS.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => setModo(m.id)}
+            aria-pressed={modo === m.id}
+            className={`border px-3 py-1.5 text-[10px] tracking-luxe uppercase transition-colors ${
+              modo === m.id
+                ? "border-accent bg-accent text-asc-ink"
+                : "border-border text-muted-foreground hover:border-accent hover:text-accent"
+            }`}
+          >
+            {m.rotulo}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+        {MODOS.find((m) => m.id === modo)?.ajuda}
+      </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {modo !== "igualar" &&
+          (["baixar", "subir"] as const).map((d) => (
+            <button
+              key={d}
+              onClick={() => setDirecao(d)}
+              aria-pressed={direcao === d}
+              className={`border px-3 py-2 text-[10px] tracking-luxe uppercase transition-colors ${
+                direcao === d
+                  ? "border-accent text-accent"
+                  : "border-border text-muted-foreground hover:border-accent hover:text-accent"
+              }`}
+            >
+              {d === "baixar" ? "Baixar" : "Subir"}
+            </button>
+          ))}
+
+        <div className="flex items-center gap-1.5 border border-border bg-background px-3 py-2">
+          {modo !== "percentual" && <span className="text-xs text-muted-foreground">R$</span>}
+          <input
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            inputMode="decimal"
+            placeholder={modo === "percentual" ? "10" : "199,90"}
+            aria-label={
+              modo === "igualar"
+                ? "Novo preço de todas as cores"
+                : modo === "percentual"
+                  ? "Porcentagem"
+                  : "Valor em reais"
+            }
+            className="w-24 bg-transparent text-sm outline-none"
+          />
+          {modo === "percentual" && <span className="text-xs text-muted-foreground">%</span>}
+        </div>
+
+        <button
+          onClick={() => void aplicar()}
+          disabled={plano.length === 0 || ocupado}
+          className="asc-btn-primary px-4 py-2 text-[10px] tracking-luxe uppercase disabled:opacity-40"
+        >
+          <Check className="mr-1.5 inline h-3 w-3" strokeWidth={2} /> Aplicar a todas as cores
+        </button>
+      </div>
+
+      {ajuste &&
+        (plano.length === 0 ? (
+          <p className="mt-3 text-[10px] text-muted-foreground">
+            Nenhuma cor muda de preço com esse valor.
+          </p>
+        ) : (
+          <ul className="mt-3 flex flex-col gap-1.5 border border-border/60 px-3 py-2">
+            {membros.map((m) => {
+              const novo = novos.get(m.id);
+              return (
+                <li key={m.id} className="flex items-center justify-between gap-3 text-xs">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span
+                      aria-hidden
+                      className="h-3.5 w-3.5 flex-none rounded-full border border-asc-ink/20"
+                      style={{ background: swatchBackground(m.variant, m.name) }}
+                    />
+                    <span className="truncate text-muted-foreground">{swatchLabel(m)}</span>
+                  </span>
+                  <span className="flex-none whitespace-nowrap tabular-nums">
+                    <span className={novo === undefined ? "text-muted-foreground" : "line-through"}>
+                      {formatBRL(m.price)}
+                    </span>
+                    {novo !== undefined && (
+                      <span className="ml-2 font-serif text-accent">{formatBRL(novo)}</span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        ))}
+
+      {noPiso && (
+        <p className="mt-2 text-[10px] leading-relaxed text-destructive">
+          O desconto zeraria o preço de alguma cor. Peça sem preço tem o pagamento recusado, então
+          ela para em {formatBRL(PRECO_MINIMO)} — confira a prévia antes de aplicar.
+        </p>
       )}
     </div>
   );

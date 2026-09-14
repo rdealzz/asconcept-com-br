@@ -565,3 +565,86 @@ export function planGroup(
     return { id: product.id, meta: out };
   });
 }
+
+/* ---------- preço do álbum ---------- */
+
+/**
+ * O que fazer com o preço das cores de um álbum.
+ *
+ * Um álbum é a mesma roupa em cores diferentes, e o preço costuma ser o mesmo
+ * em todas — mas cada cor é uma linha própria no catálogo, então uma promoção
+ * significava abrir sete peças e digitar sete preços, com a chance de esquecer
+ * a sétima. Aqui a conta é uma só e vale para o álbum inteiro.
+ *
+ * `igualar` nivela todas no mesmo valor; `percentual` e `reais` mexem no preço
+ * de cada uma preservando a diferença entre elas (a cor que custava mais
+ * continua custando mais). Valor negativo baixa, positivo sobe.
+ */
+export type AjustePreco =
+  | { modo: "igualar"; valor: number }
+  | { modo: "percentual"; valor: number }
+  | { modo: "reais"; valor: number };
+
+/**
+ * Piso do preço, em reais.
+ *
+ * Peça com preço zero aparece como "R$ 0,00" na vitrine e tem o pagamento
+ * recusado no checkout — um desconto grande demais não pode virar isso sem
+ * ninguém perceber. O painel mostra a prévia antes de gravar, então o piso é
+ * visível na tela, e não uma surpresa depois.
+ */
+export const PRECO_MINIMO = 0.01;
+
+/** Centavos — o banco guarda o preço em reais, e meio centavo não existe. */
+function emCentavos(v: number): number {
+  return Math.round(v * 100) / 100;
+}
+
+/**
+ * Os preços novos do álbum, um por cor.
+ *
+ * Só volta quem realmente muda: aplicar "−10%" duas vezes seguidas não pode
+ * regravar linha que já está no valor certo, e o painel usa a lista vazia para
+ * saber que não há o que salvar.
+ */
+export function planPrices(
+  membros: readonly Product[],
+  ajuste: AjustePreco,
+): Array<{ id: string; price: number }> {
+  if (!Number.isFinite(ajuste.valor)) return [];
+
+  const out: Array<{ id: string; price: number }> = [];
+  for (const p of membros) {
+    const atual = emCentavos(Number(p.price) || 0);
+    const bruto =
+      ajuste.modo === "igualar"
+        ? ajuste.valor
+        : ajuste.modo === "percentual"
+          ? atual * (1 + ajuste.valor / 100)
+          : atual + ajuste.valor;
+    if (!Number.isFinite(bruto)) continue;
+
+    const price = Math.max(PRECO_MINIMO, emCentavos(bruto));
+    if (price === atual) continue;
+    out.push({ id: p.id, price });
+  }
+  return out;
+}
+
+/**
+ * O número que o admin digitou no campo de preço.
+ *
+ * Aceita as formas que saem do teclado de quem mexe na loja: "199,90",
+ * "1.299,90", "199.9" e "199". Vírgula é sempre decimal; o ponto só separa
+ * milhar quando há vírgula no texto. Devolve `null` para o que não é número —
+ * o painel usa isso para manter o botão desligado em vez de gravar um NaN.
+ */
+export function parsePreco(texto: string): number | null {
+  const limpo = texto.replace(/[^\d.,]/g, "").trim();
+  if (!limpo) return null;
+  const normalizado = limpo.includes(",")
+    ? limpo.replace(/\./g, "").replace(",", ".")
+    : limpo.replace(/\.(?=\d{3}\b)/g, "");
+  const n = Number(normalizado);
+  return Number.isFinite(n) ? n : null;
+}

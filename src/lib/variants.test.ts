@@ -5,7 +5,9 @@ import {
   collapseVariants,
   detectarCores,
   nomeBase,
+  parsePreco,
   planGroup,
+  planPrices,
   productIdFromParam,
   productParam,
   slugify,
@@ -250,5 +252,62 @@ describe("sugestão automática", () => {
 
   it("o nome sem cor é o que aproxima duas peças", () => {
     expect(nomeBase("Camiseta Básica Polo – Preta com Logo Vermelho")).toBe("camiseta basica polo");
+  });
+});
+
+describe("preço do álbum", () => {
+  const album = [
+    { ...peca("a", "Camiseta – Preta"), price: 200 },
+    { ...peca("b", "Camiseta – Branca"), price: 250 },
+  ];
+
+  it("iguala todas as cores no mesmo preço", () => {
+    expect(planPrices(album, { modo: "igualar", valor: 180 })).toEqual([
+      { id: "a", price: 180 },
+      { id: "b", price: 180 },
+    ]);
+  });
+
+  it("baixa a mesma porcentagem em todas, mantendo a diferença entre elas", () => {
+    expect(planPrices(album, { modo: "percentual", valor: -10 })).toEqual([
+      { id: "a", price: 180 },
+      { id: "b", price: 225 },
+    ]);
+  });
+
+  it("baixa o mesmo valor em reais em todas", () => {
+    expect(planPrices(album, { modo: "reais", valor: -30.5 })).toEqual([
+      { id: "a", price: 169.5 },
+      { id: "b", price: 219.5 },
+    ]);
+  });
+
+  it("arredonda o centavo em vez de deixar dízima no preço", () => {
+    const [um] = planPrices([{ ...peca("a", "Camiseta"), price: 219.9 }], {
+      modo: "percentual",
+      valor: -7,
+    });
+    expect(um.price).toBe(204.51);
+  });
+
+  it("não deixa nenhuma cor cair para zero — peça sem preço não vende", () => {
+    expect(planPrices(album, { modo: "reais", valor: -999 })).toEqual([
+      { id: "a", price: 0.01 },
+      { id: "b", price: 0.01 },
+    ]);
+  });
+
+  it("não regrava a cor que já está no preço pedido", () => {
+    expect(planPrices(album, { modo: "igualar", valor: 200 })).toEqual([{ id: "b", price: 200 }]);
+    expect(planPrices(album, { modo: "percentual", valor: 0 })).toEqual([]);
+  });
+
+  it("lê o preço digitado nas formas que saem do teclado", () => {
+    expect(parsePreco("199,90")).toBe(199.9);
+    expect(parsePreco("1.299,90")).toBe(1299.9);
+    expect(parsePreco("R$ 199.90")).toBe(199.9);
+    expect(parsePreco("10")).toBe(10);
+    expect(parsePreco("")).toBeNull();
+    expect(parsePreco("abc")).toBeNull();
   });
 });
