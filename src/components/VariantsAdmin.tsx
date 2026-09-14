@@ -3,10 +3,11 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
+  FolderTree,
+  Layers,
   Plus,
   Search,
   Sparkles,
-  Layers,
   Star,
   Tag,
   Trash2,
@@ -14,14 +15,21 @@ import {
 } from "lucide-react";
 import { formatBRL, type Product } from "@/lib/cart-context";
 import { totalStock, useCatalog, type SizeStock } from "@/lib/catalog-context";
-import { categoryLabel } from "@/lib/categories";
+import {
+  categoryLabel,
+  coerceCategory,
+  PRODUCT_CATEGORIES,
+  type ProductCategory,
+} from "@/lib/categories";
 import { productImageSrc } from "@/lib/product-images";
 import {
+  albumCategories,
   albumSizes,
   detectarCores,
   normalizar,
   PRECO_MINIMO,
   parsePreco,
+  planCategories,
   planGroup,
   planPrices,
   planStock,
@@ -55,8 +63,17 @@ function hexSeguro(v: string | undefined): string {
 }
 
 export function VariantsAdmin() {
-  const { products, groups, stock, saveGroup, setPrices, setStocks, missingColumns, refresh } =
-    useCatalog();
+  const {
+    products,
+    groups,
+    stock,
+    saveGroup,
+    setPrices,
+    setStocks,
+    setCategories,
+    missingColumns,
+    refresh,
+  } = useCatalog();
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [criando, setCriando] = useState(false);
@@ -101,6 +118,15 @@ export function VariantsAdmin() {
     setErro(null);
     setSalvando(true);
     const msg = await setStocks(entries);
+    setSalvando(false);
+    if (msg) setErro(msg);
+    return !msg;
+  };
+
+  const gravarCategoria = async (entries: Array<{ id: string; category: ProductCategory }>) => {
+    setErro(null);
+    setSalvando(true);
+    const msg = await setCategories(entries);
     setSalvando(false);
     if (msg) setErro(msg);
     return !msg;
@@ -191,6 +217,7 @@ export function VariantsAdmin() {
               onPrecos={gravarPrecos}
               estoque={stock}
               onEstoque={gravarEstoque}
+              onCategoria={gravarCategoria}
             />
           ))}
         </div>
@@ -393,6 +420,7 @@ function AlbumEditor({
   onPrecos,
   estoque,
   onEstoque,
+  onCategoria,
 }: {
   album: VariantGroup;
   candidatos: Product[];
@@ -401,6 +429,7 @@ function AlbumEditor({
   onPrecos: (entries: Array<{ id: string; price: number }>) => Promise<boolean>;
   estoque: Record<string, SizeStock>;
   onEstoque: (entries: Array<{ id: string; stock: SizeStock }>) => Promise<boolean>;
+  onCategoria: (entries: Array<{ id: string; category: ProductCategory }>) => Promise<boolean>;
 }) {
   const [aberto, setAberto] = useState(false);
   const [adicionando, setAdicionando] = useState<string[]>([]);
@@ -681,6 +710,8 @@ function AlbumEditor({
             ocupado={ocupado}
             onAplicar={onEstoque}
           />
+
+          <CategoriaDoAlbum membros={membros} ocupado={ocupado} onAplicar={onCategoria} />
 
           <div className="mt-6 border-t border-border pt-4">
             <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
@@ -1056,6 +1087,99 @@ function EstoqueDoAlbum({
           vitrine.
         </p>
       )}
+    </div>
+  );
+}
+
+/* ---------- categoria do álbum ---------- */
+
+/**
+ * A categoria das cores do álbum, escolhida uma vez para todas.
+ *
+ * Aqui não é só conveniência: a vitrine filtra por categoria **antes** de juntar
+ * o álbum num card só, então uma cor cadastrada em outra aba não vira uma
+ * bolinha a mais — vira um card solto lá, e o mesmo modelo passa a aparecer
+ * duas vezes na loja, com capas diferentes. Quando isso acontece, o painel diz
+ * em que abas o álbum está espalhado, em vez de deixar o admin descobrir pela
+ * vitrine.
+ */
+function CategoriaDoAlbum({
+  membros,
+  ocupado,
+  onAplicar,
+}: {
+  membros: Product[];
+  ocupado: boolean;
+  onAplicar: (entries: Array<{ id: string; category: ProductCategory }>) => Promise<boolean>;
+}) {
+  const atuais = albumCategories(membros);
+  const espalhado = atuais.length > 1;
+  // Álbum inteiro numa categoria só: o botão dela já chega marcado, e não há o
+  // que aplicar até o admin escolher outra. Espalhado, ninguém chega escolhido —
+  // qual das abas é a certa é decisão dele.
+  const [escolhida, setEscolhida] = useState<ProductCategory | null>(
+    espalhado ? null : (atuais[0] ?? null),
+  );
+
+  const plano = escolhida ? planCategories(membros, escolhida) : [];
+  const quantasMudam = `${plano.length} ${plano.length === 1 ? "cor muda" : "cores mudam"}`;
+
+  return (
+    <div className="mt-6 border-t border-border pt-4">
+      <div className="flex items-center gap-2">
+        <FolderTree className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
+        <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+          Categoria de todas as cores
+        </p>
+      </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+        Manda as {membros.length} cores deste álbum para a mesma aba da vitrine — Roupas, Sneakers
+        ou Acessórios.
+      </p>
+
+      {espalhado && (
+        <p className="mt-2 text-[10px] leading-relaxed text-[color:var(--gold)]">
+          As cores estão em abas diferentes ({atuais.map(categoryLabel).join(" e ")}), então o mesmo
+          modelo aparece mais de uma vez na vitrine. Escolha a aba certa e aplique.
+        </p>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {PRODUCT_CATEGORIES.map((c) => {
+          const quantas = membros.filter((m) => coerceCategory(m.category) === c).length;
+          return (
+            <button
+              key={c}
+              onClick={() => setEscolhida(c)}
+              aria-pressed={escolhida === c}
+              className={`border px-3 py-1.5 text-[10px] tracking-luxe uppercase transition-colors ${
+                escolhida === c
+                  ? "border-accent bg-accent text-asc-ink"
+                  : "border-border text-muted-foreground hover:border-accent hover:text-accent"
+              }`}
+            >
+              {categoryLabel(c)}
+              {quantas > 0 && ` · ${quantas}`}
+            </button>
+          );
+        })}
+
+        <button
+          onClick={() => void onAplicar(plano)}
+          disabled={plano.length === 0 || ocupado}
+          className="asc-btn-primary px-4 py-2 text-[10px] tracking-luxe uppercase disabled:opacity-40"
+        >
+          <Check className="mr-1.5 inline h-3 w-3" strokeWidth={2} /> Aplicar a todas as cores
+        </button>
+      </div>
+
+      <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+        {escolhida === null
+          ? "Escolha a aba em que este álbum deve ficar."
+          : plano.length === 0
+            ? `Todas as cores já estão em ${categoryLabel(escolhida)}.`
+            : `${quantasMudam} para ${categoryLabel(escolhida)}.`}
+      </p>
     </div>
   );
 }

@@ -3,7 +3,7 @@ import type { Product } from "@/lib/cart-context";
 // fecharia o ciclo. `import type` some na compilação, então não há ciclo nenhum
 // em tempo de execução.
 import type { SizeStock } from "@/lib/catalog-context";
-import { coerceCategory } from "@/lib/categories";
+import { coerceCategory, type ProductCategory } from "@/lib/categories";
 import { ordenarTamanhos, suggestSizes } from "@/lib/sizes";
 
 /**
@@ -724,4 +724,39 @@ export function planStock(
     out.push({ id: m.id, stock: { ...nova } });
   }
   return out;
+}
+
+/* ---------- categoria do álbum ---------- */
+
+/**
+ * A categoria nova de cada cor do álbum.
+ *
+ * Cor em categoria diferente das outras não é detalhe de cadastro: a vitrine
+ * filtra por categoria *antes* de juntar o álbum num card só (é o que faz a aba
+ * mostrar só o que é dela), então a cor desgarrada vira um card solto na outra
+ * aba — o mesmo modelo aparecendo duas vezes na loja, com capas diferentes.
+ * Acertar a categoria de todas de uma vez é o conserto.
+ *
+ * Só volta quem realmente muda, como no preço e no estoque.
+ */
+export function planCategories(
+  membros: readonly Product[],
+  categoria: ProductCategory,
+): Array<{ id: string; category: ProductCategory }> {
+  const out: Array<{ id: string; category: ProductCategory }> = [];
+  for (const m of membros) {
+    if (coerceCategory(m.category) === categoria) continue;
+    out.push({ id: m.id, category: categoria });
+  }
+  return out;
+}
+
+/** As categorias em que as cores do álbum estão hoje, sem repetir. */
+export function albumCategories(membros: readonly Product[]): ProductCategory[] {
+  const vistas: ProductCategory[] = [];
+  for (const m of membros) {
+    const c = coerceCategory(m.category);
+    if (!vistas.includes(c)) vistas.push(c);
+  }
+  return vistas;
 }

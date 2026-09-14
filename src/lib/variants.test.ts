@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { Product } from "@/lib/cart-context";
 import {
+  albumCategories,
   albumSizes,
   buildGroups,
   collapseVariants,
@@ -8,6 +9,7 @@ import {
   nomeBase,
   parsePreco,
   planGroup,
+  planCategories,
   planPrices,
   planStock,
   productIdFromParam,
@@ -350,5 +352,30 @@ describe("estoque do álbum", () => {
 
   it("grade vazia não grava nada — zerar o álbum é digitar zero, não apagar tudo", () => {
     expect(planStock(album, { a: { P: 1 } }, {})).toEqual([]);
+  });
+});
+
+describe("categoria do álbum", () => {
+  it("leva todas as cores para a mesma categoria", () => {
+    const album = [
+      { ...peca("a", "Tênis – Branco"), category: "clothes" as const },
+      { ...peca("b", "Tênis – Preto"), category: "sneakers" as const },
+    ];
+    expect(planCategories(album, "sneakers")).toEqual([{ id: "a", category: "sneakers" }]);
+  });
+
+  it("não regrava a cor que já está na categoria pedida", () => {
+    const album = [peca("a", "Camiseta – Preta"), peca("b", "Camiseta – Branca")];
+    expect(planCategories(album, "clothes")).toEqual([]);
+  });
+
+  it("denuncia o álbum espalhado por mais de uma aba da vitrine", () => {
+    const album = [
+      peca("a", "Camiseta – Preta"),
+      { ...peca("b", "Camiseta – Branca"), category: "acessorios" as const },
+      { ...peca("c", "Camiseta – Cinza"), category: undefined },
+    ];
+    // A cor sem categoria conta como Roupas, que é o padrão do catálogo.
+    expect(albumCategories(album)).toEqual(["clothes", "acessorios"]);
   });
 });

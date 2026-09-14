@@ -9,7 +9,7 @@ import {
 } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Product } from "@/lib/cart-context";
-import { coerceCategory } from "@/lib/categories";
+import { coerceCategory, type ProductCategory } from "@/lib/categories";
 import { SIZE_GRIDS } from "@/lib/sizes";
 import { buildGroups, coerceVariant, type VariantGroup, type VariantMeta } from "@/lib/variants";
 
@@ -122,6 +122,14 @@ type CatalogCtx = {
    * sucesso ou a mensagem pronta para a tela.
    */
   setStocks: (entries: Array<{ id: string; stock: SizeStock }>) => Promise<string | null>;
+  /**
+   * Grava a categoria de várias peças de uma vez — as cores de um álbum que
+   * ficaram em abas diferentes da vitrine, por exemplo. Devolve `null` em caso
+   * de sucesso ou a mensagem pronta para a tela.
+   */
+  setCategories: (
+    entries: Array<{ id: string; category: ProductCategory }>,
+  ) => Promise<string | null>;
   addProduct: (p: ProductInput, stock: SizeStock) => Promise<string | null>;
   deleteProduct: (id: string) => Promise<void>;
   setStock: (id: string, stock: SizeStock) => Promise<void>;
@@ -488,71 +496,83 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   };
 
   /**
-   * Muda o preço de um punhado de peças.
+   * O motor das gravações em lote do painel — preço, estoque e categoria de um
+   * álbum inteiro.
    *
    * Uma linha por vez, pelo mesmo motivo de `saveGroup`: o que muda é diferente
    * em cada peça, e um `upsert` em lote mandaria a linha inteira de volta,
    * sobrescrevendo o que outra tela tivesse acabado de gravar. São poucas cores
    * por álbum, e isto só roda no painel.
    *
-   * O estado local muda antes para a prévia e a vitrine acompanharem na hora;
-   * se o banco recusar, relê tudo e conta o que houve — meio álbum com preço
+   * O estado local muda antes, para a prévia e a vitrine acompanharem na hora;
+   * se o banco recusar, relê tudo e devolve a mensagem — meio álbum com o valor
    * novo e meio com o velho é pior do que não ter mexido.
    */
-  const setPrices: CatalogCtx["setPrices"] = async (entries) => {
-    if (!entries.length) return null;
+  const gravarEmLote = async (
+    linhas: ReadonlyArray<{ id: string; patch: Record<string, unknown> }>,
+    aplicarLocal: () => void,
+    aoFalhar: string,
+  ): Promise<string | null> => {
+    if (!linhas.length) return null;
+    aplicarLocal();
 
-    const porId = new Map(entries.map((e) => [e.id, e.price]));
-    setProducts((prev) =>
-      prev.map((p) => {
-        const novo = porId.get(p.id);
-        return novo === undefined ? p : { ...p, price: novo };
-      }),
+    for (const { id, patch } of linhas) {
+      const { error } = await supabase
+        .from("products")
+        .update(patch as never)
+        .eq("id", id);
+      if (!error) continue;
+
+      console.error("[catalog] gravação em lote falhou", error);
+      await refresh();
+      return aoFalhar;
+    }
+    return null;
+  };
+
+  const setPrices: CatalogCtx["setPrices"] = async (entries) =>
+    gravarEmLote(
+      entries.map((e) => ({ id: e.id, patch: { price: e.price } })),
+      () => {
+        const porId = new Map(entries.map((e) => [e.id, e.price]));
+        setProducts((prev) =>
+          prev.map((p) => {
+            const novo = porId.get(p.id);
+            return novo === undefined ? p : { ...p, price: novo };
+          }),
+        );
+      },
+      "Não foi possível salvar os preços. Tente novamente.",
     );
 
-    for (const { id, price } of entries) {
-      const { error } = await supabase
-        .from("products")
-        .update({ price } as never)
-        .eq("id", id);
-      if (!error) continue;
-
-      console.error("[catalog] setPrices failed", error);
-      await refresh();
-      return "Não foi possível salvar os preços. Tente novamente.";
-    }
-    return null;
-  };
-
-  /**
-   * Muda a grade de um punhado de peças, pelas mesmas razões de `setPrices`:
-   * uma linha por vez, estado local na frente para a prévia acompanhar, e
-   * releitura do banco se alguma recusar — meio álbum com a grade nova e meio
-   * com a velha é pior do que não ter mexido.
-   */
   const setStocks: CatalogCtx["setStocks"] = async (entries) => {
-    if (!entries.length) return null;
-
     const limpos = entries.map((e) => ({ id: e.id, stock: coerceSizeStock(e.stock) }));
-    setStockMap((prev) => {
-      const next = { ...prev };
-      for (const { id, stock } of limpos) next[id] = stock;
-      return next;
-    });
-
-    for (const { id, stock } of limpos) {
-      const { error } = await supabase
-        .from("products")
-        .update({ sizes: stock } as never)
-        .eq("id", id);
-      if (!error) continue;
-
-      console.error("[catalog] setStocks failed", error);
-      await refresh();
-      return "Não foi possível salvar o estoque. Tente novamente.";
-    }
-    return null;
+    return gravarEmLote(
+      limpos.map((e) => ({ id: e.id, patch: { sizes: e.stock } })),
+      () =>
+        setStockMap((prev) => {
+          const next = { ...prev };
+          for (const { id, stock } of limpos) next[id] = stock;
+          return next;
+        }),
+      "Não foi possível salvar o estoque. Tente novamente.",
+    );
   };
+
+  const setCategories: CatalogCtx["setCategories"] = async (entries) =>
+    gravarEmLote(
+      entries.map((e) => ({ id: e.id, patch: { category: e.category } })),
+      () => {
+        const porId = new Map(entries.map((e) => [e.id, e.category]));
+        setProducts((prev) =>
+          prev.map((p) => {
+            const nova = porId.get(p.id);
+            return nova === undefined ? p : { ...p, category: nova };
+          }),
+        );
+      },
+      "Não foi possível salvar a categoria. Tente novamente.",
+    );
 
   const setFeatured: CatalogCtx["setFeatured"] = async (id, featured) => {
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, isFeatured: featured } : p)));
@@ -644,6 +664,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         saveGroup,
         setPrices,
         setStocks,
+        setCategories,
         addProduct,
         deleteProduct,
         setStock,
