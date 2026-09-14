@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { Product } from "@/lib/cart-context";
 import {
+  albumSizes,
   buildGroups,
   collapseVariants,
   detectarCores,
@@ -8,6 +9,7 @@ import {
   parsePreco,
   planGroup,
   planPrices,
+  planStock,
   productIdFromParam,
   productParam,
   slugify,
@@ -309,5 +311,44 @@ describe("preço do álbum", () => {
     expect(parsePreco("10")).toBe(10);
     expect(parsePreco("")).toBeNull();
     expect(parsePreco("abc")).toBeNull();
+  });
+});
+
+describe("estoque do álbum", () => {
+  const album = [peca("a", "Camiseta – Preta"), peca("b", "Camiseta – Branca")];
+
+  it("a grade do álbum é a união do que as cores têm cadastrado, em ordem", () => {
+    expect(albumSizes(album, { a: { M: 2, P: 1 }, b: { G: 0 } })).toEqual(["P", "M", "G"]);
+  });
+
+  it("álbum sem estoque nenhum cai na grade da espécie da peça", () => {
+    expect(albumSizes(album, {})).toEqual(["P", "M", "G", "GG"]);
+  });
+
+  it("aplica a mesma grade em todas as cores", () => {
+    const plano = planStock(album, { a: { P: 1, M: 0 }, b: {} }, { P: 2, M: 3 });
+    expect(plano).toEqual([
+      { id: "a", stock: { P: 2, M: 3 } },
+      { id: "b", stock: { P: 2, M: 3 } },
+    ]);
+  });
+
+  it("apaga o tamanho que sobrou de cadastro antigo — a grade aplicada é a inteira", () => {
+    const plano = planStock([peca("a", "Camiseta")], { a: { P: 1, "40": 2 } }, { P: 1, M: 1 });
+    expect(plano).toEqual([{ id: "a", stock: { P: 1, M: 1 } }]);
+  });
+
+  it("não regrava a cor que já está na grade pedida", () => {
+    const plano = planStock(album, { a: { P: 2, M: 3 }, b: { P: 0, M: 0 } }, { P: 2, M: 3 });
+    expect(plano).toEqual([{ id: "b", stock: { P: 2, M: 3 } }]);
+  });
+
+  it("arruma o que o campo aceita digitar: quebrado, negativo e tamanho em branco", () => {
+    const plano = planStock([peca("a", "Camiseta")], {}, { P: 2.7, M: -5, "": 9 });
+    expect(plano).toEqual([{ id: "a", stock: { P: 2, M: 0 } }]);
+  });
+
+  it("grade vazia não grava nada — zerar o álbum é digitar zero, não apagar tudo", () => {
+    expect(planStock(album, { a: { P: 1 } }, {})).toEqual([]);
   });
 });

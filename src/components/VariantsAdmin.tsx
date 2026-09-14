@@ -6,22 +6,25 @@ import {
   Plus,
   Search,
   Sparkles,
+  Layers,
   Star,
   Tag,
   Trash2,
   X,
 } from "lucide-react";
 import { formatBRL, type Product } from "@/lib/cart-context";
-import { useCatalog } from "@/lib/catalog-context";
+import { totalStock, useCatalog, type SizeStock } from "@/lib/catalog-context";
 import { categoryLabel } from "@/lib/categories";
 import { productImageSrc } from "@/lib/product-images";
 import {
+  albumSizes,
   detectarCores,
   normalizar,
   PRECO_MINIMO,
   parsePreco,
   planGroup,
   planPrices,
+  planStock,
   slugify,
   suggestGroups,
   swatchBackground,
@@ -52,7 +55,8 @@ function hexSeguro(v: string | undefined): string {
 }
 
 export function VariantsAdmin() {
-  const { products, groups, saveGroup, setPrices, missingColumns, refresh } = useCatalog();
+  const { products, groups, stock, saveGroup, setPrices, setStocks, missingColumns, refresh } =
+    useCatalog();
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [criando, setCriando] = useState(false);
@@ -88,6 +92,15 @@ export function VariantsAdmin() {
     setErro(null);
     setSalvando(true);
     const msg = await setPrices(entries);
+    setSalvando(false);
+    if (msg) setErro(msg);
+    return !msg;
+  };
+
+  const gravarEstoque = async (entries: Array<{ id: string; stock: SizeStock }>) => {
+    setErro(null);
+    setSalvando(true);
+    const msg = await setStocks(entries);
     setSalvando(false);
     if (msg) setErro(msg);
     return !msg;
@@ -176,6 +189,8 @@ export function VariantsAdmin() {
               ocupado={salvando}
               onSalvar={gravar}
               onPrecos={gravarPrecos}
+              estoque={stock}
+              onEstoque={gravarEstoque}
             />
           ))}
         </div>
@@ -376,12 +391,16 @@ function AlbumEditor({
   ocupado,
   onSalvar,
   onPrecos,
+  estoque,
+  onEstoque,
 }: {
   album: VariantGroup;
   candidatos: Product[];
   ocupado: boolean;
   onSalvar: (entries: Array<{ id: string; meta: VariantMeta | null }>) => Promise<boolean>;
   onPrecos: (entries: Array<{ id: string; price: number }>) => Promise<boolean>;
+  estoque: Record<string, SizeStock>;
+  onEstoque: (entries: Array<{ id: string; stock: SizeStock }>) => Promise<boolean>;
 }) {
   const [aberto, setAberto] = useState(false);
   const [adicionando, setAdicionando] = useState<string[]>([]);
@@ -489,6 +508,7 @@ function AlbumEditor({
                 <th className="py-2 pr-3">Ordem</th>
                 <th className="py-2 pr-3">Peça</th>
                 <th className="py-2 pr-3 text-right">Preço</th>
+                <th className="py-2 pr-3 text-right">Estoque</th>
                 <th className="py-2 pr-3">Peça · Logo</th>
                 <th className="py-2 pr-3">Nome da cor</th>
                 <th className="py-2 pr-3 text-right">Principal</th>
@@ -550,6 +570,13 @@ function AlbumEditor({
                         >
                           Sem preço
                         </span>
+                      )}
+                    </td>
+                    <td className="py-2 pr-3 text-right text-xs tabular-nums">
+                      {totalStock(estoque[m.id]) > 0 ? (
+                        `${totalStock(estoque[m.id])} un.`
+                      ) : (
+                        <span className="text-destructive">Esgotado</span>
                       )}
                     </td>
                     <td className="py-2 pr-3">
@@ -646,6 +673,14 @@ function AlbumEditor({
           </div>
 
           <PrecoDoAlbum membros={membros} ocupado={ocupado} onAplicar={onPrecos} />
+
+          <EstoqueDoAlbum
+            membros={membros}
+            principal={album.primary}
+            estoque={estoque}
+            ocupado={ocupado}
+            onAplicar={onEstoque}
+          />
 
           <div className="mt-6 border-t border-border pt-4">
             <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
@@ -852,6 +887,173 @@ function PrecoDoAlbum({
         <p className="mt-2 text-[10px] leading-relaxed text-destructive">
           O desconto zeraria o preço de alguma cor. Peça sem preço tem o pagamento recusado, então
           ela para em {formatBRL(PRECO_MINIMO)} — confira a prévia antes de aplicar.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ---------- estoque do álbum ---------- */
+
+/**
+ * A grade de tamanhos do álbum, digitada uma vez e gravada em todas as cores.
+ *
+ * O mesmo motivo do preço: a grade chega igual para todas as cores do modelo —
+ * duas de cada tamanho, em todas —, e gravá-la significava abrir cor por cor e
+ * repetir os mesmos números, com a chance de a última ficar esgotada na vitrine
+ * sem ninguém notar. O botão "Copiar de" puxa o que uma cor já tem, para o caso
+ * comum de o álbum ganhar uma cor nova depois.
+ *
+ * O que for aplicado substitui a grade da cor inteira, inclusive apagando um
+ * tamanho que ela tinha e o álbum não tem — é assim que uma grade mista
+ * (resquício de cadastro antigo) se conserta de uma vez. Nada vai para o banco
+ * antes da prévia.
+ */
+function EstoqueDoAlbum({
+  membros,
+  principal,
+  estoque,
+  ocupado,
+  onAplicar,
+}: {
+  membros: Product[];
+  principal: Product;
+  estoque: Record<string, SizeStock>;
+  ocupado: boolean;
+  onAplicar: (entries: Array<{ id: string; stock: SizeStock }>) => Promise<boolean>;
+}) {
+  // Tamanho tirado da grade some do campo e, ao aplicar, some do cadastro de
+  // todas as cores — é o conserto de uma grade mista ("P" e "40" na mesma peça,
+  // resquício de cadastro antigo), que a vitrine hoje mostra como esgotado.
+  const [excluidos, setExcluidos] = useState<string[]>([]);
+  const tamanhos = albumSizes(membros, estoque).filter((t) => !excluidos.includes(t));
+  // Começa na grade da peça principal, e não em zero: o valor de partida do
+  // campo é o que já está no ar, para quem abrir o painel e clicar em aplicar
+  // sem ler não esgotar o álbum inteiro sem querer.
+  const [rascunho, setRascunho] = useState<Record<string, string>>(() =>
+    Object.fromEntries(tamanhos.map((t) => [t, String(estoque[principal.id]?.[t] ?? 0)])),
+  );
+
+  const grade: SizeStock = Object.fromEntries(
+    tamanhos.map((t) => [t, Math.max(0, Math.floor(Number(rascunho[t]) || 0))]),
+  );
+  const porCor = totalStock(grade);
+  const plano = planStock(membros, estoque, grade);
+
+  const copiarDe = (p: Product) =>
+    setRascunho(Object.fromEntries(tamanhos.map((t) => [t, String(estoque[p.id]?.[t] ?? 0)])));
+
+  const aplicar = async () => {
+    if (!plano.length) return;
+    const ok = await onAplicar(plano);
+    // Gravou: o tamanho tirado já não existe em nenhuma cor, então a união das
+    // grades volta a ser a verdade e a exclusão local deixa de ser necessária.
+    if (ok) setExcluidos([]);
+  };
+
+  return (
+    <div className="mt-6 border-t border-border pt-4">
+      <div className="flex items-center gap-2">
+        <Layers className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
+        <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+          Estoque de todas as cores
+        </p>
+      </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+        Digite a grade uma vez e ela vale para as {membros.length} cores deste álbum. A grade
+        aplicada substitui a da cor inteira — confira a prévia antes de gravar.
+      </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] tracking-luxe uppercase text-muted-foreground">Copiar de</span>
+        {membros.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => copiarDe(m)}
+            title={`Preencher com o estoque de ${swatchLabel(m)}`}
+            className="inline-flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-[10px] tracking-luxe uppercase text-muted-foreground transition-colors hover:border-accent hover:text-accent"
+          >
+            <span
+              aria-hidden
+              className="h-3 w-3 rounded-full border border-asc-ink/20"
+              style={{ background: swatchBackground(m.variant, m.name) }}
+            />
+            {totalStock(estoque[m.id])} un.
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        {tamanhos.map((t) => (
+          <div key={t} className="flex flex-col gap-1">
+            <span className="flex items-center gap-1 text-[10px] tracking-luxe uppercase text-muted-foreground">
+              {t}
+              <button
+                onClick={() => setExcluidos((v) => [...v, t])}
+                aria-label={`Tirar o tamanho ${t} da grade`}
+                title="Tirar este tamanho da grade do álbum"
+                className="text-muted-foreground transition-colors hover:text-destructive"
+              >
+                <X className="h-2.5 w-2.5" strokeWidth={2.5} />
+              </button>
+            </span>
+            <input
+              value={rascunho[t] ?? "0"}
+              onChange={(e) => setRascunho((r) => ({ ...r, [t]: e.target.value }))}
+              inputMode="numeric"
+              aria-label={`Quantidade do tamanho ${t}`}
+              className="w-16 border border-border bg-background px-2 py-1.5 text-sm tabular-nums outline-none focus:border-accent"
+            />
+          </div>
+        ))}
+        <button
+          onClick={() => void aplicar()}
+          disabled={plano.length === 0 || ocupado}
+          className="asc-btn-primary px-4 py-2 text-[10px] tracking-luxe uppercase disabled:opacity-40"
+        >
+          <Check className="mr-1.5 inline h-3 w-3" strokeWidth={2} /> Aplicar a todas as cores
+        </button>
+      </div>
+
+      {tamanhos.length === 0 ? (
+        <p className="mt-3 text-[10px] text-muted-foreground">
+          Sem tamanho na grade não há o que gravar — o estoque de uma peça é a grade dela.
+        </p>
+      ) : plano.length === 0 ? (
+        <p className="mt-3 text-[10px] text-muted-foreground">
+          Todas as cores já estão nessa grade.
+        </p>
+      ) : (
+        <ul className="mt-3 flex flex-col gap-1.5 border border-border/60 px-3 py-2">
+          {membros.map((m) => {
+            const muda = plano.some((e) => e.id === m.id);
+            const antes = totalStock(estoque[m.id]);
+            return (
+              <li key={m.id} className="flex items-center justify-between gap-3 text-xs">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span
+                    aria-hidden
+                    className="h-3.5 w-3.5 flex-none rounded-full border border-asc-ink/20"
+                    style={{ background: swatchBackground(m.variant, m.name) }}
+                  />
+                  <span className="truncate text-muted-foreground">{swatchLabel(m)}</span>
+                </span>
+                <span className="flex-none whitespace-nowrap tabular-nums">
+                  <span className={muda ? "line-through" : "text-muted-foreground"}>
+                    {antes} un.
+                  </span>
+                  {muda && <span className="ml-2 font-serif text-accent">{porCor} un.</span>}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {porCor === 0 && plano.length > 0 && (
+        <p className="mt-2 text-[10px] leading-relaxed text-destructive">
+          A grade está toda em zero: aplicar assim deixa as {membros.length} cores esgotadas na
+          vitrine.
         </p>
       )}
     </div>

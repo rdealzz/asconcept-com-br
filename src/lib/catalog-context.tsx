@@ -116,6 +116,12 @@ type CatalogCtx = {
    * sucesso ou a mensagem pronta para a tela.
    */
   setPrices: (entries: Array<{ id: string; price: number }>) => Promise<string | null>;
+  /**
+   * Grava a grade de tamanhos de várias peças de uma vez — o mesmo estoque nas
+   * várias cores de um álbum, sem abrir cor por cor. Devolve `null` em caso de
+   * sucesso ou a mensagem pronta para a tela.
+   */
+  setStocks: (entries: Array<{ id: string; stock: SizeStock }>) => Promise<string | null>;
   addProduct: (p: ProductInput, stock: SizeStock) => Promise<string | null>;
   deleteProduct: (id: string) => Promise<void>;
   setStock: (id: string, stock: SizeStock) => Promise<void>;
@@ -518,6 +524,36 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     return null;
   };
 
+  /**
+   * Muda a grade de um punhado de peças, pelas mesmas razões de `setPrices`:
+   * uma linha por vez, estado local na frente para a prévia acompanhar, e
+   * releitura do banco se alguma recusar — meio álbum com a grade nova e meio
+   * com a velha é pior do que não ter mexido.
+   */
+  const setStocks: CatalogCtx["setStocks"] = async (entries) => {
+    if (!entries.length) return null;
+
+    const limpos = entries.map((e) => ({ id: e.id, stock: coerceSizeStock(e.stock) }));
+    setStockMap((prev) => {
+      const next = { ...prev };
+      for (const { id, stock } of limpos) next[id] = stock;
+      return next;
+    });
+
+    for (const { id, stock } of limpos) {
+      const { error } = await supabase
+        .from("products")
+        .update({ sizes: stock } as never)
+        .eq("id", id);
+      if (!error) continue;
+
+      console.error("[catalog] setStocks failed", error);
+      await refresh();
+      return "Não foi possível salvar o estoque. Tente novamente.";
+    }
+    return null;
+  };
+
   const setFeatured: CatalogCtx["setFeatured"] = async (id, featured) => {
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, isFeatured: featured } : p)));
     const { error } = await supabase
@@ -607,6 +643,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         setFeatured,
         saveGroup,
         setPrices,
+        setStocks,
         addProduct,
         deleteProduct,
         setStock,

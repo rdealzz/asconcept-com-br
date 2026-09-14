@@ -1,5 +1,10 @@
 import type { Product } from "@/lib/cart-context";
+// Só o tipo: `catalog-context` importa este arquivo, e um `import` de valor
+// fecharia o ciclo. `import type` some na compilação, então não há ciclo nenhum
+// em tempo de execução.
+import type { SizeStock } from "@/lib/catalog-context";
 import { coerceCategory } from "@/lib/categories";
+import { ordenarTamanhos, suggestSizes } from "@/lib/sizes";
 
 /**
  * Variações de cor — o álbum de uma peça.
@@ -647,4 +652,76 @@ export function parsePreco(texto: string): number | null {
     : limpo.replace(/\.(?=\d{3}\b)/g, "");
   const n = Number(normalizado);
   return Number.isFinite(n) ? n : null;
+}
+
+/* ---------- estoque do álbum ---------- */
+
+/**
+ * A grade de tamanhos do álbum — a união do que as cores têm cadastrado.
+ *
+ * Quem manda é o cadastro, como em `sizesForProduct`: se uma cor foi gravada em
+ * P/M/G e outra só em M, o painel mostra P/M/G, para o admin não ter de
+ * adivinhar o tamanho que falta numa delas. Álbum recém-criado, sem estoque em
+ * nenhuma cor, cai na grade sugerida pela espécie da primeira peça — é a mesma
+ * conta que o formulário de cadastro faz.
+ */
+export function albumSizes(
+  membros: readonly Product[],
+  estoque: Readonly<Record<string, SizeStock>>,
+): string[] {
+  const chaves = new Set<string>();
+  for (const m of membros) {
+    for (const tamanho of Object.keys(estoque[m.id] ?? {})) {
+      if (tamanho.trim()) chaves.add(tamanho);
+    }
+  }
+  if (chaves.size) return ordenarTamanhos([...chaves]);
+  const base = membros[0];
+  return base ? [...suggestSizes(base.category, base.name)] : [];
+}
+
+/** Grade limpa: quantidade inteira, nunca negativa, sem tamanho em branco. */
+function gradeLimpa(grade: SizeStock): SizeStock {
+  const out: SizeStock = {};
+  for (const [tamanho, qtd] of Object.entries(grade)) {
+    if (!tamanho.trim()) continue;
+    out[tamanho] = Math.max(0, Math.floor(Number(qtd) || 0));
+  }
+  return out;
+}
+
+/** Duas grades iguais — mesmos tamanhos e mesmas quantidades. */
+function mesmaGrade(a: SizeStock, b: SizeStock): boolean {
+  const chaves = Object.keys(a);
+  if (chaves.length !== Object.keys(b).length) return false;
+  return chaves.every((k) => (Number(a[k]) || 0) === (Number(b[k]) || 0));
+}
+
+/**
+ * O estoque novo de cada cor do álbum.
+ *
+ * A mesma dor do preço, no campo ao lado: a grade chega igual para todas as
+ * cores do modelo, e gravá-la significava abrir cor por cor e repetir os mesmos
+ * números — com a chance de a última ficar esgotada na vitrine sem ninguém
+ * notar. A grade aplicada substitui a da cor inteira, inclusive apagando um
+ * tamanho que ela tinha e o álbum não tem: é assim que uma grade mista
+ * (resquício de cadastro antigo) se conserta de uma vez.
+ *
+ * Só volta quem realmente muda — cor que já está na grade pedida não é
+ * regravada, e o painel usa a lista vazia para saber que não há o que salvar.
+ */
+export function planStock(
+  membros: readonly Product[],
+  estoque: Readonly<Record<string, SizeStock>>,
+  grade: SizeStock,
+): Array<{ id: string; stock: SizeStock }> {
+  const nova = gradeLimpa(grade);
+  if (!Object.keys(nova).length) return [];
+
+  const out: Array<{ id: string; stock: SizeStock }> = [];
+  for (const m of membros) {
+    if (mesmaGrade(estoque[m.id] ?? {}, nova)) continue;
+    out.push({ id: m.id, stock: { ...nova } });
+  }
+  return out;
 }
