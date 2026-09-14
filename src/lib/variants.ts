@@ -760,3 +760,59 @@ export function albumCategories(membros: readonly Product[]): ProductCategory[] 
   }
   return vistas;
 }
+
+/* ---------- nome do álbum ---------- */
+
+/** O separador que a loja usa entre o modelo e a cor no nome da peça. */
+const SEPARADOR = " – ";
+const SEPARADOR_QUALQUER = /\s[–—-]\s/;
+
+/**
+ * A parte do nome que descreve a cor — o que vem depois do traço.
+ *
+ * Ordem de preferência, da mais fiel ao que está na tela para a mais deduzida:
+ * a cauda do próprio nome ("Camiseta Polo – Preta com Logo Vermelho"), o rótulo
+ * de cor que o admin gravou no álbum, e por fim o que se lê do nome inteiro
+ * ("Camiseta Preta" → "Preta"). Vazio quando não há cor nenhuma no cadastro.
+ */
+export function nomeDaCor(p: Product): string {
+  const corte = SEPARADOR_QUALQUER.exec(p.name);
+  if (corte) {
+    const cauda = p.name.slice(corte.index + corte[0].length).trim();
+    if (cauda && detectarCores(cauda).color) return cauda;
+  }
+  return p.variant?.colorLabel ?? detectarCores(p.name).colorLabel ?? "";
+}
+
+/**
+ * Os nomes novos das cores do álbum, a partir de um nome de modelo só.
+ *
+ * Aqui "o mesmo para todas" não pode ser o mesmo texto: cada cor é uma peça com
+ * nome próprio na vitrine, na busca e na URL, e sete peças chamadas igual é o
+ * cliente sem saber qual está abrindo. O que se repete é o modelo — "Camiseta
+ * Básica Polo Ralph Lauren" —, e cada cor continua levando a sua cauda: a
+ * correção de um nome de modelo escrito errado vale para o álbum inteiro sem
+ * apagar a cor de ninguém.
+ *
+ * A cor que não tem cauda nenhuma fica só com o modelo. É o caso que pode gerar
+ * nome repetido, e por isso o painel mostra a prévia e avisa.
+ *
+ * O endereço da peça muda junto (a URL leva o nome na frente do id), mas link
+ * antigo continua abrindo: `productIdFromParam` lê o id do fim.
+ */
+export function planNames(
+  membros: readonly Product[],
+  modelo: string,
+): Array<{ id: string; name: string }> {
+  const base = modelo.trim();
+  if (!base) return [];
+
+  const out: Array<{ id: string; name: string }> = [];
+  for (const p of membros) {
+    const cor = nomeDaCor(p);
+    const nome = cor ? `${base}${SEPARADOR}${cor}` : base;
+    if (nome === p.name) continue;
+    out.push({ id: p.id, name: nome });
+  }
+  return out;
+}

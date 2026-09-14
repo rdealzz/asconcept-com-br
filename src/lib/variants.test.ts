@@ -7,9 +7,11 @@ import {
   collapseVariants,
   detectarCores,
   nomeBase,
+  nomeDaCor,
   parsePreco,
-  planGroup,
   planCategories,
+  planGroup,
+  planNames,
   planPrices,
   planStock,
   productIdFromParam,
@@ -377,5 +379,47 @@ describe("categoria do álbum", () => {
     ];
     // A cor sem categoria conta como Roupas, que é o padrão do catálogo.
     expect(albumCategories(album)).toEqual(["clothes", "acessorios"]);
+  });
+});
+
+describe("nome do modelo", () => {
+  it("troca o modelo em todas as cores e devolve a cauda de cada uma", () => {
+    const album = [
+      peca("a", "Camiseta Básica Polo – Preta com Logo Vermelho"),
+      peca("b", "Camiseta Básica Polo - Branca"),
+    ];
+    expect(planNames(album, "Camiseta Polo Ralph Lauren")).toEqual([
+      { id: "a", name: "Camiseta Polo Ralph Lauren – Preta com Logo Vermelho" },
+      { id: "b", name: "Camiseta Polo Ralph Lauren – Branca" },
+    ]);
+  });
+
+  it("acha a cor sem traço no nome, pelo rótulo gravado ou pelo próprio nome", () => {
+    expect(nomeDaCor(peca("a", "Camiseta Preta"))).toBe("Preta");
+    expect(nomeDaCor(peca("b", "Camiseta", { group: "g", colorLabel: "Verde musgo" }))).toBe(
+      "Verde musgo",
+    );
+    expect(nomeDaCor(peca("c", "Camiseta"))).toBe("");
+  });
+
+  it("não corta o que vem depois do traço e não é cor", () => {
+    expect(nomeDaCor(peca("a", "Camisa – Edição Inverno"))).toBe("");
+    expect(planNames([peca("a", "Camisa – Edição Inverno")], "Camisa Oxford")).toEqual([
+      { id: "a", name: "Camisa Oxford" },
+    ]);
+  });
+
+  it("não regrava a cor que já está com o nome certo", () => {
+    const album = [peca("a", "Camiseta Polo – Preta"), peca("b", "Camiseta Polo – Branca")];
+    expect(planNames(album, "Camiseta Polo")).toEqual([]);
+  });
+
+  it("modelo em branco não renomeia nada", () => {
+    expect(planNames([peca("a", "Camiseta – Preta")], "   ")).toEqual([]);
+  });
+
+  it("o nome novo continua abrindo a peça pela URL", () => {
+    const [novo] = planNames([peca(UUID_A, "Camiseta Polo – Preta")], "Camisa Oxford");
+    expect(productIdFromParam(productParam({ id: UUID_A, name: novo.name }))).toBe(UUID_A);
   });
 });

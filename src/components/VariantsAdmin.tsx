@@ -5,6 +5,7 @@ import {
   Check,
   FolderTree,
   Layers,
+  PenLine,
   Plus,
   Search,
   Sparkles,
@@ -31,6 +32,7 @@ import {
   parsePreco,
   planCategories,
   planGroup,
+  planNames,
   planPrices,
   planStock,
   slugify,
@@ -71,6 +73,7 @@ export function VariantsAdmin() {
     setPrices,
     setStocks,
     setCategories,
+    setNames,
     missingColumns,
     refresh,
   } = useCatalog();
@@ -127,6 +130,15 @@ export function VariantsAdmin() {
     setErro(null);
     setSalvando(true);
     const msg = await setCategories(entries);
+    setSalvando(false);
+    if (msg) setErro(msg);
+    return !msg;
+  };
+
+  const gravarNomes = async (entries: Array<{ id: string; name: string }>) => {
+    setErro(null);
+    setSalvando(true);
+    const msg = await setNames(entries);
     setSalvando(false);
     if (msg) setErro(msg);
     return !msg;
@@ -218,6 +230,7 @@ export function VariantsAdmin() {
               estoque={stock}
               onEstoque={gravarEstoque}
               onCategoria={gravarCategoria}
+              onNomes={gravarNomes}
             />
           ))}
         </div>
@@ -421,6 +434,7 @@ function AlbumEditor({
   estoque,
   onEstoque,
   onCategoria,
+  onNomes,
 }: {
   album: VariantGroup;
   candidatos: Product[];
@@ -430,6 +444,7 @@ function AlbumEditor({
   estoque: Record<string, SizeStock>;
   onEstoque: (entries: Array<{ id: string; stock: SizeStock }>) => Promise<boolean>;
   onCategoria: (entries: Array<{ id: string; category: ProductCategory }>) => Promise<boolean>;
+  onNomes: (entries: Array<{ id: string; name: string }>) => Promise<boolean>;
 }) {
   const [aberto, setAberto] = useState(false);
   const [adicionando, setAdicionando] = useState<string[]>([]);
@@ -446,10 +461,11 @@ function AlbumEditor({
     primaryId: string,
     removidos: Product[] = [],
     metas: Record<string, Partial<VariantMeta>> = rascunho,
+    label: string = album.label,
   ) => {
     const plano = planGroup(
       album.id,
-      album.label,
+      label,
       ordem.map((p) => ({ product: p, meta: metas[p.id] })),
       primaryId,
     );
@@ -485,6 +501,18 @@ function AlbumEditor({
     if (!novas.length) return;
     setAdicionando([]);
     void aplicar([...membros, ...novas], principal);
+  };
+
+  /**
+   * Renomeia as cores e o álbum na mesma ação: o nome do álbum é o modelo
+   * escrito uma vez só, e vê-lo desatualizado no painel enquanto as peças já
+   * mudaram é ver duas verdades para o mesmo fato.
+   */
+  const renomear = async (plano: Array<{ id: string; name: string }>, modelo: string) => {
+    const ok = await onNomes(plano);
+    if (ok && modelo && modelo !== album.label) {
+      await aplicar(membros, principal, [], rascunho, modelo);
+    }
   };
 
   return (
@@ -712,6 +740,13 @@ function AlbumEditor({
           />
 
           <CategoriaDoAlbum membros={membros} ocupado={ocupado} onAplicar={onCategoria} />
+
+          <NomeDoAlbum
+            membros={membros}
+            label={album.label}
+            ocupado={ocupado}
+            onAplicar={renomear}
+          />
 
           <div className="mt-6 border-t border-border pt-4">
             <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
@@ -1180,6 +1215,128 @@ function CategoriaDoAlbum({
             ? `Todas as cores já estão em ${categoryLabel(escolhida)}.`
             : `${quantasMudam} para ${categoryLabel(escolhida)}.`}
       </p>
+    </div>
+  );
+}
+
+/* ---------- nome do álbum ---------- */
+
+/**
+ * O nome do modelo, escrito uma vez e gravado em todas as cores.
+ *
+ * "O mesmo nome para todas" não pode ser o mesmo texto: cada cor é uma peça com
+ * nome próprio na vitrine, na busca e na URL, e sete peças chamadas igual é o
+ * cliente sem saber qual está abrindo. O que se repete é o modelo — "Camiseta
+ * Básica Polo Ralph Lauren" —, e cada cor continua levando a sua cauda. Corrigir
+ * o modelo escrito errado passa a valer para o álbum inteiro sem apagar a cor
+ * de ninguém; a prévia mostra nome por nome antes de gravar.
+ *
+ * O álbum é renomeado junto, na mesma ação — é o mesmo modelo.
+ */
+function NomeDoAlbum({
+  membros,
+  label,
+  ocupado,
+  onAplicar,
+}: {
+  membros: Product[];
+  label: string;
+  ocupado: boolean;
+  onAplicar: (plano: Array<{ id: string; name: string }>, modelo: string) => Promise<void>;
+}) {
+  const [texto, setTexto] = useState(label);
+  const modelo = texto.trim();
+
+  const plano = planNames(membros, modelo);
+  const novos = new Map(plano.map((e) => [e.id, e.name]));
+  // Cor sem cauda de cor fica só com o modelo, e duas delas colidem. Não é
+  // impedimento — a loja funciona com nomes repetidos —, mas é coisa que o
+  // admin tem de ver antes, e não depois, na vitrine.
+  const finais = membros.map((m) => novos.get(m.id) ?? m.name);
+  const repetido = modelo.length > 0 && new Set(finais).size < finais.length;
+  const soOAlbum = plano.length === 0 && modelo.length > 0 && modelo !== label;
+
+  return (
+    <div className="mt-6 border-t border-border pt-4">
+      <div className="flex items-center gap-2">
+        <PenLine className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
+        <p className="text-[10px] tracking-luxe uppercase text-muted-foreground">
+          Nome de todas as cores
+        </p>
+      </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+        Escreva o modelo uma vez e ele vale para as {membros.length} cores — cada uma mantém a sua
+        cor no fim do nome. O álbum é renomeado junto.
+      </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder="Ex: Camiseta Básica Polo Ralph Lauren"
+          aria-label="Nome do modelo"
+          className="min-w-[16rem] flex-1 border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+        />
+        <button
+          onClick={() => void onAplicar(plano, modelo)}
+          disabled={(plano.length === 0 && !soOAlbum) || ocupado}
+          className="asc-btn-primary px-4 py-2 text-[10px] tracking-luxe uppercase disabled:opacity-40"
+        >
+          <Check className="mr-1.5 inline h-3 w-3" strokeWidth={2} /> Aplicar a todas as cores
+        </button>
+      </div>
+
+      {modelo.length === 0 ? (
+        <p className="mt-3 text-[10px] text-muted-foreground">
+          Sem modelo escrito não há o que gravar.
+        </p>
+      ) : plano.length === 0 ? (
+        <p className="mt-3 text-[10px] text-muted-foreground">
+          {soOAlbum
+            ? "As peças já estão com esse modelo no nome; só o álbum será renomeado."
+            : "Todas as cores já estão com esse nome."}
+        </p>
+      ) : (
+        <ul className="mt-3 flex flex-col gap-2 border border-border/60 px-3 py-2">
+          {membros.map((m) => {
+            const novo = novos.get(m.id);
+            return (
+              <li key={m.id} className="flex items-start gap-2 text-xs">
+                <span
+                  aria-hidden
+                  className="mt-0.5 h-3.5 w-3.5 flex-none rounded-full border border-asc-ink/20"
+                  style={{ background: swatchBackground(m.variant, m.name) }}
+                />
+                <span className="min-w-0">
+                  <span
+                    className={`block leading-tight text-muted-foreground ${
+                      novo === undefined ? "" : "line-through"
+                    }`}
+                  >
+                    {m.name}
+                  </span>
+                  {novo !== undefined && (
+                    <span className="block font-serif leading-tight text-accent">{novo}</span>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {repetido && (
+        <p className="mt-2 text-[10px] leading-relaxed text-destructive">
+          Duas cores ficariam com o mesmo nome — alguma delas não tem cor no cadastro. Preencha o
+          nome da cor na tabela acima para cada uma aparecer com o seu.
+        </p>
+      )}
+
+      {plano.length > 0 && (
+        <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+          O endereço da peça muda junto com o nome; os links antigos continuam abrindo.
+        </p>
+      )}
     </div>
   );
 }

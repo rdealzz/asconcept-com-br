@@ -130,6 +130,12 @@ type CatalogCtx = {
   setCategories: (
     entries: Array<{ id: string; category: ProductCategory }>,
   ) => Promise<string | null>;
+  /**
+   * Grava o nome de várias peças de uma vez — as cores de um álbum que precisam
+   * levar o mesmo modelo no nome. Devolve `null` em caso de sucesso ou a
+   * mensagem pronta para a tela.
+   */
+  setNames: (entries: Array<{ id: string; name: string }>) => Promise<string | null>;
   addProduct: (p: ProductInput, stock: SizeStock) => Promise<string | null>;
   deleteProduct: (id: string) => Promise<void>;
   setStock: (id: string, stock: SizeStock) => Promise<void>;
@@ -559,6 +565,21 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const setNames: CatalogCtx["setNames"] = async (entries) =>
+    gravarEmLote(
+      entries.map((e) => ({ id: e.id, patch: { name: e.name } })),
+      () => {
+        const porId = new Map(entries.map((e) => [e.id, e.name]));
+        setProducts((prev) =>
+          prev.map((p) => {
+            const novo = porId.get(p.id);
+            return novo === undefined ? p : { ...p, name: novo };
+          }),
+        );
+      },
+      "Não foi possível salvar os nomes. Tente novamente.",
+    );
+
   const setCategories: CatalogCtx["setCategories"] = async (entries) =>
     gravarEmLote(
       entries.map((e) => ({ id: e.id, patch: { category: e.category } })),
@@ -665,6 +686,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         setPrices,
         setStocks,
         setCategories,
+        setNames,
         addProduct,
         deleteProduct,
         setStock,
