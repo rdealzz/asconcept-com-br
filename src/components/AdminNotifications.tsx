@@ -8,6 +8,8 @@ import {
   type AdminNotification,
   type AdminNotificationKind,
 } from "@/lib/admin-notifications";
+import { useAuth } from "@/lib/auth-context";
+import { bloquearSeSomenteLeitura } from "@/lib/admin-access";
 
 /**
  * A aba de avisos do painel.
@@ -71,15 +73,17 @@ export function AdminNotifications({
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [reconciliados, setReconciliados] = useState<number | null>(null);
+  const { user } = useAuth();
+  const somenteLeitura = !!user?.readOnly;
 
   const carregar = useCallback(async () => {
     setCarregando(true);
-    const r = await fetchAdminNotifications();
+    const r = await fetchAdminNotifications(somenteLeitura);
     setAvisos(r.avisos);
     setSemTabela(r.semTabela);
     setErro(r.erro);
     setCarregando(false);
-  }, []);
+  }, [somenteLeitura]);
 
   // Primeiro a varredura, depois a lista: um pedido que baixe agora já entra
   // na lista desta mesma abertura, em vez de aparecer só na próxima.
@@ -97,12 +101,14 @@ export function AdminNotifications({
   }, [carregar, onReconcile]);
 
   const marcarUm = async (id: string) => {
+    if (bloquearSeSomenteLeitura(user)) return;
     const agora = new Date().toISOString();
     setAvisos((prev) => prev.map((a) => (a.id === id ? { ...a, readAt: agora } : a)));
     if (!(await markNotificationRead(id))) await carregar();
   };
 
   const marcarTodos = async () => {
+    if (bloquearSeSomenteLeitura(user)) return;
     const agora = new Date().toISOString();
     setAvisos((prev) => prev.map((a) => (a.readAt ? a : { ...a, readAt: agora })));
     if (!(await markAllNotificationsRead())) await carregar();

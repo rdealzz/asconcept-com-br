@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./auth-context";
 import { adminCreateManualOrder, adminUpdateOrderStatus } from "./admin.functions";
+import { bloquearSeSomenteLeitura, SOMENTE_LEITURA } from "./admin-access";
+import { lerTabelaDoPainel } from "./admin-viewer";
 import {
   isFlowStatus,
   isPrePaymentStatus,
@@ -108,10 +110,11 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase
-      .from("orders")
-      .select("*")
-      .order("created_at", { ascending: false });
+    // Admin de visualização: sem o papel no banco, a RLS mostraria só os
+    // pedidos dele — a lista da loja vem pelo servidor.
+    const { data, error } = user.readOnly
+      ? await lerTabelaDoPainel<Row>("orders")
+      : await supabase.from("orders").select("*").order("created_at", { ascending: false });
     setLoading(false);
     if (error) {
       console.error("[orders] fetch failed", error);
@@ -126,6 +129,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
 
   const createManualOrder: OrdersCtx["createManualOrder"] = async (o) => {
     if (!user) throw new Error("Não autenticado.");
+    if (bloquearSeSomenteLeitura(user)) throw new Error(SOMENTE_LEITURA);
     const { orderNumber, status, stockConsumed } = await adminCreateManualOrder({ data: o });
     // A lista vem do banco em vez de ser remendada aqui: a venda de balcão
     // mexe em estoque e em pedido na mesma ida, e o que o servidor gravou é a
@@ -135,6 +139,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
   };
 
   const updateStatus: OrdersCtx["updateStatus"] = async (id, status, trackingCode) => {
+    if (bloquearSeSomenteLeitura(user)) throw new Error(SOMENTE_LEITURA);
     const target = orders.find((o) => o.id === id);
     if (!target) return;
     const result = await adminUpdateOrderStatus({
@@ -150,6 +155,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
   };
 
   const setTrackingCode: OrdersCtx["setTrackingCode"] = async (id, trackingCode) => {
+    if (bloquearSeSomenteLeitura(user)) throw new Error(SOMENTE_LEITURA);
     const { error } = await supabase
       .from("orders")
       .update({ tracking_code: trackingCode || null })

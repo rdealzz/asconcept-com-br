@@ -17,6 +17,7 @@ import {
   Lock,
 } from "lucide-react";
 import { useAuth, isMasterAdminEmail } from "@/lib/auth-context";
+import { lerTabelaDoPainel } from "@/lib/admin-viewer";
 import { useOrders } from "@/lib/orders-context";
 import { formatBRL } from "@/lib/cart-context";
 import { supabase } from "@/integrations/supabase/client";
@@ -117,7 +118,9 @@ function OrdersPage() {
     }
   }, [loading, user]);
 
-  const isAllowedAdmin = !!user && isMasterAdminEmail(user.email);
+  // O admin de visualização também vê a gestão; quem grava confere
+  // `readOnly` (ver `admin-access`).
+  const isAllowedAdmin = !!user && (isMasterAdminEmail(user.email) || user.readOnly);
   const visible = isAllowedAdmin ? orders : user ? byUser(user.email) : [];
 
   return (
@@ -142,7 +145,7 @@ function OrdersPage() {
           </h1>
           {isAllowedAdmin && (
             <span className="rounded-sm border border-[color:var(--gold)] px-2 py-0.5 text-[10px] tracking-luxe uppercase text-[color:var(--gold)]">
-              Admin · {user.name ?? user.email}
+              {user.readOnly ? "Admin · só visualização" : "Admin"} · {user.name ?? user.email}
             </span>
           )}
         </div>
@@ -261,7 +264,8 @@ function AdminDashboard({ orders }: { orders: Order[] }) {
 type NewsletterLead = { id: string; email: string; created_at: string };
 
 function AdminClientsPanel() {
-  const { listCustomers } = useAuth();
+  const { user, listCustomers } = useAuth();
+  const somenteLeitura = !!user?.readOnly;
   const customers = listCustomers();
   const [sub, setSub] = useState<"clientes" | "leads">("clientes");
   const [leads, setLeads] = useState<NewsletterLead[]>([]);
@@ -271,23 +275,27 @@ function AdminClientsPanel() {
     if (sub !== "leads") return;
     let cancelled = false;
     setLoadingLeads(true);
-    void supabase
-      .from("newsletter_subscribers")
-      .select("id, email, created_at")
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        setLoadingLeads(false);
-        if (error) {
-          console.error("[leads] fetch failed", error);
-          return;
-        }
-        setLeads((data ?? []) as NewsletterLead[]);
-      });
+    // Admin de visualização lê pelo servidor (a RLS esconderia os leads).
+    void Promise.resolve(
+      somenteLeitura
+        ? lerTabelaDoPainel<NewsletterLead>("newsletter_subscribers")
+        : supabase
+            .from("newsletter_subscribers")
+            .select("id, email, created_at")
+            .order("created_at", { ascending: false }),
+    ).then(({ data, error }) => {
+      if (cancelled) return;
+      setLoadingLeads(false);
+      if (error) {
+        console.error("[leads] fetch failed", error);
+        return;
+      }
+      setLeads((data ?? []) as NewsletterLead[]);
+    });
     return () => {
       cancelled = true;
     };
-  }, [sub]);
+  }, [sub, somenteLeitura]);
 
   return (
     <div className="mt-10 animate-[fade-in_0.4s_ease-out] space-y-6">

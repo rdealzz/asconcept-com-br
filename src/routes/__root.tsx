@@ -17,6 +17,7 @@ import { AuthProvider } from "../lib/auth-context";
 import { CartProvider } from "../lib/cart-context";
 import { CatalogProvider } from "../lib/catalog-context";
 import { OrdersProvider } from "../lib/orders-context";
+import { SomenteLeituraAviso } from "../components/SomenteLeituraAviso";
 import { WhatsAppFab } from "../components/WhatsAppFab";
 import { CartDrawer } from "../components/CartDrawer";
 import { AuthModal } from "../components/AuthModal";
@@ -208,6 +209,7 @@ function RootComponent() {
               <CartDrawer />
               <AuthModal />
               <WhatsAppFab />
+              <SomenteLeituraAviso />
             </OrdersProvider>
           </CatalogProvider>
         </CartProvider>

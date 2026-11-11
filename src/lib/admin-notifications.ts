@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { detectarCores } from "@/lib/variants";
+import { lerTabelaDoPainel } from "@/lib/admin-viewer";
 
 /**
  * Avisos do administrador.
@@ -135,12 +136,18 @@ export type ListaDeAvisos = {
   erro: string | null;
 };
 
-export async function fetchAdminNotifications(): Promise<ListaDeAvisos> {
-  const { data, error } = await supabase
-    .from("admin_notifications")
-    .select(COLUNAS)
-    .order("created_at", { ascending: false })
-    .limit(LIMITE);
+/**
+ * `peloServidor` é o caminho do admin de visualização: sem o papel `admin` no
+ * banco, a RLS esconderia os avisos (ver `admin-viewer`).
+ */
+export async function fetchAdminNotifications(peloServidor = false): Promise<ListaDeAvisos> {
+  const { data, error } = peloServidor
+    ? await lerTabelaDoPainel<Row>("admin_notifications")
+    : await supabase
+        .from("admin_notifications")
+        .select(COLUNAS)
+        .order("created_at", { ascending: false })
+        .limit(LIMITE);
 
   if (error) {
     // A tabela ausente não é falha: o código sobe antes de a migração rodar, e
@@ -178,7 +185,11 @@ export async function markAllNotificationsRead(): Promise<boolean> {
 }
 
 /** Quantos avisos ainda não foram lidos. Zero também quando a tabela não existe. */
-export async function countUnreadNotifications(): Promise<number> {
+export async function countUnreadNotifications(peloServidor = false): Promise<number> {
+  if (peloServidor) {
+    const r = await fetchAdminNotifications(true);
+    return r.avisos.filter((a) => !a.readAt).length;
+  }
   const { count, error } = await supabase
     .from("admin_notifications")
     .select("id", { count: "exact", head: true })

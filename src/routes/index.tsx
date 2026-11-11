@@ -57,6 +57,7 @@ import {
   MapPin,
   Package,
   Star,
+  Eye,
 } from "lucide-react";
 import { useOrders } from "@/lib/orders-context";
 import { OrigemBadge } from "@/components/OrigemBadge";
@@ -80,6 +81,8 @@ import {
   coerceCategory,
 } from "@/lib/categories";
 import { useAuth } from "@/lib/auth-context";
+import { bloquearSeSomenteLeitura } from "@/lib/admin-access";
+import { lerTabelaDoPainel } from "@/lib/admin-viewer";
 import {
   useCatalog,
   emptyStock,
@@ -1570,6 +1573,7 @@ function AdminEditModal() {
     useCatalog();
   const { tab } = useSearch();
   const isAdmin = useIsAdmin();
+  const { user } = useAuth();
   const isCreate = editingId === "__new__";
   const product =
     !isCreate && editingId ? (products.find((p) => p.id === editingId) ?? null) : null;
@@ -1687,6 +1691,8 @@ function AdminEditModal() {
 
   const onPickFiles = async (fileList: FileList | null) => {
     setUploadError(null);
+    // Foto vai para o Storage na hora de escolher, antes de qualquer "salvar".
+    if (bloquearSeSomenteLeitura(user)) return;
     const files = Array.from(fileList ?? []);
     if (!files.length) return;
 
@@ -3255,8 +3261,11 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
     [orders, filtroOrigem],
   );
 
+  const somenteLeitura = !!user?.readOnly;
+
   const handleDeleteOrder = async () => {
     if (!confirmOrder || !isAdminUser) return;
+    if (bloquearSeSomenteLeitura(user)) return setConfirmOrder(null);
     setDeleting(true);
     setErroExclusao(null);
     try {
@@ -3275,6 +3284,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
 
   const handleDeleteCustomer = async () => {
     if (!confirmCustomer || !isAdminUser) return;
+    if (bloquearSeSomenteLeitura(user)) return setConfirmCustomer(null);
     setDeleting(true);
     setErroExclusao(null);
     try {
@@ -3295,28 +3305,34 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
     }
   };
 
+  // O admin de visualização lê pelo servidor: sem o papel no banco, a RLS
+  // devolveria as listas vazias.
   const loadNewsletter = useCallback(async () => {
-    const { data } = await supabase
-      .from("newsletter_subscribers")
-      .select("id, email, created_at")
-      .order("created_at", { ascending: false });
+    const { data } = somenteLeitura
+      ? await lerTabelaDoPainel<NewsletterRow>("newsletter_subscribers")
+      : await supabase
+          .from("newsletter_subscribers")
+          .select("id, email, created_at")
+          .order("created_at", { ascending: false });
     if (data) setNewsletter(data as NewsletterRow[]);
-  }, []);
+  }, [somenteLeitura]);
   const loadManual = useCallback(async () => {
-    const { data } = await supabase
-      .from("manual_customers")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const { data } = somenteLeitura
+      ? await lerTabelaDoPainel<ManualCustomerRow>("manual_customers")
+      : await supabase
+          .from("manual_customers")
+          .select("*")
+          .order("created_at", { ascending: false });
     if (data) setManual(data as ManualCustomerRow[]);
-  }, []);
+  }, [somenteLeitura]);
 
   useEffect(() => {
     if (open && isAdminUser) {
       void loadNewsletter();
       void loadManual();
-      void countUnreadNotifications().then(setNaoLidos);
+      void countUnreadNotifications(somenteLeitura).then(setNaoLidos);
     }
-  }, [open, isAdminUser, loadNewsletter, loadManual]);
+  }, [open, isAdminUser, somenteLeitura, loadNewsletter, loadManual]);
 
   /**
    * Manda o servidor completar a baixa de pedidos pagos que ficaram para trás e
@@ -3327,6 +3343,8 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
    * avisos não rodada), que a aba trata como "sem varredura", não como erro.
    */
   const reconciliar = useCallback(async (): Promise<number | null> => {
+    // A varredura grava estoque: fica com quem pode gravar.
+    if (somenteLeitura) return null;
     try {
       const r = await reconcileFn();
       if (!r?.ok) return null;
@@ -3336,7 +3354,7 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
       console.error("[admin] reconciliação de estoque falhou", e);
       return null;
     }
-  }, [reconcileFn, refreshStock]);
+  }, [reconcileFn, refreshStock, somenteLeitura]);
 
   if (!open || !isAdminUser) return null;
 
@@ -3373,6 +3391,12 @@ function AdminPanelModal({ open, onClose }: { open: boolean; onClose: () => void
               <Shield className="h-3 w-3" /> Painel Admin · A&amp;S Conccept
             </p>
             <h2 className="mt-1 font-serif text-3xl">Gestão Interna</h2>
+            {somenteLeitura && (
+              <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                <Eye className="h-3.5 w-3.5 text-accent" strokeWidth={1.5} />
+                Acesso de visualização: você vê tudo do painel, mas nada é alterado.
+              </p>
+            )}
           </div>
           <div className="flex gap-1 border-b border-border px-8 overflow-x-auto">
             {tabs.map((t) => (
@@ -4931,6 +4955,7 @@ function ManualCustomerModal({
   onClose: () => void;
   onSaved: () => Promise<void> | void;
 }) {
+  const { user } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -4944,6 +4969,7 @@ function ManualCustomerModal({
       setErr("Informe um e-mail válido.");
       return;
     }
+    if (bloquearSeSomenteLeitura(user)) return;
     setSaving(true);
     const { error } = await supabase.from("manual_customers").insert({
       name: name.trim() || null,
@@ -5134,6 +5160,7 @@ function Stars({ n }: { n: number }) {
 
 function Testimonials() {
   const isAdmin = useIsAdmin();
+  const { user } = useAuth();
   const [rows, setRows] = useState<TestimonialRow[]>([]);
   const [idx, setIdx] = useState(0);
   const [editing, setEditing] = useState<TestimonialRow | null>(null);
@@ -5161,6 +5188,7 @@ function Testimonials() {
   const current = rows[idx % Math.max(1, rows.length)];
 
   const save = async (t: Partial<TestimonialRow> & { id?: string }) => {
+    if (bloquearSeSomenteLeitura(user)) return;
     if (t.id) {
       await supabase
         .from("testimonials")
@@ -5184,6 +5212,7 @@ function Testimonials() {
     await load();
   };
   const remove = async (id: string) => {
+    if (bloquearSeSomenteLeitura(user)) return;
     if (!confirm("Excluir depoimento?")) return;
     await supabase.from("testimonials").delete().eq("id", id);
     await load();

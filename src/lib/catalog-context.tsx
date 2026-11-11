@@ -12,6 +12,8 @@ import type { Product } from "@/lib/cart-context";
 import { coerceCategory, type ProductCategory } from "@/lib/categories";
 import { SIZE_GRIDS } from "@/lib/sizes";
 import { buildGroups, coerceVariant, type VariantGroup, type VariantMeta } from "@/lib/variants";
+import { useAuth } from "@/lib/auth-context";
+import { bloquearSeSomenteLeitura, SOMENTE_LEITURA } from "@/lib/admin-access";
 
 /**
  * Catálogo (Supabase) — extraído de routes/index.tsx para que outras rotas
@@ -233,6 +235,10 @@ export function rowToProduct(r: ProductRow): Product {
 }
 
 export function CatalogProvider({ children }: { children: React.ReactNode }) {
+  // Admin de visualização: toda gravação do catálogo para antes de mexer na
+  // tela — o otimismo local faria a mudança parecer salva.
+  const { user } = useAuth();
+  const somenteLeitura = () => bloquearSeSomenteLeitura(user);
   const [products, setProducts] = useState<Product[]>([]);
   const [stock, setStockMap] = useState<Record<string, SizeStock>>({});
   const [loading, setLoading] = useState(true);
@@ -430,6 +436,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   }, [refreshStock]);
 
   const updateProduct: CatalogCtx["updateProduct"] = async (id, patch) => {
+    if (somenteLeitura()) return;
     const dbPatch: Record<string, unknown> = {};
     if (patch.name !== undefined) dbPatch.name = patch.name;
     if (patch.description !== undefined) dbPatch.description = patch.description;
@@ -477,6 +484,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
    * que houve.
    */
   const saveGroup: CatalogCtx["saveGroup"] = async (entries) => {
+    if (somenteLeitura()) return SOMENTE_LEITURA;
     if (missingColumns.includes("variant")) {
       return "A coluna variant ainda não existe no banco. Rode a migração de variações.";
     }
@@ -519,6 +527,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     aplicarLocal: () => void,
     aoFalhar: string,
   ): Promise<string | null> => {
+    if (somenteLeitura()) return SOMENTE_LEITURA;
     if (!linhas.length) return null;
     aplicarLocal();
 
@@ -596,6 +605,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     );
 
   const setFeatured: CatalogCtx["setFeatured"] = async (id, featured) => {
+    if (somenteLeitura()) return SOMENTE_LEITURA;
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, isFeatured: featured } : p)));
     const { error } = await supabase
       .from("products")
@@ -612,6 +622,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addProduct: CatalogCtx["addProduct"] = async (p, s) => {
+    if (somenteLeitura()) return null;
     const payload = {
       name: p.name,
       description: p.description,
@@ -642,6 +653,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteProduct: CatalogCtx["deleteProduct"] = async (id) => {
+    if (somenteLeitura()) return;
     setProducts((prev) => prev.filter((p) => p.id !== id));
     setStockMap((prev) => {
       const { [id]: _drop, ...rest } = prev;
@@ -655,6 +667,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setStock: CatalogCtx["setStock"] = async (id, s) => {
+    if (somenteLeitura()) return;
     const next = coerceSizeStock(s);
     setStockMap((prev) => ({ ...prev, [id]: next }));
     const { error } = await supabase

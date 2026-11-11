@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { supabase } from "@/integrations/supabase/client";
 import { triggerWelcomeMail } from "./mail";
 import { sanitizeText, sanitizeEmail } from "./sanitize";
+import { isViewerAdminEmail } from "./admin-access";
+import { lerTabelaDoPainel } from "./admin-viewer";
 
 /**
  * E-mail mestre com privilégio administrativo permanente.
@@ -20,6 +22,12 @@ export type AppUser = {
   email: string;
   name?: string;
   isAdmin: boolean;
+  /**
+   * Admin só de visualização: enxerga o painel inteiro, mas nada grava.
+   * `isAdmin` vem `true` junto, para que as telas do painel apareçam; quem
+   * grava confere este campo antes (ver `admin-access`).
+   */
+  readOnly: boolean;
   /**
    * Sessão de convidado — quem está comprando sem ter criado conta.
    *
@@ -131,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Convidado não tem perfil nem papel para buscar: são duas idas ao banco
     // que voltariam vazias em toda navegação de quem está no meio da compra.
     if (isGuest) {
-      setUser({ id: userId, email: "", isAdmin: false, isGuest: true });
+      setUser({ id: userId, email: "", isAdmin: false, readOnly: false, isGuest: true });
       setAddressState(null);
       return;
     }
@@ -144,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         name: prev?.name,
         isAdmin: true,
+        readOnly: false,
         isGuest: false,
       }));
     }
@@ -160,12 +169,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }),
     ]);
     const resolvedEmail = profile?.email ?? email;
+    const fullAdmin = admin || isMasterAdminEmail(resolvedEmail);
+    // Admin de visualização: o e-mail do token (o que o servidor confere) ou o
+    // do perfil. Quem já é admin de verdade continua com tudo liberado.
+    const viewer = !fullAdmin && (isViewerAdminEmail(email) || isViewerAdminEmail(resolvedEmail));
     setUser({
       id: userId,
       email: resolvedEmail,
       name: profile?.name ?? undefined,
       // Bypass permanente para o e-mail mestre, mesmo se a RPC não retornar admin.
-      isAdmin: admin || isMasterAdminEmail(resolvedEmail),
+      isAdmin: fullAdmin || viewer,
+      readOnly: viewer,
       isGuest: false,
     });
     setAddressState((profile?.address as CustomerAddress | null) ?? null);
@@ -237,10 +251,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshCustomers = useCallback(async () => {
     if (!user?.isAdmin) return;
-    const { data } = await supabase
-      .from("profiles")
-      .select("email, name, phone, created_at")
-      .order("created_at", { ascending: false });
+    // O admin de visualização não tem o papel `admin` no banco, então a RLS
+    // devolveria só o próprio perfil: a lista vem pelo servidor.
+    const { data } = user.readOnly
+      ? await lerTabelaDoPainel<{
+          email: string;
+          name: string | null;
+          phone?: string | null;
+          created_at: string;
+        }>("profiles")
+      : await supabase
+          .from("profiles")
+          .select("email, name, phone, created_at")
+          .order("created_at", { ascending: false });
     if (data) {
       setCustomers(
         data.map((r) => ({
@@ -251,7 +274,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })),
       );
     }
-  }, [user?.isAdmin]);
+  }, [user?.isAdmin, user?.readOnly]);
 
   useEffect(() => {
     if (user?.isAdmin) void refreshCustomers();
